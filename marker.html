@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#171311" />
+  <meta name="theme-color" content="#000000" />
   <title>Steak Out | QR Lock AR</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,8 +16,15 @@
 </head>
 <body>
   <div class="marker-shell" id="marker-shell">
-    <header class="marker-hud marker-hud--top">
-      <a class="marker-back" href="./index.html" aria-label="Back to AR preview">←</a>
+    <div class="ar-splash" id="ar-splash" hidden aria-hidden="true">
+      <div class="ar-splash__glow"></div>
+      <img class="ar-splash__logo" id="splash-logo" src="./assets/steakout-logo.webp" alt="" />
+    </div>
+
+    <header class="marker-hud marker-hud--top" id="marker-hud">
+      <a class="marker-logo-home" href="./index.html" aria-label="Back to AR preview">
+        <img src="./assets/steakout-logo.webp" alt="Steak Out" />
+      </a>
       <div class="marker-brand">
         <small>STEAK OUT</small>
         <strong>QR LOCK</strong>
