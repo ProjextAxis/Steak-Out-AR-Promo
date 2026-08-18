@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#171311" />
+  <title>Steak Out | QR Lock AR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Roboto+Slab:wght@800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./marker.css" />
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script defer src="./config.js"></script>
+  <script defer src="./marker.js"></script>
+</head>
+<body>
+  <div class="marker-shell" id="marker-shell">
+    <header class="marker-hud marker-hud--top">
+      <a class="marker-back" href="./index.html" aria-label="Back to AR preview">←</a>
+      <div class="marker-brand">
+        <small>STEAK OUT</small>
+        <strong>QR LOCK</strong>
+      </div>
+      <span class="marker-status" id="marker-status">READY</span>
+    </header>
+
+    <div class="marker-intro" id="marker-intro">
+      <span class="marker-intro__eyebrow">TABLE MARKER TEST</span>
+      <h1>LOCK THE MEAL<br />TO ONE SPOT.</h1>
+      <p>This prototype uses MindAR's sample tracking card until your Steak Out QR ad is finished.</p>
+      <div class="marker-intro__actions">
+        <button id="marker-start" type="button">START CAMERA</button>
+        <a href="./test-target.html" target="_blank" rel="noopener">OPEN TEST MARKER</a>
+      </div>
+      <small>For a phone-only test, print the test marker. Or show it on a second screen.</small>
+    </div>
+
+    <div class="marker-scan-guide" id="marker-scan-guide" hidden>
+      <span class="scan-corners" aria-hidden="true"></span>
+      <strong>POINT AT THE TEST MARKER</strong>
+      <span>The burger will lock to it when detected.</span>
+    </div>
+
+    <div class="marker-size-control" id="marker-size-control" hidden>
+      <span>TEST SIZE</span>
+      <button id="scale-down" type="button" aria-label="Make burger smaller">−</button>
+      <output id="scale-output">100%</output>
+      <button id="scale-up" type="button" aria-label="Make burger larger">+</button>
+    </div>
+
+    <a-scene
+      id="marker-scene"
+      embedded
+      loading-screen="enabled: false"
+      color-space="sRGB"
+      renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false">
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-entity id="marker-anchor" mindar-image-target="targetIndex: 0">
+        <a-gltf-model id="marker-food"></a-gltf-model>
+      </a-entity>
+    </a-scene>
+  </div>
+</body>
+</html>
