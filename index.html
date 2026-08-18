@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#b5121b" />
+  <meta name="description" content="Put Steak Out on your table with an augmented-reality food preview, then order directly through Toast." />
+  <title>Steak Out | View It On Your Table</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Roboto+Slab:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
+  <script defer src="./config.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="top-ribbon" role="note">
+    <span>STEAK OUT · SEWELL, NJ</span>
+    <span class="top-ribbon__dot">•</span>
+    <span>EST. 1982</span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand-lockup" href="https://mysteakout.com/" aria-label="Steak Out home">
+      <span class="brand-lockup__eyebrow">ESTABLISHED 1982</span>
+      <span class="brand-lockup__name">STEAK OUT</span>
+      <span class="brand-lockup__sub">PHILLY STYLE SANDWICHES &amp; PIZZAS</span>
+    </a>
+
+    <a class="header-order" href="https://order.toasttab.com/online/steakout-sewell" data-order-link target="_blank" rel="noopener">
+      ORDER NOW
+    </a>
+  </header>
+
+  <main>
+    <section class="hero shell" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="kicker"><span class="kicker__spark">✦</span> NEW STEAK OUT EXPERIENCE</div>
+
+        <h1 id="hero-title">
+          PUT STEAK OUT<br />
+          <span>ON YOUR TABLE.</span>
+        </h1>
+
+        <p class="hero-lede">
+          Test the Steak Out AR experience two ways: freely place the meal anywhere now, or lock it to a printed table marker for the final promotion.
+        </p>
+
+        <div class="hero-actions">
+          <button class="button button--primary" id="launch-ar-top" type="button">
+            <span class="button__icon" aria-hidden="true">▣</span>
+            VIEW IN AR
+          </button>
+          <a class="button button--ghost" href="https://order.toasttab.com/online/steakout-sewell" data-order-link target="_blank" rel="noopener">
+            ORDER ON TOAST
+          </a>
+        </div>
+
+        <div class="quick-steps" aria-label="How it works">
+          <div class="quick-step">
+            <span class="quick-step__number">1</span>
+            <span><strong>Tap</strong> View in AR</span>
+          </div>
+          <div class="quick-step">
+            <span class="quick-step__number">2</span>
+            <span><strong>Scan</strong> your table</span>
+          </div>
+          <div class="quick-step">
+            <span class="quick-step__number">3</span>
+            <span><strong>Place</strong> the meal</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="viewer-wrap">
+        <div class="viewer-card">
+          <div class="prototype-controls" id="mode-toggle" aria-label="AR prototype mode">
+            <div class="prototype-controls__label">PROTOTYPE MODE</div>
+            <div class="mode-switch" role="group" aria-label="Choose AR mode">
+              <button class="mode-switch__button is-active" type="button" data-ar-mode="free" aria-pressed="true">FREE PLACE</button>
+              <button class="mode-switch__button" type="button" data-ar-mode="marker" aria-pressed="false">QR LOCK</button>
+            </div>
+            <div class="mode-explain">
+              <div>
+                <span class="mode-explain__badge" id="mode-badge">TEST NOW</span>
+                <strong id="mode-title">PLACE IT ANYWHERE</strong>
+              </div>
+              <p id="mode-copy">No printed marker needed. Scan a horizontal surface and drop the test meal wherever you want.</p>
+            </div>
+          </div>
+
+          <div class="viewer-card__topline">
+            <span class="viewer-label">YOUR TABLE PREVIEW</span>
+            <span class="status-pill" id="ar-status">3D READY</span>
+          </div>
+
+          <model-viewer
+            id="meal-viewer"
+            src="https://raw.githubusercontent.com/tommykho/tommykho.github.io/main/assets/models/Burger.glb"
+            alt="Interactive 3D preview model"
+            ar
+            ar-modes="webxr scene-viewer quick-look"
+            ar-placement="floor"
+            ar-scale="auto"
+            camera-controls
+            touch-action="pan-y"
+            auto-rotate
+            rotation-per-second="18deg"
+            shadow-intensity="1.25"
+            shadow-softness="0.85"
+            exposure="1.05"
+            environment-image="neutral"
+            interaction-prompt="auto"
+            loading="eager">
+
+            <button class="model-ar-button" slot="ar-button" type="button">
+              <span aria-hidden="true">▣</span>
+              PUT IT ON MY TABLE
+            </button>
+
+            <div class="ar-prompt" id="ar-prompt" aria-hidden="true">
+              <div class="ar-prompt__phone">▯</div>
+              <span>Move your phone slowly to find the table.</span>
+            </div>
+          </model-viewer>
+
+          <div class="viewer-info">
+            <div>
+              <span class="viewer-info__eyebrow">TEST FOOD MODEL</span>
+              <h2 id="item-name">Test Burger</h2>
+            </div>
+            <div class="viewer-info__scale">
+              <span>TRUE-TO-LIFE</span>
+              <strong>SCALE</strong>
+            </div>
+          </div>
+
+          <div class="prototype-note" id="prototype-note">
+            Temporary cheeseburger asset is active for AR testing. Final launch will use the real Steak Out meal model and exact physical scale.
+          </div>
+        </div>
+
+        <div class="viewer-shadow" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="trust-strip">
+      <div class="shell trust-strip__inner">
+        <span>REAL FOOD</span>
+        <span>•</span>
+        <span>BIG PORTIONS</span>
+        <span>•</span>
+        <span>SEWELL, NJ</span>
+        <span>•</span>
+        <span>ORDER DIRECT</span>
+      </div>
+    </section>
+
+    <section class="how shell" aria-labelledby="how-title">
+      <div class="section-heading">
+        <span class="section-heading__eyebrow">SEE IT BEFORE YOU EAT IT</span>
+        <h2 id="how-title">FROM YOUR SCREEN<br />TO YOUR TABLE.</h2>
+      </div>
+
+      <div class="how-grid">
+        <article class="how-card">
+          <span class="how-card__number">01</span>
+          <h3>Pick the food.</h3>
+          <p>Choose the Steak Out item you want to preview.</p>
+        </article>
+        <article class="how-card how-card--red">
+          <span class="how-card__number">02</span>
+          <h3>Place it in AR.</h3>
+          <p>Use Free Place now, then switch to QR Lock when the printed Steak Out table marker is ready.</p>
+        </article>
+        <article class="how-card">
+          <span class="how-card__number">03</span>
+          <h3>Make it real.</h3>
+          <p>Jump straight to Toast and order when the craving wins.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="order-band">
+      <div class="shell order-band__inner">
+        <div>
+          <span class="order-band__eyebrow">LIKE WHAT YOU SEE?</span>
+          <h2>MAKE IT REAL.</h2>
+        </div>
+        <a class="button button--cream" href="https://order.toasttab.com/online/steakout-sewell" data-order-link target="_blank" rel="noopener">
+          ORDER STEAK OUT
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell site-footer__inner">
+      <div>
+        <strong>STEAK OUT</strong>
+        <span>641 Woodbury Glassboro Rd · Sewell, NJ 08080</span>
+      </div>
+      <a href="https://mysteakout.com/">MySteakOut.com</a>
+    </div>
+  </footer>
+
+  <div class="mobile-dock" aria-label="Quick actions">
+    <button class="mobile-dock__ar" id="launch-ar-mobile" type="button">VIEW IN AR</button>
+    <a href="https://order.toasttab.com/online/steakout-sewell" data-order-link target="_blank" rel="noopener">ORDER</a>
+  </div>
+
+  <noscript>
+    <div class="noscript">JavaScript is required to launch the AR preview.</div>
+  </noscript>
+</body>
+</html>
