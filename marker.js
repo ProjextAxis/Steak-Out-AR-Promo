@@ -9,6 +9,7 @@
   const guide = document.querySelector('#marker-scan-guide');
   const sizeControl = document.querySelector('#marker-size-control');
   const status = document.querySelector('#marker-status');
+  const splash = document.querySelector('#ar-splash');
   const down = document.querySelector('#scale-down');
   const up = document.querySelector('#scale-up');
   const scaleOutput = document.querySelector('#scale-output');
@@ -46,20 +47,43 @@
     return scene.systems['mindar-image-system'];
   };
 
+  const showSplash = () => {
+    if (!splash) return;
+    splash.hidden = false;
+    splash.classList.remove('is-live', 'is-revealing');
+    void splash.offsetWidth;
+    splash.classList.add('is-live');
+  };
+
+  const revealCamera = async () => {
+    if (!splash) return;
+    splash.classList.add('is-revealing');
+    await new Promise((resolve) => setTimeout(resolve, 620));
+    splash.hidden = true;
+    splash.classList.remove('is-live', 'is-revealing');
+  };
+
   const start = async () => {
     try {
       setStatus('STARTING', 'busy');
       intro.hidden = true;
-      guide.hidden = false;
-      sizeControl.hidden = false;
+      guide.hidden = true;
+      sizeControl.hidden = true;
+      showSplash();
 
+      const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1050));
       const arSystem = await getArSystem();
       if (!arSystem) throw new Error('MindAR image system failed to initialize.');
 
       await arSystem.start();
+      await minSplashTime;
       setStatus('SCANNING', 'busy');
+      guide.hidden = false;
+      sizeControl.hidden = false;
+      await revealCamera();
     } catch (error) {
       console.error(error);
+      if (splash) splash.hidden = true;
       setStatus('CAMERA ERROR', 'error');
       intro.hidden = false;
       guide.hidden = true;
