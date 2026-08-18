@@ -13,7 +13,7 @@
   const up = document.querySelector('#scale-up');
   const scaleOutput = document.querySelector('#scale-output');
 
-  if (!scene || !anchor || !food) return;
+  if (!scene || !anchor || !food || !startButton) return;
 
   let scale = Number(markerConfig.modelScale || 0.32);
   const initialScale = scale;
@@ -22,15 +22,14 @@
   const step = Number(markerConfig.scaleStep || 0.04);
 
   const setStatus = (label, state = '') => {
+    if (!status) return;
     status.textContent = label;
     status.dataset.state = state;
   };
 
   const applyScale = () => {
-    const value = `${scale} ${scale} ${scale}`;
-    food.setAttribute('scale', value);
-    const percent = Math.round((scale / initialScale) * 100);
-    scaleOutput.textContent = `${percent}%`;
+    food.setAttribute('scale', `${scale} ${scale} ${scale}`);
+    if (scaleOutput) scaleOutput.textContent = `${Math.round((scale / initialScale) * 100)}%`;
   };
 
   const clampScale = (next) => Math.min(maxScale, Math.max(minScale, next));
@@ -40,16 +39,12 @@
   food.setAttribute('rotation', markerConfig.modelRotation || '90 0 0');
   applyScale();
 
-  const mindarOptions = [
-    `imageTargetSrc: ${markerConfig.targetMindUrl}`,
-    'autoStart: false',
-    'uiScanning: no',
-    'uiLoading: no',
-    'uiError: no',
-    'filterMinCF: 0.001',
-    'filterBeta: 10'
-  ].join('; ');
-  scene.setAttribute('mindar-image', mindarOptions);
+  const getArSystem = async () => {
+    if (!scene.hasLoaded) {
+      await new Promise((resolve) => scene.addEventListener('loaded', resolve, { once: true }));
+    }
+    return scene.systems['mindar-image-system'];
+  };
 
   const start = async () => {
     try {
@@ -58,11 +53,10 @@
       guide.hidden = false;
       sizeControl.hidden = false;
 
-      if (!scene.systems['mindar-image-system']) {
-        await new Promise((resolve) => scene.addEventListener('loaded', resolve, { once: true }));
-      }
+      const arSystem = await getArSystem();
+      if (!arSystem) throw new Error('MindAR image system failed to initialize.');
 
-      await scene.systems['mindar-image-system'].start();
+      await arSystem.start();
       setStatus('SCANNING', 'busy');
     } catch (error) {
       console.error(error);
@@ -85,12 +79,12 @@
     guide.querySelector('span:last-child').textContent = 'Keep the full printed target visible and reduce glare on the glass.';
   });
 
-  down.addEventListener('click', () => {
+  down?.addEventListener('click', () => {
     scale = clampScale(Number((scale - step).toFixed(3)));
     applyScale();
   });
 
-  up.addEventListener('click', () => {
+  up?.addEventListener('click', () => {
     scale = clampScale(Number((scale + step).toFixed(3)));
     applyScale();
   });
