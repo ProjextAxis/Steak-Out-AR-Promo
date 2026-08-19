@@ -10,12 +10,12 @@ window.STEAKOUT_AR_CONFIG = {
     facebookUrl: 'https://www.facebook.com/SteakOutSewellNJ/'
   },
 
-  // Keep FREE PLACE as the default while testing the final Steak Out model.
-  defaultMode: 'free',
+  // The branded in-browser Steak Out camera experience is the primary flow.
+  // FREE PLACE stays available only as a developer/test option.
+  defaultMode: 'marker',
   showModeToggle: true,
 
   freePlace: {
-    // Allow pinch/resize while the real-world serving scale is being tuned.
     arScale: 'auto'
   },
 
@@ -26,7 +26,6 @@ window.STEAKOUT_AR_CONFIG = {
     targetMindUrl: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind',
     targetPreviewUrl: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.png',
 
-    // A-Frame/MindAR transforms for the Steak Out food model during testing.
     modelPosition: '0 0 0.12',
     modelRotation: '90 0 0',
     modelScale: 0.32,
