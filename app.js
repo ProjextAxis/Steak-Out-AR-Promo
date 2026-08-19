@@ -6,6 +6,54 @@
   const modeCopy = document.querySelector('#mode-copy');
   const splash = document.querySelector('#ar-splash');
   const launchButtons = [document.querySelector('#launch-ar-top')].filter(Boolean);
+  const announcementCopy = document.querySelector('.announcement__copy');
+  const announcementDots = [...document.querySelectorAll('.announcement__dots span')];
+
+  const announcementMessages = [
+    'Gift Cards Available In-Store Now!',
+    'No Gift Idea? Give The Steak Out Experience'
+  ];
+
+  let announcementIndex = 0;
+
+  const renderAnnouncement = (index, animate = true) => {
+    if (!announcementCopy || announcementDots.length !== announcementMessages.length) return;
+
+    const update = () => {
+      announcementIndex = index;
+      announcementCopy.textContent = announcementMessages[index];
+      announcementDots.forEach((dot, dotIndex) => {
+        dot.style.background = dotIndex === index
+          ? 'var(--white)'
+          : 'rgba(255,255,255,.42)';
+      });
+    };
+
+    if (!animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      update();
+      return;
+    }
+
+    const fadeOut = announcementCopy.animate(
+      [{ opacity: 1 }, { opacity: 0 }],
+      { duration: 180, easing: 'ease', fill: 'forwards' }
+    );
+
+    fadeOut.finished.then(() => {
+      update();
+      announcementCopy.animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        { duration: 180, easing: 'ease', fill: 'forwards' }
+      );
+    });
+  };
+
+  if (announcementCopy && announcementDots.length === announcementMessages.length) {
+    renderAnnouncement(announcementIndex, false);
+    window.setInterval(() => {
+      renderAnnouncement((announcementIndex + 1) % announcementMessages.length);
+    }, 5000);
+  }
 
   const config = window.STEAKOUT_AR_CONFIG || {};
   let activeMode = config.defaultMode === 'marker' ? 'marker' : 'free';
