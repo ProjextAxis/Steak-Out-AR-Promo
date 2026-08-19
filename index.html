@@ -13,11 +13,11 @@
   <link href="https://fonts.cdnfonts.com/css/rustler" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css?v=20260819-banner-swipe-cart" />
   <link rel="stylesheet" href="./header-enhancements.css?v=20260819-nav-align" />
-  <link rel="stylesheet" href="./ar-flow.css?v=20260819-three-step-flow" />
+  <link rel="stylesheet" href="./ar-flow.css?v=20260819-sales-funnel" />
 
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
   <script defer src="./config.js"></script>
-  <script defer src="./app.js?v=20260819-three-step-flow"></script>
+  <script defer src="./app.js?v=20260819-sales-funnel"></script>
 </head>
 <body>
   <div class="announcement">
@@ -64,73 +64,25 @@
 
   <main>
     <section class="ar-hero">
-      <div class="hero-label">$12 LUNCH SPECIALS</div>
-      <h1>SEE IT ON<br />THIS TABLE.</h1>
-
-      <div class="ar-flow" role="list" aria-label="How to preview a lunch special in augmented reality">
-        <div class="ar-step" role="listitem">
-          <div class="ar-step__circle">
-            <span class="ar-step__number">1</span>
-            <svg class="ar-step__icon" viewBox="0 0 48 48" aria-hidden="true">
-              <path d="M20 24V12a4 4 0 0 1 8 0v12" />
-              <path d="M28 22a4 4 0 0 1 8 0v4" />
-              <path d="M36 24a4 4 0 0 1 8 0v7c0 7-5 12-12 12h-5c-4 0-7-2-9-5L9 25a4 4 0 0 1 6-5l5 4" />
-              <path d="M11 13a11 11 0 0 1 5-9" />
-              <path d="M9 21a17 17 0 0 1 1-13" />
-            </svg>
-          </div>
-          <span class="ar-step__label">TAP VIEW IN AR</span>
-        </div>
-
-        <span class="ar-flow__connector" aria-hidden="true"></span>
-
-        <div class="ar-step" role="listitem">
-          <div class="ar-step__circle">
-            <span class="ar-step__number">2</span>
-            <svg class="ar-step__icon" viewBox="0 0 48 48" aria-hidden="true">
-              <rect x="11" y="5" width="26" height="38" rx="4" />
-              <path d="M20 9h8" />
-              <rect x="16" y="15" width="6" height="6" />
-              <rect x="27" y="15" width="5" height="5" />
-              <rect x="16" y="26" width="5" height="5" />
-              <path d="M26 25h6v7h-3v-3h-3zM21 21h5v5h-5z" />
-              <path d="M21 38h6" />
-            </svg>
-          </div>
-          <span class="ar-step__label">POINT BACK AT<br />THE TABLE GRAPHIC</span>
-        </div>
-
-        <span class="ar-flow__connector" aria-hidden="true"></span>
-
-        <div class="ar-step" role="listitem">
-          <div class="ar-step__circle">
-            <span class="ar-step__number">3</span>
-            <svg class="ar-step__icon" viewBox="0 0 48 48" aria-hidden="true">
-              <path d="M7 18V8h10M31 8h10v10M41 30v10H31M17 40H7V30" />
-              <rect x="17" y="17" width="6" height="6" />
-              <rect x="27" y="17" width="5" height="5" />
-              <rect x="17" y="27" width="5" height="5" />
-              <path d="M27 27h5v5h-5zM22 22h5v5h-5z" />
-            </svg>
-          </div>
-          <span class="ar-step__label">KEEP IT IN FRAME</span>
-        </div>
-      </div>
-
-      <div class="ar-result" aria-label="Your lunch appears directly over the table graphic">
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M10 22c1-8 6-12 14-12s13 4 14 12H10z" />
-          <path d="M8 27h32M10 32h28M12 37h24" />
-          <path d="M37 7v6M34 10h6" />
-        </svg>
-        <span>YOUR LUNCH APPEARS RIGHT HERE</span>
-        <span class="ar-result__arrow" aria-hidden="true">↓</span>
-      </div>
+      <div class="offer-window">MONDAY–FRIDAY • 10 AM–3 PM</div>
+      <h1 class="offer-headline">
+        <span class="offer-price">$12</span>
+        <span class="offer-name">LUNCH SPECIALS</span>
+      </h1>
+      <div class="offer-hook">SEE WHAT YOU GET.</div>
+      <p class="offer-promise">Preview the portion right on this table before you order.</p>
 
       <p class="offer-details">
-        <span>MONDAY–FRIDAY • 10 AM–3 PM</span>
         <span>DINE IN • TAKE OUT • DELIVERY</span>
       </p>
+
+      <button
+        class="primary-ar-button ar-launch-button"
+        id="launch-ar-top"
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded="false"
+        aria-controls="ar-guide">VIEW IN AR</button>
 
       <div class="viewer-shell">
         <div class="viewer-status" id="ar-status">3D READY</div>
@@ -169,8 +121,62 @@
     </details>
   </main>
 
+  <dialog class="ar-guide" id="ar-guide" aria-labelledby="ar-guide-title">
+    <section class="ar-guide__sheet">
+      <button class="ar-guide__close" type="button" data-guide-close aria-label="Close AR instructions">×</button>
+      <div class="ar-guide__kicker">VIEW IN AR</div>
+      <h2 id="ar-guide-title">POINT BACK AT THIS TABLE.</h2>
+      <p class="ar-guide__intro">Keep the tabletop graphic you scanned in frame. Your $12 lunch preview will appear directly over it.</p>
+
+      <div class="ar-guide__steps" role="list" aria-label="AR placement instructions">
+        <div class="ar-guide-step" role="listitem">
+          <div class="ar-guide-step__icon">
+            <span>1</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="11" y="5" width="26" height="38" rx="4" />
+              <path d="M20 9h8M21 38h6" />
+              <rect x="16" y="15" width="6" height="6" />
+              <rect x="27" y="15" width="5" height="5" />
+              <rect x="16" y="26" width="5" height="5" />
+              <path d="M26 25h6v7h-3v-3h-3zM21 21h5v5h-5z" />
+            </svg>
+          </div>
+          <strong>POINT BACK AT THE TABLE GRAPHIC</strong>
+        </div>
+
+        <span class="ar-guide__arrow" aria-hidden="true">→</span>
+
+        <div class="ar-guide-step" role="listitem">
+          <div class="ar-guide-step__icon">
+            <span>2</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M7 18V8h10M31 8h10v10M41 30v10H31M17 40H7V30" />
+              <rect x="17" y="17" width="6" height="6" />
+              <rect x="27" y="17" width="5" height="5" />
+              <rect x="17" y="27" width="5" height="5" />
+              <path d="M27 27h5v5h-5zM22 22h5v5h-5z" />
+            </svg>
+          </div>
+          <strong>KEEP IT IN FRAME</strong>
+        </div>
+      </div>
+
+      <div class="ar-guide__result">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M10 22c1-8 6-12 14-12s13 4 14 12H10z" />
+          <path d="M8 27h32M10 32h28M12 37h24" />
+          <path d="M37 7v6M34 10h6" />
+        </svg>
+        <span>YOUR LUNCH APPEARS OVER THE GRAPHIC</span>
+      </div>
+
+      <button class="ar-guide__start" id="ar-guide-start" type="button">START AR</button>
+      <button class="ar-guide__cancel" type="button" data-guide-close>NOT NOW</button>
+    </section>
+  </dialog>
+
   <div class="bottom-order-bar">
-    <a href="#meal-viewer" id="sticky-action" data-action="ar" aria-label="View the lunch special in augmented reality">VIEW IN AR</a>
+    <a href="https://order.toasttab.com/online/steakout-sewell" data-order-link>ORDER NOW</a>
   </div>
 
   <div class="ar-splash" id="ar-splash" aria-hidden="true">
