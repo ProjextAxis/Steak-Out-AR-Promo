@@ -685,3 +685,403 @@ a {
   border-radius: 50%;
   font: 700 15px/12px Arial, sans-serif;
 }
+
+/* Customer AR camera UI */
+.marker-hud {
+  left: max(10px,env(safe-area-inset-left));
+  right: max(10px,env(safe-area-inset-right));
+  top: max(10px,env(safe-area-inset-top));
+  min-height: 82px;
+  padding: 11px 14px;
+  grid-template-columns: 54px minmax(0,1fr) auto;
+  gap: 11px;
+  background: rgba(12,12,12,.86);
+  border: 1px solid rgba(255,255,255,.25);
+  box-shadow: 0 16px 42px rgba(0,0,0,.25);
+}
+
+.marker-logo-home,
+.marker-logo-home img {
+  width: 50px;
+  height: 50px;
+}
+
+.marker-brand {
+  gap: 7px;
+}
+
+.marker-brand strong {
+  gap: 9px;
+  font-size: clamp(20px,5.6vw,27px);
+  letter-spacing: -.025em;
+}
+
+.marker-brand strong b {
+  padding: 6px 7px 5px;
+  font-size: 15px;
+}
+
+.marker-brand small {
+  color: #f1b82f;
+  font-size: clamp(10px,2.8vw,13px);
+  letter-spacing: .13em;
+}
+
+.marker-social {
+  position: static;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  padding: 4px;
+  gap: 3px;
+  flex: 0 0 auto;
+  background: rgba(11,11,11,.68);
+  border-color: rgba(255,255,255,.24);
+  box-shadow: none;
+}
+
+.marker-social a {
+  width: 40px;
+  height: 40px;
+}
+
+.marker-social svg {
+  width: 23px;
+  height: 23px;
+}
+
+.marker-scan-guide {
+  left: 50%;
+  top: calc(max(10px,env(safe-area-inset-top)) + 112px);
+  width: min(calc(100vw - 88px),520px);
+  height: clamp(250px,40dvh,500px);
+  aspect-ratio: auto;
+  transform: translateX(-50%);
+}
+
+.marker-scan-guide.is-found {
+  transform: translateX(-50%) scale(.96);
+}
+
+.scan-corners {
+  border-color: rgba(255,255,255,.3);
+}
+
+.scan-corners::before,
+.scan-corners::after {
+  background:
+    linear-gradient(var(--red),var(--red)) left top/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) left top/5px 48px no-repeat,
+    linear-gradient(var(--red),var(--red)) right top/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) right top/5px 48px no-repeat,
+    linear-gradient(var(--red),var(--red)) left bottom/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) left bottom/5px 48px no-repeat,
+    linear-gradient(var(--red),var(--red)) right bottom/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) right bottom/5px 48px no-repeat;
+}
+
+.marker-instruction {
+  left: max(16px,env(safe-area-inset-left));
+  right: max(16px,env(safe-area-inset-right));
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  min-height: 268px;
+  padding: 16px 17px 62px;
+  color: #fff;
+  background: rgba(13,13,13,.9);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 22px;
+  box-shadow: 0 22px 58px rgba(0,0,0,.48);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.marker-progress {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(10px,24px) minmax(0,1fr) minmax(10px,24px) minmax(0,1fr) minmax(10px,24px) minmax(0,1fr);
+  align-items: start;
+}
+
+.marker-progress__step {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.marker-progress__circle {
+  position: relative;
+  width: clamp(54px,16vw,74px);
+  height: clamp(54px,16vw,74px);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(5,5,5,.88);
+  border: 2px solid var(--red);
+  border-radius: 50%;
+  transition: color .22s ease, background .22s ease, border-color .22s ease, transform .22s ease;
+}
+
+.marker-progress__number {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  color: #fff;
+  font: 800 11px/1 Arial,sans-serif;
+  transform: translateX(-50%);
+}
+
+.marker-progress__circle svg {
+  width: clamp(28px,8vw,38px);
+  height: clamp(28px,8vw,38px);
+  margin-top: 8px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marker-progress__step > strong {
+  max-width: 92px;
+  margin-top: 9px;
+  color: #fff;
+  font: 900 clamp(10px,2.8vw,13px)/1.05 var(--display);
+  letter-spacing: .02em;
+}
+
+.marker-progress__line {
+  height: 2px;
+  margin-top: clamp(27px,8vw,37px);
+  background: var(--red);
+  opacity: .95;
+}
+
+.marker-progress__step[data-state="active"] .marker-progress__circle {
+  background: #c91f2c;
+  border-color: #c91f2c;
+  box-shadow: 0 0 0 3px rgba(201,31,44,.13), 0 10px 24px rgba(181,18,27,.28);
+  transform: scale(1.04);
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__circle {
+  color: rgba(255,255,255,.82);
+  background: rgba(22,14,14,.88);
+  border-color: rgba(181,18,27,.7);
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__number {
+  color: var(--red);
+  font-size: 0;
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__number::after {
+  content: '✓';
+  font: 900 12px/1 Arial,sans-serif;
+}
+
+.marker-progress__step[data-state="upcoming"] {
+  opacity: .9;
+}
+
+.marker-instruction__copy {
+  margin-top: 18px;
+  padding: 0 4px;
+  gap: 7px;
+}
+
+.marker-instruction .marker-instruction__copy > strong {
+  max-width: 100%;
+  color: #fff;
+  font: 900 clamp(25px,7vw,35px)/.95 var(--display);
+  letter-spacing: .012em;
+}
+
+.marker-instruction__body {
+  max-width: 475px;
+  color: rgba(255,255,255,.86);
+  font: 600 clamp(12px,3.4vw,15px)/1.35 Arial,sans-serif;
+}
+
+.marker-instruction .marker-status {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  min-height: 38px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  background: rgba(25,22,21,.9);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  font: 900 15px/1 var(--display);
+  letter-spacing: .08em;
+}
+
+.marker-instruction .marker-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  background: #d31f2e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(211,31,46,.12);
+}
+
+.marker-instruction .marker-status[data-state="active"] {
+  color: #fff;
+  background: rgba(25,22,21,.9);
+}
+
+.marker-instruction .marker-status[data-state="active"]::before {
+  background: #bfe76d;
+  box-shadow: 0 0 0 3px rgba(191,231,109,.12);
+}
+
+.marker-instruction .marker-status[data-state="error"] {
+  color: #fff;
+  background: rgba(105,12,19,.94);
+}
+
+.marker-order {
+  left: max(16px,env(safe-area-inset-left));
+  right: max(16px,env(safe-area-inset-right));
+  bottom: max(10px,env(safe-area-inset-bottom));
+  max-width: 640px;
+  min-height: 64px;
+  background: #c91f2c;
+  font-size: clamp(31px,8.6vw,40px);
+}
+
+@media (max-width:390px) {
+  .marker-hud {
+    min-height: 74px;
+    padding: 9px 10px;
+    grid-template-columns: 46px minmax(0,1fr) auto;
+    gap: 8px;
+  }
+
+  .marker-logo-home,
+  .marker-logo-home img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .marker-brand {
+    gap: 5px;
+  }
+
+  .marker-brand strong {
+    gap: 6px;
+    font-size: clamp(17px,5vw,21px);
+  }
+
+  .marker-brand strong b {
+    padding: 5px 6px 4px;
+    font-size: 12px;
+  }
+
+  .marker-brand small {
+    font-size: clamp(8px,2.5vw,10px);
+  }
+
+  .marker-social a {
+    width: 34px;
+    height: 34px;
+  }
+
+  .marker-social svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .marker-scan-guide {
+    top: calc(max(10px,env(safe-area-inset-top)) + 101px);
+    width: calc(100vw - 72px);
+  }
+
+  .marker-instruction {
+    left: max(10px,env(safe-area-inset-left));
+    right: max(10px,env(safe-area-inset-right));
+    padding-inline: 12px;
+  }
+
+  .marker-progress {
+    grid-template-columns: minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr);
+  }
+
+  .marker-progress__step > strong {
+    font-size: clamp(9px,2.7vw,11px);
+  }
+}
+
+@media (max-height:720px) {
+  .marker-hud {
+    top: max(7px,env(safe-area-inset-top));
+    min-height: 70px;
+  }
+
+  .marker-scan-guide {
+    top: calc(max(7px,env(safe-area-inset-top)) + 91px);
+    height: clamp(190px,31dvh,250px);
+  }
+
+  .marker-instruction {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    min-height: 224px;
+    padding-top: 11px;
+    padding-bottom: 49px;
+  }
+
+  .marker-progress__circle {
+    width: clamp(48px,14vw,58px);
+    height: clamp(48px,14vw,58px);
+  }
+
+  .marker-progress__circle svg {
+    width: clamp(25px,7vw,31px);
+    height: clamp(25px,7vw,31px);
+  }
+
+  .marker-progress__line {
+    margin-top: clamp(24px,7vw,29px);
+  }
+
+  .marker-progress__step > strong {
+    margin-top: 6px;
+  }
+
+  .marker-instruction__copy {
+    margin-top: 11px;
+  }
+
+  .marker-instruction .marker-instruction__copy > strong {
+    font-size: clamp(22px,6.2vw,28px);
+  }
+
+  .marker-instruction__body {
+    display: block;
+    font-size: 12px;
+  }
+
+  .marker-instruction .marker-status {
+    min-height: 32px;
+    bottom: 10px;
+    font-size: 12px;
+  }
+
+  .marker-order {
+    min-height: 56px;
+    font-size: 30px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .marker-progress__circle {
+    transition: none;
+  }
+}

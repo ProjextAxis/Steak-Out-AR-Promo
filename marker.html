@@ -10,11 +10,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Roboto+Slab:wght@800;900&display=swap" rel="stylesheet" />
   <link href="https://fonts.cdnfonts.com/css/rustler" rel="stylesheet" />
-  <link rel="stylesheet" href="./marker.css?v=20260819-integrated-ar" />
+  <link rel="stylesheet" href="./marker.css?v=20260819-progress-ui" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <script defer src="./config.js?v=20260819-integrated-ar"></script>
-  <script defer src="./marker.js?v=20260819-integrated-ar"></script>
+  <script defer src="./config.js?v=20260819-progress-ui"></script>
+  <script defer src="./marker.js?v=20260819-progress-ui"></script>
 </head>
 <body>
   <div class="marker-shell" id="marker-shell">
@@ -31,7 +31,20 @@
         <strong><span>STEAK OUT</span><b>AR</b></strong>
         <small>$12 LUNCH PREVIEW</small>
       </div>
-      <span class="marker-status" id="marker-status">READY</span>
+      <nav class="marker-social" id="marker-social" aria-label="Follow Steak Out" hidden>
+        <a id="marker-instagram" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="5" />
+            <circle cx="12" cy="12" r="4.1" />
+            <circle class="social-icon-fill" cx="17.5" cy="6.7" r="1.1" />
+          </svg>
+        </a>
+        <a id="marker-facebook" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Facebook">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="social-icon-fill" d="M14.3 8.2V6.6c0-.8.5-1 1-1h2.5V2.1L14.6 2C11.4 2 9.9 3.9 9.9 6.3v1.9H7v4h2.9V22h4.4v-9.8h3.2l.5-4h-3.7Z" />
+          </svg>
+        </a>
+      </nav>
     </header>
 
     <div class="marker-intro" id="marker-intro">
@@ -53,52 +66,76 @@
       class="marker-instruction"
       id="marker-instruction"
       data-state="scanning"
+      data-current-step="2"
       role="status"
       aria-live="polite"
       hidden>
-      <button
-        class="marker-instruction__surface"
-        id="marker-instruction-toggle"
-        type="button"
-        aria-label="Show full AR instructions"
-        aria-expanded="true">
-        <span class="marker-instruction__icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48">
-            <path class="marker-instruction__frame" d="M5 17V7a2 2 0 0 1 2-2h10M31 5h10a2 2 0 0 1 2 2v10M43 31v10a2 2 0 0 1-2 2H31M17 43H7a2 2 0 0 1-2-2V31" />
-            <path class="marker-instruction__qr" d="M14 14h8v8h-8zm12 0h8v8h-8zM14 26h8v8h-8zm13 0h3v3h-3zm4 0h3v8h-3zm-4 5h3v3h-3z" />
-            <path class="marker-instruction__check" d="m14 25 7 7 14-16" />
-          </svg>
-        </span>
-        <span class="marker-instruction__copy">
-          <span class="marker-instruction__eyebrow" id="marker-instruction-eyebrow">1 · VIEW IN AR</span>
-          <strong id="marker-instruction-title">POINT BACK AT THE TABLE GRAPHIC</strong>
-          <span class="marker-instruction__body" id="marker-instruction-body">Keep the full graphic in frame. Your $12 lunch will appear here.</span>
-        </span>
-        <span class="marker-instruction__chevron" aria-hidden="true">⌃</span>
-      </button>
+      <div class="marker-progress" id="marker-progress" role="list" aria-label="AR preview progress">
+        <div class="marker-progress__step" data-step="1" data-state="complete" role="listitem">
+          <span class="marker-progress__circle">
+            <span class="marker-progress__number">1</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M18 24V13a3 3 0 0 1 6 0v8-11a3 3 0 0 1 6 0v11-8a3 3 0 0 1 6 0v12-7a3 3 0 0 1 6 0v11c0 8-6 14-14 14h-2c-6 0-10-3-13-8l-5-8a3.5 3.5 0 0 1 6-3l4 6Z" />
+              <path d="M8 12c1-3 3-5 6-7M9 19c-3-1-5-3-7-6" />
+            </svg>
+          </span>
+          <strong>VIEW IN AR</strong>
+        </div>
+
+        <span class="marker-progress__line" aria-hidden="true"></span>
+
+        <div class="marker-progress__step" data-step="2" data-state="active" role="listitem">
+          <span class="marker-progress__circle">
+            <span class="marker-progress__number">2</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="11" y="5" width="26" height="38" rx="4" />
+              <path d="M20 9h8M21 38h6" />
+              <rect x="16" y="15" width="6" height="6" />
+              <rect x="27" y="15" width="5" height="5" />
+              <rect x="16" y="26" width="5" height="5" />
+              <path d="M26 25h6v7h-3v-3h-3zM21 21h5v5h-5z" />
+            </svg>
+          </span>
+          <strong>AIM AT QR</strong>
+        </div>
+
+        <span class="marker-progress__line" aria-hidden="true"></span>
+
+        <div class="marker-progress__step" data-step="3" data-state="upcoming" role="listitem">
+          <span class="marker-progress__circle">
+            <span class="marker-progress__number">3</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M7 18V8h10M31 8h10v10M41 30v10H31M17 40H7V30" />
+              <rect x="17" y="17" width="6" height="6" />
+              <rect x="27" y="17" width="5" height="5" />
+              <rect x="17" y="27" width="5" height="5" />
+              <path d="M27 27h5v5h-5zM22 22h5v5h-5z" />
+            </svg>
+          </span>
+          <strong>KEEP IN FRAME</strong>
+        </div>
+
+        <span class="marker-progress__line" aria-hidden="true"></span>
+
+        <div class="marker-progress__step" data-step="4" data-state="upcoming" role="listitem">
+          <span class="marker-progress__circle">
+            <span class="marker-progress__number">4</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M10 22c1-8 6-12 14-12s13 4 14 12H10zM8 27h32M10 32h28M12 37h24" />
+              <path d="M38 5v7M34.5 8.5h7M8 7v5M5.5 9.5h5" />
+            </svg>
+          </span>
+          <strong>MEAL APPEARS</strong>
+        </div>
+      </div>
+
+      <div class="marker-instruction__copy">
+        <strong id="marker-instruction-title">POINT BACK AT THE TABLE GRAPHIC</strong>
+        <span class="marker-instruction__body" id="marker-instruction-body">Keep the full graphic in frame. Your $12 lunch will appear here.</span>
+      </div>
+
+      <span class="marker-status" id="marker-status" data-state="busy">SCANNING</span>
     </aside>
-
-    <div class="marker-size-control" id="marker-size-control" hidden>
-      <span>TEST SIZE</span>
-      <button id="scale-down" type="button" aria-label="Make burger smaller">−</button>
-      <output id="scale-output">100%</output>
-      <button id="scale-up" type="button" aria-label="Make burger larger">+</button>
-    </div>
-
-    <nav class="marker-social" id="marker-social" aria-label="Follow Steak Out" hidden>
-      <a id="marker-instagram" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Instagram">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="3" width="18" height="18" rx="5" />
-          <circle cx="12" cy="12" r="4.1" />
-          <circle class="social-icon-fill" cx="17.5" cy="6.7" r="1.1" />
-        </svg>
-      </a>
-      <a id="marker-facebook" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Facebook">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path class="social-icon-fill" d="M14.3 8.2V6.6c0-.8.5-1 1-1h2.5V2.1L14.6 2C11.4 2 9.9 3.9 9.9 6.3v1.9H7v4h2.9V22h4.4v-9.8h3.2l.5-4h-3.7Z" />
-        </svg>
-      </a>
-    </nav>
 
     <a class="marker-order" id="marker-order" href="#" hidden>ORDER NOW</a>
 

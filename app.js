@@ -161,7 +161,14 @@
     browserARLayer.classList.add('is-open');
     browserARLayer.setAttribute('aria-hidden', 'false');
     document.body.classList.add('browser-ar-open');
-    if (browserARLoading) browserARLoading.hidden = browserARFrameReady;
+    if (browserARLoading) {
+      browserARLoading.hidden = browserARFrameReady;
+      if (!browserARFrameReady) {
+        browserARLoading.classList.remove('is-active');
+        void browserARLoading.offsetWidth;
+        browserARLoading.classList.add('is-active');
+      }
+    }
     loadBrowserAR();
 
     if (browserARFrameReady) postToBrowserAR('steakout-ar-start');

@@ -9,34 +9,25 @@
   const intro = document.querySelector('#marker-intro');
   const guide = document.querySelector('#marker-scan-guide');
   const instruction = document.querySelector('#marker-instruction');
-  const instructionToggle = document.querySelector('#marker-instruction-toggle');
-  const instructionEyebrow = document.querySelector('#marker-instruction-eyebrow');
   const instructionTitle = document.querySelector('#marker-instruction-title');
   const instructionBody = document.querySelector('#marker-instruction-body');
-  const sizeControl = document.querySelector('#marker-size-control');
+  const progressSteps = [...document.querySelectorAll('.marker-progress__step')];
   const socialDock = document.querySelector('#marker-social');
   const instagramLink = document.querySelector('#marker-instagram');
   const facebookLink = document.querySelector('#marker-facebook');
   const orderLink = document.querySelector('#marker-order');
   const status = document.querySelector('#marker-status');
   const splash = document.querySelector('#ar-splash');
-  const down = document.querySelector('#scale-down');
-  const up = document.querySelector('#scale-up');
-  const scaleOutput = document.querySelector('#scale-output');
   const logoHome = document.querySelector('.marker-logo-home');
 
   if (!scene || !anchor || !food || !startButton) return;
 
-  let scale = Number(markerConfig.modelScale || 0.32);
-  let instructionCollapseTimer;
   let arSystem;
   let startPromise;
   let stopPromise;
   let isRunning = false;
-  const initialScale = scale;
-  const minScale = Number(markerConfig.minScale || 0.08);
-  const maxScale = Number(markerConfig.maxScale || 1.25);
-  const step = Number(markerConfig.scaleStep || 0.04);
+  let targetVisible = false;
+  let progressAdvanceTimer;
 
   const setStatus = (label, state = '') => {
     if (!status) return;
@@ -49,62 +40,77 @@
     window.parent.postMessage({ type }, window.location.origin);
   };
 
-  const applyScale = () => {
-    food.setAttribute('scale', `${scale} ${scale} ${scale}`);
-    if (scaleOutput) scaleOutput.textContent = `${Math.round((scale / initialScale) * 100)}%`;
-  };
+  const setProgressStep = (currentStep) => {
+    if (instruction) instruction.dataset.currentStep = String(currentStep);
 
-  const clampScale = (next) => Math.min(maxScale, Math.max(minScale, next));
+    progressSteps.forEach((progressStep) => {
+      const stepNumber = Number(progressStep.dataset.step);
+      const state = stepNumber === currentStep
+        ? 'active'
+        : stepNumber < currentStep
+          ? 'complete'
+          : 'upcoming';
+
+      progressStep.dataset.state = state;
+      progressStep.setAttribute('aria-current', state === 'active' ? 'step' : 'false');
+    });
+  };
 
   const instructionStates = {
     scanning: {
-      eyebrow: '1 · VIEW IN AR',
+      step: 2,
       title: 'POINT BACK AT THE TABLE GRAPHIC',
-      body: 'Keep the full graphic in frame. Your $12 lunch will appear here.'
+      body: 'Keep the full graphic in frame. Your $12 lunch will appear here.',
+      status: 'SCANNING',
+      statusState: 'busy'
+    },
+    holding: {
+      step: 3,
+      title: 'KEEP THE FULL GRAPHIC IN FRAME',
+      body: 'Hold steady while Steak Out locks your $12 lunch to this table.',
+      status: 'HOLD STEADY',
+      statusState: 'busy'
     },
     locked: {
-      eyebrow: '2 · PORTION PREVIEW',
+      step: 4,
       title: 'YOUR $12 LUNCH IS RIGHT HERE',
-      body: 'Move around it—the portion stays anchored to this table.'
+      body: 'Move around it to see the portion before you order.',
+      status: 'MEAL READY',
+      statusState: 'active'
     },
     lost: {
-      eyebrow: 'FIND THE GRAPHIC',
+      step: 2,
       title: 'POINT BACK AT THE TABLE GRAPHIC',
-      body: 'Keep the whole graphic visible and reduce glare.'
+      body: 'Bring the full graphic back into frame and reduce glare.',
+      status: 'SEARCHING',
+      statusState: 'busy'
     },
     error: {
-      eyebrow: 'CAMERA ACCESS',
+      step: 2,
       title: 'ALLOW THE CAMERA TO CONTINUE',
-      body: 'Allow camera access, then tap this message to try again.'
+      body: 'Allow camera access, then close and reopen Steak Out AR.',
+      status: 'CAMERA ERROR',
+      statusState: 'error'
     }
   };
 
-  const renderInstruction = (state, { collapse = false } = {}) => {
+  const renderInstruction = (state) => {
     if (!instruction) return;
     const next = instructionStates[state] || instructionStates.scanning;
-    window.clearTimeout(instructionCollapseTimer);
     instruction.dataset.state = state;
-    instruction.classList.toggle('is-collapsed', collapse);
     instruction.hidden = false;
-    if (instructionEyebrow) instructionEyebrow.textContent = next.eyebrow;
     if (instructionTitle) instructionTitle.textContent = next.title;
     if (instructionBody) instructionBody.textContent = next.body;
-    instructionToggle?.setAttribute('aria-expanded', collapse ? 'false' : 'true');
-  };
-
-  const scheduleInstructionCollapse = () => {
-    window.clearTimeout(instructionCollapseTimer);
-    instructionCollapseTimer = window.setTimeout(() => {
-      if (instruction?.dataset.state !== 'locked') return;
-      instruction.classList.add('is-collapsed');
-      instructionToggle?.setAttribute('aria-expanded', 'false');
-    }, 1900);
+    setProgressStep(next.step);
+    setStatus(next.status, next.statusState);
   };
 
   food.setAttribute('src', config.modelUrl || '');
   food.setAttribute('position', markerConfig.modelPosition || '0 0 0.12');
   food.setAttribute('rotation', markerConfig.modelRotation || '90 0 0');
-  applyScale();
+  const modelScale = Number(markerConfig.modelScale || 0.32);
+  food.setAttribute('scale', `${modelScale} ${modelScale} ${modelScale}`);
+
   if (orderLink && config.orderUrl) orderLink.href = config.orderUrl;
   if (instagramLink && config.social?.instagramUrl) instagramLink.href = config.social.instagramUrl;
   if (facebookLink && config.social?.facebookUrl) facebookLink.href = config.social.facebookUrl;
@@ -134,6 +140,11 @@
     splash.classList.remove('is-live', 'is-revealing');
   };
 
+  const clearProgressAdvance = () => {
+    window.clearTimeout(progressAdvanceTimer);
+    progressAdvanceTimer = undefined;
+  };
+
   const start = () => {
     if (stopPromise) return stopPromise.then(start);
     if (isRunning) return Promise.resolve();
@@ -141,11 +152,12 @@
 
     startPromise = (async () => {
       try {
+        clearProgressAdvance();
+        targetVisible = false;
         setStatus('STARTING', 'busy');
         intro.hidden = true;
         guide.hidden = true;
         if (instruction) instruction.hidden = true;
-        sizeControl.hidden = true;
         if (socialDock) socialDock.hidden = true;
         if (orderLink) orderLink.hidden = true;
         showSplash();
@@ -158,11 +170,9 @@
         await system.start();
         isRunning = true;
         await minSplashTime;
-        setStatus('SCANNING', 'busy');
         guide.hidden = false;
         guide.classList.remove('is-found');
         renderInstruction('scanning');
-        sizeControl.hidden = !config.demoAsset;
         if (socialDock) socialDock.hidden = false;
         if (orderLink) orderLink.hidden = false;
         await revealCamera();
@@ -170,11 +180,11 @@
       } catch (error) {
         console.error(error);
         isRunning = false;
+        targetVisible = false;
+        clearProgressAdvance();
         if (splash) splash.hidden = true;
-        setStatus('CAMERA ERROR', 'error');
         intro.hidden = isEmbedded;
         guide.hidden = true;
-        sizeControl.hidden = true;
         if (socialDock) socialDock.hidden = true;
         if (orderLink) orderLink.hidden = true;
         if (isEmbedded) renderInstruction('error');
@@ -192,7 +202,8 @@
     if (stopPromise) return stopPromise;
 
     stopPromise = (async () => {
-      window.clearTimeout(instructionCollapseTimer);
+      targetVisible = false;
+      clearProgressAdvance();
       if (startPromise) await startPromise;
 
       try {
@@ -207,7 +218,6 @@
       guide.hidden = true;
       guide.classList.remove('is-found');
       if (instruction) instruction.hidden = true;
-      sizeControl.hidden = true;
       if (socialDock) socialDock.hidden = true;
       if (orderLink) orderLink.hidden = true;
       intro.hidden = isEmbedded;
@@ -220,38 +230,24 @@
   };
 
   anchor.addEventListener('targetFound', () => {
-    setStatus('LOCKED', 'active');
+    if (!isRunning) return;
+    targetVisible = true;
+    clearProgressAdvance();
     guide?.classList.add('is-found');
-    renderInstruction('locked');
-    scheduleInstructionCollapse();
+    renderInstruction('holding');
+
+    progressAdvanceTimer = window.setTimeout(() => {
+      if (!isRunning || !targetVisible) return;
+      renderInstruction('locked');
+    }, 900);
   });
 
   anchor.addEventListener('targetLost', () => {
-    setStatus('SEARCHING', 'busy');
+    if (!isRunning) return;
+    targetVisible = false;
+    clearProgressAdvance();
     guide?.classList.remove('is-found');
     renderInstruction('lost');
-  });
-
-  instructionToggle?.addEventListener('click', () => {
-    if (instruction?.dataset.state === 'error') {
-      start();
-      return;
-    }
-    if (instruction?.dataset.state !== 'locked') return;
-    const willExpand = instruction.classList.contains('is-collapsed');
-    instruction.classList.toggle('is-collapsed', !willExpand);
-    instructionToggle.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
-    if (willExpand) scheduleInstructionCollapse();
-  });
-
-  down?.addEventListener('click', () => {
-    scale = clampScale(Number((scale - step).toFixed(3)));
-    applyScale();
-  });
-
-  up?.addEventListener('click', () => {
-    scale = clampScale(Number((scale + step).toFixed(3)));
-    applyScale();
   });
 
   startButton.addEventListener('click', start);
