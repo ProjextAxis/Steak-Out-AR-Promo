@@ -6,53 +6,101 @@
   const modeCopy = document.querySelector('#mode-copy');
   const splash = document.querySelector('#ar-splash');
   const launchButtons = [document.querySelector('#launch-ar-top')].filter(Boolean);
-  const announcementCopy = document.querySelector('.announcement__copy');
+  const announcementViewport = document.querySelector('.announcement__viewport');
+  const announcementTrack = document.querySelector('.announcement__track');
   const announcementDots = [...document.querySelectorAll('.announcement__dots span')];
 
-  const announcementMessages = [
-    'Gift Cards Available In-Store Now!',
-    'No Gift Idea? Give The Steak Out Experience'
-  ];
-
+  const announcementDelay = 8000;
+  const announcementTransitionDuration = 300;
+  const announcementMessageCount = 2;
   let announcementIndex = 0;
+  let announcementSlot = 1;
+  let announcementTimer;
+  let announcementIsTransitioning = false;
+  let announcementPointerStart = null;
 
-  const renderAnnouncement = (index, animate = true) => {
-    if (!announcementCopy || announcementDots.length !== announcementMessages.length) return;
-
-    const update = () => {
-      announcementIndex = index;
-      announcementCopy.textContent = announcementMessages[index];
-      announcementDots.forEach((dot, dotIndex) => {
-        dot.style.background = dotIndex === index
-          ? 'var(--white)'
-          : 'rgba(255,255,255,.42)';
-      });
-    };
-
-    if (!animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      update();
-      return;
-    }
-
-    const fadeOut = announcementCopy.animate(
-      [{ opacity: 1 }, { opacity: 0 }],
-      { duration: 180, easing: 'ease', fill: 'forwards' }
-    );
-
-    fadeOut.finished.then(() => {
-      update();
-      announcementCopy.animate(
-        [{ opacity: 0 }, { opacity: 1 }],
-        { duration: 180, easing: 'ease', fill: 'forwards' }
-      );
+  const updateAnnouncementDots = () => {
+    announcementDots.forEach((dot, dotIndex) => {
+      dot.style.background = dotIndex === announcementIndex
+        ? 'var(--white)'
+        : 'rgba(255,255,255,.42)';
     });
   };
 
-  if (announcementCopy && announcementDots.length === announcementMessages.length) {
-    renderAnnouncement(announcementIndex, false);
-    window.setInterval(() => {
-      renderAnnouncement((announcementIndex + 1) % announcementMessages.length);
-    }, 5000);
+  const positionAnnouncementTrack = (animate) => {
+    announcementTrack.style.transition = animate
+      ? `transform ${announcementTransitionDuration}ms ease`
+      : 'none';
+    announcementTrack.style.transform = `translate3d(-${announcementSlot * 100}%, 0, 0)`;
+  };
+
+  const scheduleAnnouncement = () => {
+    window.clearTimeout(announcementTimer);
+    announcementTimer = window.setTimeout(() => moveAnnouncement(1), announcementDelay);
+  };
+
+  const finishAnnouncementMove = () => {
+    if (announcementSlot === 0) {
+      announcementSlot = 2;
+      positionAnnouncementTrack(false);
+    } else if (announcementSlot === 3) {
+      announcementSlot = 1;
+      positionAnnouncementTrack(false);
+    }
+
+    announcementIsTransitioning = false;
+    scheduleAnnouncement();
+  };
+
+  function moveAnnouncement(direction) {
+    if (announcementIsTransitioning) return;
+
+    window.clearTimeout(announcementTimer);
+    announcementIsTransitioning = true;
+    announcementIndex = (announcementIndex + direction + announcementMessageCount) % announcementMessageCount;
+    announcementSlot += direction;
+    updateAnnouncementDots();
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      positionAnnouncementTrack(false);
+      finishAnnouncementMove();
+      return;
+    }
+
+    positionAnnouncementTrack(true);
+  }
+
+  if (announcementViewport && announcementTrack && announcementDots.length === announcementMessageCount) {
+    positionAnnouncementTrack(false);
+    updateAnnouncementDots();
+
+    announcementTrack.addEventListener('transitionend', (event) => {
+      if (event.target === announcementTrack && event.propertyName === 'transform') {
+        finishAnnouncementMove();
+      }
+    });
+
+    announcementViewport.addEventListener('pointerdown', (event) => {
+      if (!event.isPrimary) return;
+      announcementPointerStart = { id: event.pointerId, x: event.clientX };
+      window.clearTimeout(announcementTimer);
+    });
+
+    announcementViewport.addEventListener('pointerup', (event) => {
+      if (!announcementPointerStart || announcementPointerStart.id !== event.pointerId) return;
+      const swipeDistance = event.clientX - announcementPointerStart.x;
+      announcementPointerStart = null;
+
+      if (Math.abs(swipeDistance) >= 32) moveAnnouncement(swipeDistance < 0 ? 1 : -1);
+      else scheduleAnnouncement();
+    });
+
+    announcementViewport.addEventListener('pointercancel', () => {
+      announcementPointerStart = null;
+      scheduleAnnouncement();
+    });
+
+    scheduleAnnouncement();
   }
 
   const config = window.STEAKOUT_AR_CONFIG || {};
