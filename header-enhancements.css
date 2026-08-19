@@ -57,3 +57,9 @@
   width: 100%;
   height: 100%;
 }
+
+/* Keep customers inside the branded Steak Out AR flow. The native model-viewer
+   AR shortcut remains hidden; FREE PLACE is still available through the dev toggle. */
+model-viewer::part(default-ar-button) {
+  display: none !important;
+}
