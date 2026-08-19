@@ -25,6 +25,28 @@
   white-space: nowrap;
 }
 
+.menu-button {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.menu-button svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.site-logo {
+  gap: 4px;
+}
+
+.site-logo span {
+  transform: translateY(2px);
+}
+
 .gift-icon {
   width: 14px;
   height: 18px;
