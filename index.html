@@ -13,11 +13,11 @@
   <link href="https://fonts.cdnfonts.com/css/rustler" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css?v=20260819-banner-swipe-cart" />
   <link rel="stylesheet" href="./header-enhancements.css?v=20260819-nav-align" />
-  <link rel="stylesheet" href="./ar-flow.css?v=20260819-sales-funnel" />
+  <link rel="stylesheet" href="./ar-flow.css?v=20260819-integrated-ar" />
 
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
-  <script defer src="./config.js"></script>
-  <script defer src="./app.js?v=20260819-camera-overlay"></script>
+  <script defer src="./config.js?v=20260819-integrated-ar"></script>
+  <script defer src="./app.js?v=20260819-integrated-ar"></script>
 </head>
 <body>
   <div class="announcement">
@@ -113,10 +113,10 @@
       <div class="dev-panel__body">
         <p>Temporary controls while the printed table ad is being designed.</p>
         <div class="mode-switch" role="group" aria-label="Choose AR mode">
-          <button class="mode-switch__button is-active" type="button" data-ar-mode="free" aria-pressed="true">FREE PLACE</button>
-          <button class="mode-switch__button" type="button" data-ar-mode="marker" aria-pressed="false">QR LOCK</button>
+          <button class="mode-switch__button" type="button" data-ar-mode="free" aria-pressed="false">FREE PLACE</button>
+          <button class="mode-switch__button is-active" type="button" data-ar-mode="marker" aria-pressed="true">QR LOCK</button>
         </div>
-        <div class="mode-copy" id="mode-copy">Place the test model anywhere without a printed marker.</div>
+        <div class="mode-copy" id="mode-copy">Lock the test model to the printed table marker.</div>
       </div>
     </details>
   </main>
@@ -178,6 +178,21 @@
   <div class="bottom-order-bar">
     <a href="https://order.toasttab.com/online/steakout-sewell" data-order-link>ORDER NOW</a>
   </div>
+
+  <section class="browser-ar-layer" id="browser-ar-layer" aria-label="Steak Out AR camera" aria-hidden="true">
+    <div class="browser-ar-loading" id="browser-ar-loading" aria-live="polite">
+      <img src="./assets/steakout-logo.webp" alt="" />
+      <strong>OPENING STEAK OUT AR</strong>
+      <span>Camera access may be requested.</span>
+    </div>
+    <iframe
+      id="browser-ar-frame"
+      title="Steak Out AR camera experience"
+      src="about:blank"
+      data-src="./marker.html?embedded=1&amp;v=20260819-integrated-ar"
+      allow="camera; accelerometer; gyroscope; fullscreen"
+      allowfullscreen></iframe>
+  </section>
 
   <div class="ar-splash" id="ar-splash" aria-hidden="true">
     <img src="./assets/steakout-logo.webp" alt="" />

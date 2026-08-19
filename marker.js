@@ -1,6 +1,7 @@
 (() => {
   const config = window.STEAKOUT_AR_CONFIG || {};
   const markerConfig = config.marker || {};
+  const isEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1';
   const scene = document.querySelector('#marker-scene');
   const anchor = document.querySelector('#marker-anchor');
   const food = document.querySelector('#marker-food');
@@ -22,11 +23,16 @@
   const down = document.querySelector('#scale-down');
   const up = document.querySelector('#scale-up');
   const scaleOutput = document.querySelector('#scale-output');
+  const logoHome = document.querySelector('.marker-logo-home');
 
   if (!scene || !anchor || !food || !startButton) return;
 
   let scale = Number(markerConfig.modelScale || 0.32);
   let instructionCollapseTimer;
+  let arSystem;
+  let startPromise;
+  let stopPromise;
+  let isRunning = false;
   const initialScale = scale;
   const minScale = Number(markerConfig.minScale || 0.08);
   const maxScale = Number(markerConfig.maxScale || 1.25);
@@ -36,6 +42,11 @@
     if (!status) return;
     status.textContent = label;
     status.dataset.state = state;
+  };
+
+  const postToParent = (type) => {
+    if (!isEmbedded || window.parent === window) return;
+    window.parent.postMessage({ type }, window.location.origin);
   };
 
   const applyScale = () => {
@@ -60,6 +71,11 @@
       eyebrow: 'FIND THE GRAPHIC',
       title: 'POINT BACK AT THE TABLE GRAPHIC',
       body: 'Keep the whole graphic visible and reduce glare.'
+    },
+    error: {
+      eyebrow: 'CAMERA ACCESS',
+      title: 'ALLOW THE CAMERA TO CONTINUE',
+      body: 'Allow camera access, then tap this message to try again.'
     }
   };
 
@@ -94,10 +110,12 @@
   if (facebookLink && config.social?.facebookUrl) facebookLink.href = config.social.facebookUrl;
 
   const getArSystem = async () => {
+    if (arSystem) return arSystem;
     if (!scene.hasLoaded) {
       await new Promise((resolve) => scene.addEventListener('loaded', resolve, { once: true }));
     }
-    return scene.systems['mindar-image-system'];
+    arSystem = scene.systems['mindar-image-system'];
+    return arSystem;
   };
 
   const showSplash = () => {
@@ -116,42 +134,89 @@
     splash.classList.remove('is-live', 'is-revealing');
   };
 
-  const start = async () => {
-    try {
-      setStatus('STARTING', 'busy');
-      intro.hidden = true;
-      guide.hidden = true;
-      if (instruction) instruction.hidden = true;
-      sizeControl.hidden = true;
-      if (socialDock) socialDock.hidden = true;
-      if (orderLink) orderLink.hidden = true;
-      showSplash();
+  const start = () => {
+    if (stopPromise) return stopPromise.then(start);
+    if (isRunning) return Promise.resolve();
+    if (startPromise) return startPromise;
 
-      const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1050));
-      const arSystem = await getArSystem();
-      if (!arSystem) throw new Error('MindAR image system failed to initialize.');
+    startPromise = (async () => {
+      try {
+        setStatus('STARTING', 'busy');
+        intro.hidden = true;
+        guide.hidden = true;
+        if (instruction) instruction.hidden = true;
+        sizeControl.hidden = true;
+        if (socialDock) socialDock.hidden = true;
+        if (orderLink) orderLink.hidden = true;
+        showSplash();
+        window.dispatchEvent(new Event('resize'));
 
-      await arSystem.start();
-      await minSplashTime;
-      setStatus('SCANNING', 'busy');
-      guide.hidden = false;
-      guide.classList.remove('is-found');
-      renderInstruction('scanning');
-      sizeControl.hidden = false;
-      if (socialDock) socialDock.hidden = false;
-      if (orderLink) orderLink.hidden = false;
-      await revealCamera();
-    } catch (error) {
-      console.error(error);
+        const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1050));
+        const system = await getArSystem();
+        if (!system) throw new Error('MindAR image system failed to initialize.');
+
+        await system.start();
+        isRunning = true;
+        await minSplashTime;
+        setStatus('SCANNING', 'busy');
+        guide.hidden = false;
+        guide.classList.remove('is-found');
+        renderInstruction('scanning');
+        sizeControl.hidden = !config.demoAsset;
+        if (socialDock) socialDock.hidden = false;
+        if (orderLink) orderLink.hidden = false;
+        await revealCamera();
+        postToParent('steakout-ar-camera-live');
+      } catch (error) {
+        console.error(error);
+        isRunning = false;
+        if (splash) splash.hidden = true;
+        setStatus('CAMERA ERROR', 'error');
+        intro.hidden = isEmbedded;
+        guide.hidden = true;
+        sizeControl.hidden = true;
+        if (socialDock) socialDock.hidden = true;
+        if (orderLink) orderLink.hidden = true;
+        if (isEmbedded) renderInstruction('error');
+        else if (instruction) instruction.hidden = true;
+        postToParent('steakout-ar-camera-error');
+      } finally {
+        startPromise = null;
+      }
+    })();
+
+    return startPromise;
+  };
+
+  const stop = () => {
+    if (stopPromise) return stopPromise;
+
+    stopPromise = (async () => {
+      window.clearTimeout(instructionCollapseTimer);
+      if (startPromise) await startPromise;
+
+      try {
+        const system = await getArSystem();
+        if (isRunning && system?.stop) await system.stop();
+      } catch (error) {
+        console.warn('Unable to stop AR cleanly:', error);
+      }
+
+      isRunning = false;
       if (splash) splash.hidden = true;
-      setStatus('CAMERA ERROR', 'error');
-      intro.hidden = false;
       guide.hidden = true;
+      guide.classList.remove('is-found');
       if (instruction) instruction.hidden = true;
       sizeControl.hidden = true;
       if (socialDock) socialDock.hidden = true;
       if (orderLink) orderLink.hidden = true;
-    }
+      intro.hidden = isEmbedded;
+      setStatus('READY');
+    })().finally(() => {
+      stopPromise = null;
+    });
+
+    return stopPromise;
   };
 
   anchor.addEventListener('targetFound', () => {
@@ -168,6 +233,10 @@
   });
 
   instructionToggle?.addEventListener('click', () => {
+    if (instruction?.dataset.state === 'error') {
+      start();
+      return;
+    }
     if (instruction?.dataset.state !== 'locked') return;
     const willExpand = instruction.classList.contains('is-collapsed');
     instruction.classList.toggle('is-collapsed', !willExpand);
@@ -186,4 +255,27 @@
   });
 
   startButton.addEventListener('click', start);
+
+  if (isEmbedded) {
+    intro.hidden = true;
+    logoHome?.setAttribute('aria-label', 'Close Steak Out AR');
+    logoHome?.addEventListener('click', (event) => {
+      event.preventDefault();
+      postToParent('steakout-ar-close');
+    });
+
+    window.addEventListener('message', (event) => {
+      if (event.source !== window.parent || event.origin !== window.location.origin) return;
+      if (event.data?.type === 'steakout-ar-start') start();
+      else if (event.data?.type === 'steakout-ar-stop') stop();
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') postToParent('steakout-ar-close');
+    });
+
+    getArSystem()
+      .then(() => postToParent('steakout-ar-ready'))
+      .catch(() => postToParent('steakout-ar-camera-error'));
+  }
 })();

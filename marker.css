@@ -661,3 +661,27 @@ a {
     transition-duration: .01ms !important;
   }
 }
+
+.is-embedded .marker-intro {
+  display: none;
+}
+
+.is-embedded .marker-logo-home {
+  position: relative;
+}
+
+.is-embedded .marker-logo-home::after {
+  content: '×';
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--red);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  font: 700 15px/12px Arial, sans-serif;
+}

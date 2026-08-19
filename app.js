@@ -9,6 +9,9 @@
   const arGuide = document.querySelector('#ar-guide');
   const arGuideStart = document.querySelector('#ar-guide-start');
   const arGuideCloseButtons = [...document.querySelectorAll('[data-guide-close]')];
+  const browserARLayer = document.querySelector('#browser-ar-layer');
+  const browserARFrame = document.querySelector('#browser-ar-frame');
+  const browserARLoading = document.querySelector('#browser-ar-loading');
   const announcementViewport = document.querySelector('.announcement__viewport');
   const announcementTrack = document.querySelector('.announcement__track');
   const announcementDots = [...document.querySelectorAll('.announcement__dots span')];
@@ -21,6 +24,9 @@
   let announcementTimer;
   let announcementIsTransitioning = false;
   let announcementPointerStart = null;
+  let browserARFrameReady = false;
+  let browserARIsLoaded = false;
+  let browserARShouldStart = false;
 
   const updateAnnouncementDots = () => {
     announcementDots.forEach((dot, dotIndex) => {
@@ -132,6 +138,81 @@
     window.dataLayer.push({ event: eventName, ...detail });
   };
 
+  const postToBrowserAR = (type) => {
+    if (!browserARFrameReady || !browserARFrame?.contentWindow) return;
+    browserARFrame.contentWindow.postMessage({ type }, window.location.origin);
+  };
+
+  const loadBrowserAR = () => {
+    if (!browserARFrame || browserARIsLoaded) return;
+    const source = browserARFrame.dataset.src;
+    if (!source) return;
+    browserARIsLoaded = true;
+    browserARFrame.src = source;
+  };
+
+  const openBrowserAR = () => {
+    if (!browserARLayer || !browserARFrame) {
+      window.location.href = './marker.html';
+      return;
+    }
+
+    browserARShouldStart = true;
+    browserARLayer.classList.add('is-open');
+    browserARLayer.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('browser-ar-open');
+    if (browserARLoading) browserARLoading.hidden = browserARFrameReady;
+    loadBrowserAR();
+
+    if (browserARFrameReady) postToBrowserAR('steakout-ar-start');
+    setStatus('OPENING AR', 'active');
+    track('browser_ar_opened', { item: config.itemName || 'test-food' });
+  };
+
+  const closeBrowserAR = () => {
+    if (!browserARLayer?.classList.contains('is-open')) return;
+    browserARShouldStart = false;
+    postToBrowserAR('steakout-ar-stop');
+    browserARLayer.classList.remove('is-open');
+    browserARLayer.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('browser-ar-open');
+    setStatus('QR READY', 'ready');
+    track('browser_ar_closed');
+    window.setTimeout(() => launchButton?.focus(), 0);
+  };
+
+  window.addEventListener('message', (event) => {
+    if (!browserARFrame?.contentWindow || event.source !== browserARFrame.contentWindow) return;
+    if (event.origin !== window.location.origin) return;
+
+    if (event.data?.type === 'steakout-ar-ready') {
+      browserARFrameReady = true;
+      if (browserARShouldStart) {
+        if (browserARLoading) browserARLoading.hidden = true;
+        postToBrowserAR('steakout-ar-start');
+      }
+    } else if (event.data?.type === 'steakout-ar-camera-live') {
+      if (!browserARShouldStart) {
+        postToBrowserAR('steakout-ar-stop');
+        return;
+      }
+      if (browserARLoading) browserARLoading.hidden = true;
+      setStatus('AR ACTIVE', 'active');
+    } else if (event.data?.type === 'steakout-ar-camera-error') {
+      if (!browserARShouldStart) return;
+      if (browserARLoading) browserARLoading.hidden = true;
+      setStatus('CAMERA ERROR', 'error');
+    } else if (event.data?.type === 'steakout-ar-close') {
+      closeBrowserAR();
+    }
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeBrowserAR();
+  });
+
+  window.addEventListener('pagehide', () => postToBrowserAR('steakout-ar-stop'));
+
   const renderMode = () => {
     modeButtons.forEach((button) => {
       const selected = button.dataset.arMode === activeMode;
@@ -149,9 +230,11 @@
       if (activeMode === 'marker') {
         launchButton.removeAttribute('aria-haspopup');
         launchButton.removeAttribute('aria-controls');
+        launchButton.removeAttribute('aria-expanded');
       } else {
         launchButton.setAttribute('aria-haspopup', 'dialog');
         launchButton.setAttribute('aria-controls', 'ar-guide');
+        launchButton.setAttribute('aria-expanded', 'false');
       }
     }
 
@@ -196,12 +279,13 @@
 
   const launchAR = async () => {
     track('ar_launch_tapped', { mode: activeMode, item: config.itemName || 'test-food' });
-    await runSplash();
 
     if (activeMode === 'marker') {
-      window.location.href = './marker.html';
+      openBrowserAR();
       return;
     }
+
+    await runSplash();
 
     try {
       if (typeof viewer.activateAR !== 'function') throw new Error('AR unavailable');
@@ -247,6 +331,18 @@
     closeARGuide();
     launchAR();
   });
+
+  const warmBrowserAR = () => {
+    if (config.marker?.enabled === false) return;
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(loadBrowserAR, { timeout: 1600 });
+    } else {
+      window.setTimeout(loadBrowserAR, 500);
+    }
+  };
+
+  if (document.readyState === 'complete') warmBrowserAR();
+  else window.addEventListener('load', warmBrowserAR, { once: true });
 
   renderMode();
 })();

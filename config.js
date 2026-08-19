@@ -11,7 +11,7 @@ window.STEAKOUT_AR_CONFIG = {
   },
 
   // Prototype controls. Set showModeToggle to false for the customer launch.
-  defaultMode: 'free',
+  defaultMode: 'marker',
   showModeToggle: true,
 
   freePlace: {
