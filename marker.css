@@ -39,9 +39,22 @@ a {
 
 #marker-scene {
   position: absolute;
+  z-index: 1;
   inset: 0;
   width: 100%;
   height: 100%;
+  background: transparent !important;
+}
+
+#marker-scene .a-canvas {
+  background: transparent !important;
+}
+
+/* MindAR injects the live camera video at z-index:-2. Keep it above the
+   shell background and below the transparent A-Frame model canvas. */
+.marker-shell > video {
+  z-index: 0 !important;
+  max-width: none !important;
 }
 
 .ar-splash {

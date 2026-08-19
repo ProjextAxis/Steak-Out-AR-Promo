@@ -19,6 +19,7 @@
   const announcementDelay = 8000;
   const announcementTransitionDuration = 300;
   const announcementMessageCount = 2;
+  const browserARSplashMinimum = 1200;
   let announcementIndex = 0;
   let announcementSlot = 1;
   let announcementTimer;
@@ -27,6 +28,8 @@
   let browserARFrameReady = false;
   let browserARIsLoaded = false;
   let browserARShouldStart = false;
+  let browserARSplashStartedAt = 0;
+  let browserARSplashTimer;
 
   const updateAnnouncementDots = () => {
     announcementDots.forEach((dot, dotIndex) => {
@@ -151,6 +154,26 @@
     browserARFrame.src = source;
   };
 
+  const showBrowserARSplash = () => {
+    if (!browserARLoading) return;
+    window.clearTimeout(browserARSplashTimer);
+    browserARSplashStartedAt = window.performance?.now?.() || Date.now();
+    browserARLoading.hidden = false;
+    browserARLoading.classList.remove('is-active');
+    void browserARLoading.offsetWidth;
+    browserARLoading.classList.add('is-active');
+  };
+
+  const hideBrowserARSplash = () => {
+    if (!browserARLoading) return;
+    const now = window.performance?.now?.() || Date.now();
+    const remaining = Math.max(0, browserARSplashMinimum - (now - browserARSplashStartedAt));
+    window.clearTimeout(browserARSplashTimer);
+    browserARSplashTimer = window.setTimeout(() => {
+      browserARLoading.hidden = true;
+    }, remaining);
+  };
+
   const openBrowserAR = () => {
     if (!browserARLayer || !browserARFrame) {
       window.location.href = './marker.html';
@@ -161,14 +184,7 @@
     browserARLayer.classList.add('is-open');
     browserARLayer.setAttribute('aria-hidden', 'false');
     document.body.classList.add('browser-ar-open');
-    if (browserARLoading) {
-      browserARLoading.hidden = browserARFrameReady;
-      if (!browserARFrameReady) {
-        browserARLoading.classList.remove('is-active');
-        void browserARLoading.offsetWidth;
-        browserARLoading.classList.add('is-active');
-      }
-    }
+    showBrowserARSplash();
     loadBrowserAR();
 
     if (browserARFrameReady) postToBrowserAR('steakout-ar-start');
@@ -183,6 +199,8 @@
     browserARLayer.classList.remove('is-open');
     browserARLayer.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('browser-ar-open');
+    window.clearTimeout(browserARSplashTimer);
+    if (browserARLoading) browserARLoading.hidden = true;
     setStatus('QR READY', 'ready');
     track('browser_ar_closed');
     window.setTimeout(() => launchButton?.focus(), 0);
@@ -195,7 +213,6 @@
     if (event.data?.type === 'steakout-ar-ready') {
       browserARFrameReady = true;
       if (browserARShouldStart) {
-        if (browserARLoading) browserARLoading.hidden = true;
         postToBrowserAR('steakout-ar-start');
       }
     } else if (event.data?.type === 'steakout-ar-camera-live') {
@@ -203,11 +220,11 @@
         postToBrowserAR('steakout-ar-stop');
         return;
       }
-      if (browserARLoading) browserARLoading.hidden = true;
+      hideBrowserARSplash();
       setStatus('AR ACTIVE', 'active');
     } else if (event.data?.type === 'steakout-ar-camera-error') {
       if (!browserARShouldStart) return;
-      if (browserARLoading) browserARLoading.hidden = true;
+      hideBrowserARSplash();
       setStatus('CAMERA ERROR', 'error');
     } else if (event.data?.type === 'steakout-ar-close') {
       closeBrowserAR();
