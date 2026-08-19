@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="./ar-flow.css?v=20260819-progress-ui" />
 
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
-  <script defer src="./config.js?v=20260819-progress-ui"></script>
+  <script defer src="./config.js?v=20260819-cheesesteak-live"></script>
   <script defer src="./app.js?v=20260819-splash-handoff"></script>
 </head>
 <body>
@@ -88,8 +88,8 @@
         <div class="viewer-status" id="ar-status">3D READY</div>
         <model-viewer
           id="meal-viewer"
-          src="https://raw.githubusercontent.com/tommykho/tommykho.github.io/main/assets/models/Burger.glb"
-          alt="Interactive 3D food preview"
+          src="./assets/cheesesteak-special-ar-optimized.glb"
+          alt="Interactive 3D Steak Out cheesesteak special preview"
           ar
           ar-modes="webxr scene-viewer quick-look"
           ar-placement="floor"
@@ -113,10 +113,10 @@
       <div class="dev-panel__body">
         <p>Temporary controls while the printed table ad is being designed.</p>
         <div class="mode-switch" role="group" aria-label="Choose AR mode">
-          <button class="mode-switch__button" type="button" data-ar-mode="free" aria-pressed="false">FREE PLACE</button>
-          <button class="mode-switch__button is-active" type="button" data-ar-mode="marker" aria-pressed="true">QR LOCK</button>
+          <button class="mode-switch__button is-active" type="button" data-ar-mode="free" aria-pressed="true">FREE PLACE</button>
+          <button class="mode-switch__button" type="button" data-ar-mode="marker" aria-pressed="false">QR LOCK</button>
         </div>
-        <div class="mode-copy" id="mode-copy">Lock the test model to the printed table marker.</div>
+        <div class="mode-copy" id="mode-copy">Place the Steak Out meal anywhere while testing.</div>
       </div>
     </details>
   </main>
