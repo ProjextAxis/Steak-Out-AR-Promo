@@ -5,7 +5,8 @@
   const modeButtons = [...document.querySelectorAll('[data-ar-mode]')];
   const modeCopy = document.querySelector('#mode-copy');
   const splash = document.querySelector('#ar-splash');
-  const launchButtons = [document.querySelector('#launch-ar-top')].filter(Boolean);
+  const stickyAction = document.querySelector('#sticky-action');
+  const launchButtons = [stickyAction].filter(Boolean);
   const announcementViewport = document.querySelector('.announcement__viewport');
   const announcementTrack = document.querySelector('.announcement__track');
   const announcementDots = [...document.querySelectorAll('.announcement__dots span')];
@@ -112,6 +113,29 @@
   if (config.iosModelUrl) viewer.setAttribute('ios-src', config.iosModelUrl);
   viewer.setAttribute('ar-scale', config.freePlace?.arScale || 'auto');
 
+  const setStickyAction = (action) => {
+    if (!stickyAction) return;
+    const isOrder = action === 'order';
+
+    stickyAction.dataset.action = isOrder ? 'order' : 'ar';
+    stickyAction.textContent = isOrder ? 'ORDER NOW' : 'VIEW IN AR';
+    stickyAction.href = isOrder ? (config.orderUrl || '#') : '#meal-viewer';
+    stickyAction.setAttribute(
+      'aria-label',
+      isOrder ? 'Order Steak Out online' : 'View the lunch special in augmented reality'
+    );
+    stickyAction.removeAttribute('aria-busy');
+  };
+
+  const setStickyLaunching = () => {
+    if (!stickyAction) return;
+    stickyAction.dataset.action = 'launching';
+    stickyAction.textContent = 'OPENING AR';
+    stickyAction.setAttribute('aria-busy', 'true');
+  };
+
+  setStickyAction('ar');
+
   document.querySelectorAll('[data-order-link]').forEach((link) => {
     if (config.orderUrl) link.href = config.orderUrl;
   });
@@ -172,17 +196,26 @@
   viewer.addEventListener('ar-status', (event) => {
     if (activeMode !== 'free') return;
     const arStatus = event.detail?.status;
-    if (arStatus === 'session-started') setStatus('AR ACTIVE', 'active');
-    else if (arStatus === 'object-placed') setStatus('PLACED', 'active');
-    else if (arStatus === 'failed') setStatus('AR UNAVAILABLE', 'error');
-    else if (arStatus === 'not-presenting') setStatus('3D READY', 'ready');
+    if (arStatus === 'session-started') {
+      setStatus('AR ACTIVE', 'active');
+      setStickyAction('order');
+    } else if (arStatus === 'object-placed') {
+      setStatus('PLACED', 'active');
+      setStickyAction('order');
+    } else if (arStatus === 'failed') {
+      setStatus('AR UNAVAILABLE', 'error');
+      setStickyAction('ar');
+    } else if (arStatus === 'not-presenting') setStatus('3D READY', 'ready');
   });
 
   const launchAR = async () => {
+    if (stickyAction?.dataset.action === 'launching') return;
+    setStickyLaunching();
     track('ar_launch_tapped', { mode: activeMode, item: config.itemName || 'test-food' });
     await runSplash();
 
     if (activeMode === 'marker') {
+      setStickyAction('order');
       window.location.href = './marker.html';
       return;
     }
@@ -190,13 +223,19 @@
     try {
       if (typeof viewer.activateAR !== 'function') throw new Error('AR unavailable');
       await viewer.activateAR();
+      setStickyAction('order');
     } catch (error) {
       console.warn('AR launch failed:', error);
       viewer.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setStatus('USE AR BUTTON', 'error');
+      setStickyAction('ar');
     }
   };
 
-  launchButtons.forEach((button) => button.addEventListener('click', launchAR));
+  launchButtons.forEach((button) => button.addEventListener('click', (event) => {
+    if (button.dataset.action === 'order') return;
+    event.preventDefault();
+    launchAR();
+  }));
   renderMode();
 })();

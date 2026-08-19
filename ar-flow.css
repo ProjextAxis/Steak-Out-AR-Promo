@@ -1,0 +1,145 @@
+.ar-flow {
+  width: min(100%, 620px);
+  margin: 26px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr);
+  align-items: start;
+}
+
+.ar-step {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+}
+
+.ar-step__circle {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  background: #070707;
+  border: 2px solid var(--red);
+  border-radius: 50%;
+}
+
+.ar-step__number {
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 700 12px/1 Arial, sans-serif;
+}
+
+.ar-step__icon {
+  width: 36px;
+  height: 36px;
+  margin-top: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ar-flow__connector {
+  height: 2px;
+  margin-top: 38px;
+  background: var(--red);
+}
+
+.ar-step__label {
+  min-height: 34px;
+  margin-top: 9px;
+  color: var(--white);
+  font: 400 16px/1.05 var(--display);
+  letter-spacing: .025em;
+  text-align: center;
+}
+
+.ar-result {
+  width: fit-content;
+  max-width: 100%;
+  margin: 15px auto 0;
+  padding: 8px 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--white);
+  background: var(--nav);
+  border: 1px solid #2a2525;
+  border-radius: 999px;
+  font: 400 17px/1 var(--display);
+  letter-spacing: .035em;
+}
+
+.ar-result svg {
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ar-result__arrow {
+  color: var(--red);
+  font: 700 20px/1 Arial, sans-serif;
+}
+
+.offer-details {
+  margin: 12px auto 0 !important;
+  display: grid;
+  gap: 3px;
+  color: var(--muted) !important;
+  font: 400 15px/1.1 var(--display) !important;
+  letter-spacing: .045em;
+}
+
+.viewer-shell {
+  margin-top: 22px;
+}
+
+.bottom-order-bar a[data-action="launching"] {
+  opacity: .78;
+  pointer-events: none;
+}
+
+@media (max-width: 410px) {
+  .ar-flow {
+    grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) 18px minmax(0, 1fr);
+  }
+
+  .ar-step__circle {
+    width: 70px;
+    height: 70px;
+  }
+
+  .ar-flow__connector {
+    margin-top: 34px;
+  }
+
+  .ar-step__icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ar-step__label {
+    font-size: 14px;
+  }
+
+  .ar-result {
+    gap: 7px;
+    padding-inline: 11px;
+    font-size: 15px;
+  }
+
+  .ar-result svg {
+    width: 26px;
+    height: 26px;
+  }
+}
