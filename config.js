@@ -1,22 +1,21 @@
 window.STEAKOUT_AR_CONFIG = {
-  itemName: 'Test Burger',
-  modelUrl: 'https://raw.githubusercontent.com/tommykho/tommykho.github.io/main/assets/models/Burger.glb',
+  itemName: 'Cheesesteak Special',
+  modelUrl: './assets/cheesesteak-special-ar-optimized.glb',
   iosModelUrl: '',
   orderUrl: 'https://order.toasttab.com/online/steakout-sewell',
-  demoAsset: true,
+  demoAsset: false,
 
   social: {
     instagramUrl: 'https://www.instagram.com/steakout.sewell/',
     facebookUrl: 'https://www.facebook.com/SteakOutSewellNJ/'
   },
 
-  // Prototype controls. Set showModeToggle to false for the customer launch.
+  // Keep FREE PLACE as the default while testing the final Steak Out model.
   defaultMode: 'free',
   showModeToggle: true,
 
   freePlace: {
-    // "auto" lets us pinch/resize while testing. Change to "fixed" once the
-    // final Steak Out meal is authored at real-world dimensions.
+    // Allow pinch/resize while the real-world serving scale is being tuned.
     arScale: 'auto'
   },
 
@@ -27,7 +26,7 @@ window.STEAKOUT_AR_CONFIG = {
     targetMindUrl: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind',
     targetPreviewUrl: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.png',
 
-    // A-Frame/MindAR transforms for the temporary food model.
+    // A-Frame/MindAR transforms for the Steak Out food model during testing.
     modelPosition: '0 0 0.12',
     modelRotation: '90 0 0',
     modelScale: 0.32,
