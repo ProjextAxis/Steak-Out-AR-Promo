@@ -5,6 +5,11 @@ window.STEAKOUT_AR_CONFIG = {
   orderUrl: 'https://order.toasttab.com/online/steakout-sewell',
   demoAsset: true,
 
+  social: {
+    instagramUrl: 'https://www.instagram.com/steakout.sewell/',
+    facebookUrl: 'https://www.facebook.com/SteakOutSewellNJ/'
+  },
+
   // Prototype controls. Set showModeToggle to false for the customer launch.
   defaultMode: 'free',
   showModeToggle: true,

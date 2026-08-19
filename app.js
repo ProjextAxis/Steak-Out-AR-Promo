@@ -145,6 +145,16 @@
         : 'Place the test model anywhere without a printed marker.';
     }
 
+    if (launchButton) {
+      if (activeMode === 'marker') {
+        launchButton.removeAttribute('aria-haspopup');
+        launchButton.removeAttribute('aria-controls');
+      } else {
+        launchButton.setAttribute('aria-haspopup', 'dialog');
+        launchButton.setAttribute('aria-controls', 'ar-guide');
+      }
+    }
+
     setStatus(activeMode === 'marker' ? 'QR READY' : '3D READY', 'ready');
   };
 
@@ -208,6 +218,11 @@
   };
 
   launchButton?.addEventListener('click', () => {
+    if (activeMode === 'marker') {
+      launchAR();
+      return;
+    }
+
     if (!arGuide || typeof arGuide.showModal !== 'function') {
       launchAR();
       return;

@@ -4,15 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
-  <title>Steak Out | QR Lock AR</title>
+  <title>Steak Out AR | $12 Lunch Preview</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Roboto+Slab:wght@800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./marker.css" />
+  <link href="https://fonts.cdnfonts.com/css/rustler" rel="stylesheet" />
+  <link rel="stylesheet" href="./marker.css?v=20260819-camera-overlay" />
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <script defer src="./config.js"></script>
-  <script defer src="./marker.js"></script>
+  <script defer src="./config.js?v=20260819-camera-overlay"></script>
+  <script defer src="./marker.js?v=20260819-camera-overlay"></script>
 </head>
 <body>
   <div class="marker-shell" id="marker-shell">
@@ -26,8 +27,8 @@
         <img src="./assets/steakout-logo.webp" alt="Steak Out" />
       </a>
       <div class="marker-brand">
-        <small>STEAK OUT</small>
-        <strong>QR LOCK</strong>
+        <strong><span>STEAK OUT</span><b>AR</b></strong>
+        <small>$12 LUNCH PREVIEW</small>
       </div>
       <span class="marker-status" id="marker-status">READY</span>
     </header>
@@ -43,11 +44,38 @@
       <small>For a phone-only test, print the test marker. Or show it on a second screen.</small>
     </div>
 
-    <div class="marker-scan-guide" id="marker-scan-guide" hidden>
-      <span class="scan-corners" aria-hidden="true"></span>
-      <strong>POINT AT THE TEST MARKER</strong>
-      <span>The burger will lock to it when detected.</span>
+    <div class="marker-scan-guide" id="marker-scan-guide" hidden aria-hidden="true">
+      <span class="scan-corners"></span>
     </div>
+
+    <aside
+      class="marker-instruction"
+      id="marker-instruction"
+      data-state="scanning"
+      role="status"
+      aria-live="polite"
+      hidden>
+      <button
+        class="marker-instruction__surface"
+        id="marker-instruction-toggle"
+        type="button"
+        aria-label="Show full AR instructions"
+        aria-expanded="true">
+        <span class="marker-instruction__icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <path class="marker-instruction__frame" d="M5 17V7a2 2 0 0 1 2-2h10M31 5h10a2 2 0 0 1 2 2v10M43 31v10a2 2 0 0 1-2 2H31M17 43H7a2 2 0 0 1-2-2V31" />
+            <path class="marker-instruction__qr" d="M14 14h8v8h-8zm12 0h8v8h-8zM14 26h8v8h-8zm13 0h3v3h-3zm4 0h3v8h-3zm-4 5h3v3h-3z" />
+            <path class="marker-instruction__check" d="m14 25 7 7 14-16" />
+          </svg>
+        </span>
+        <span class="marker-instruction__copy">
+          <span class="marker-instruction__eyebrow" id="marker-instruction-eyebrow">1 · VIEW IN AR</span>
+          <strong id="marker-instruction-title">POINT BACK AT THE TABLE GRAPHIC</strong>
+          <span class="marker-instruction__body" id="marker-instruction-body">Keep the full graphic in frame. Your $12 lunch will appear here.</span>
+        </span>
+        <span class="marker-instruction__chevron" aria-hidden="true">⌃</span>
+      </button>
+    </aside>
 
     <div class="marker-size-control" id="marker-size-control" hidden>
       <span>TEST SIZE</span>
@@ -55,6 +83,23 @@
       <output id="scale-output">100%</output>
       <button id="scale-up" type="button" aria-label="Make burger larger">+</button>
     </div>
+
+    <nav class="marker-social" id="marker-social" aria-label="Follow Steak Out" hidden>
+      <a id="marker-instagram" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Instagram">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="5" />
+          <circle cx="12" cy="12" r="4.1" />
+          <circle class="social-icon-fill" cx="17.5" cy="6.7" r="1.1" />
+        </svg>
+      </a>
+      <a id="marker-facebook" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Facebook">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="social-icon-fill" d="M14.3 8.2V6.6c0-.8.5-1 1-1h2.5V2.1L14.6 2C11.4 2 9.9 3.9 9.9 6.3v1.9H7v4h2.9V22h4.4v-9.8h3.2l.5-4h-3.7Z" />
+        </svg>
+      </a>
+    </nav>
+
+    <a class="marker-order" id="marker-order" href="#" hidden>ORDER NOW</a>
 
     <a-scene
       id="marker-scene"
