@@ -30,7 +30,7 @@
   const loadingText = splash.querySelector('span');
   if (loadingText) {
     loadingText.className = 'page-load-status';
-    loadingText.innerHTML = '<span class="page-load-status__word">LOADING</span><span class="page-load-status__dots" aria-hidden="true">.</span>';
+    loadingText.innerHTML = '<span class="page-load-status__word">LOADING EXPERIENCE</span><span class="page-load-status__dots" aria-hidden="true">.</span>';
   }
   const dots = splash.querySelector('.page-load-status__dots');
 

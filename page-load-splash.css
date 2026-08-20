@@ -34,3 +34,13 @@ html.is-preloading-ar body { overflow:hidden !important; }
 @media(prefers-reduced-motion:reduce){
   #ar-splash.is-page-load img { opacity:1; transform:none; }
 }
+
+/* styles.css runs wordFade on every span inside an active splash, and that
+   keyframe ends at opacity 0. It was written for the old <span>STEAK OUT</span>.
+   The status line's word and dots are nested spans, so they inherited the rule
+   and faded themselves out permanently. Opt them back in. */
+#ar-splash .page-load-status__word,
+#ar-splash .page-load-status__dots {
+  animation: none !important;
+  opacity: 1 !important;
+}
