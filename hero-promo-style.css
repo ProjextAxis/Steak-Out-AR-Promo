@@ -29,44 +29,44 @@
   line-height: .76;
 }
 
-/* Wide, soft red field centered behind the $12 and extending up behind the hours. */
+/* Softer red field behind the price, still matching the reference direction. */
 .ar-hero .offer-headline::before {
   content: '';
   position: absolute;
   z-index: -2;
   left: 50%;
-  top: 42%;
-  width: min(142vw, 980px);
-  height: 154%;
+  top: 43%;
+  width: min(132vw, 900px);
+  height: 146%;
   transform: translate(-50%, -50%);
   border-radius: 46%;
   background:
     radial-gradient(ellipse at 50% 42%,
-      rgba(255, 31, 35, .98) 0%,
-      rgba(225, 7, 22, .93) 14%,
-      rgba(174, 0, 15, .78) 30%,
-      rgba(115, 0, 10, .58) 47%,
-      rgba(64, 0, 7, .37) 61%,
-      rgba(24, 0, 3, .18) 72%,
+      rgba(255, 31, 35, .62) 0%,
+      rgba(225, 7, 22, .54) 16%,
+      rgba(174, 0, 15, .42) 32%,
+      rgba(115, 0, 10, .30) 49%,
+      rgba(64, 0, 7, .18) 63%,
+      rgba(24, 0, 3, .08) 73%,
       rgba(0, 0, 0, 0) 84%);
-  filter: blur(7px);
+  filter: blur(10px);
   pointer-events: none;
 }
 
-/* Heavy black perimeter so the glow dies into black like the reference. */
+/* Stronger black falloff keeps the glow subtle at the edges. */
 .ar-hero .offer-headline::after {
   content: '';
   position: absolute;
   z-index: -1;
   left: 50%;
-  top: 42%;
-  width: min(148vw, 1020px);
-  height: 160%;
+  top: 43%;
+  width: min(138vw, 940px);
+  height: 152%;
   transform: translate(-50%, -50%);
   border-radius: 46%;
   box-shadow:
-    inset 0 0 110px 52px rgba(0, 0, 0, .40),
-    inset 0 0 180px 84px rgba(0, 0, 0, .17);
+    inset 0 0 118px 58px rgba(0, 0, 0, .50),
+    inset 0 0 185px 88px rgba(0, 0, 0, .22);
   pointer-events: none;
 }
 
@@ -119,14 +119,14 @@
   }
 
   .ar-hero .offer-headline::before {
-    width: 154vw;
-    height: 162%;
-    top: 40%;
+    width: 144vw;
+    height: 154%;
+    top: 41%;
   }
 
   .ar-hero .offer-headline::after {
-    width: 160vw;
-    height: 168%;
-    top: 40%;
+    width: 150vw;
+    height: 160%;
+    top: 41%;
   }
 }
