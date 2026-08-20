@@ -3,7 +3,7 @@
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.96fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.9fr);
   grid-template-areas:
     "price model"
     "name  name";
@@ -23,7 +23,7 @@
   position: relative;
   isolation: isolate;
   justify-self: center;
-  font-size: clamp(106px, 34vw, 188px);
+  font-size: clamp(118px, 38vw, 210px);
   line-height: .78;
 }
 
@@ -88,6 +88,6 @@
 
 @media (max-width: 380px) {
   .hero-grid { column-gap: 0; }
-  .ar-hero .offer-price { font-size: clamp(92px, 32vw, 140px); }
+  .ar-hero .offer-price { font-size: clamp(104px, 36vw, 152px); }
   .ar-hero model-viewer#meal-viewer { height: clamp(140px, 42vw, 190px) !important; }
 }
