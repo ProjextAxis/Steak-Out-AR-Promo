@@ -30,12 +30,14 @@ window.STEAKOUT_AR_CONFIG = {
     // printed width and needs no physical measurement. The model is 0.3521
     // wide, so 1 / 0.3521 = 2.84 makes the plate exactly as wide as the flyer.
     // 3.0 gives it a slight overhang so it covers the artwork.
-    //   2.84 = exactly the flyer's width
-    //   4.15 = covers the whole portrait flyer
-    //   6.00 = current, roughly twice the flyer's width
+    // Plate width as a multiple of the flyer's width is 0.3521 * scale:
+    //    2.84 -> 1.0x, sits exactly within the flyer
+    //    6.00 -> 2.1x
+    //   12.00 -> 4.2x, current
+    //   17.00 -> 6.0x
     modelPosition: '0 0 0',
     modelRotation: '90 0 0',
-    modelScale: 6.0,
+    modelScale: 12.0,
     minScale: 0.08,
     maxScale: 1.25,
     scaleStep: 0.04
