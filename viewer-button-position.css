@@ -1,9 +1,9 @@
 .viewer-shell {
   position: relative;
+  overflow: hidden;
 }
 
-/* Keep the existing CTA styling, but pin the button inside the open strip
-   at the top of the food preview instead of letting it drift off-center. */
+/* Keep VIEW IN AR fully contained inside the 3D render card. */
 .viewer-ar-button {
   position: absolute !important;
   z-index: 9 !important;
@@ -14,6 +14,7 @@
   width: auto !important;
   max-width: none !important;
   margin: 0 !important;
+  box-sizing: border-box !important;
 }
 
 @media (max-width: 620px) {
