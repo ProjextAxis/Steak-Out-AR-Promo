@@ -89,7 +89,9 @@ window.STEAKOUT_AR_CONFIG = {
     }
   };
 
-  installTransparentSplashLogo();
+  // Single owner of the logo swap. page-load-splash.js waits on this instead of
+  // repeating the work, so nothing reassigns the src mid-animation.
+  window.STEAKOUT_LOGO_READY = installTransparentSplashLogo();
 
   const style = document.createElement('style');
   style.textContent = `

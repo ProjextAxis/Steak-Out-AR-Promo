@@ -24,7 +24,6 @@
   let pulseAnimation;
   let entranceScheduled = false;
   let focusTimer;
-  let cleanLogoUrl;
 
   splash.classList.add('is-page-load', 'is-active');
   splash.classList.remove('is-entering', 'is-waiting', 'is-page-load-exit');
@@ -57,30 +56,6 @@
       dotCount = (dotCount % 3) + 1;
       dots.textContent = '.'.repeat(dotCount);
     }, 700);
-  };
-
-  const prepareTransparentSvg = async () => {
-    if (!logo) return;
-    // Swapping src after the entrance begins reloads the image and blanks the
-    // logo part-way through the animation.
-    if (entranceAnimation) return;
-    try {
-      const response = await fetch('./assets/STEAK%20OUT%20LOGO.svg', { cache: 'force-cache' });
-      if (!response.ok) throw new Error('SVG load failed');
-      let svg = await response.text();
-      svg = svg.replace(/<path\b[^>]*fill=["']#ffffff["'][^>]*\/>/i, '');
-      cleanLogoUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-      if (entranceAnimation) return;
-      await new Promise((resolve) => {
-        const done = () => resolve();
-        logo.addEventListener('load', done, { once: true });
-        logo.addEventListener('error', done, { once: true });
-        logo.src = cleanLogoUrl;
-      });
-    } catch (error) {
-      console.warn('Using fallback splash logo:', error);
-      logo.src = './assets/steakout-logo.webp';
-    }
   };
 
   const startPulse = () => {
@@ -146,7 +121,12 @@
   window.addEventListener('pageshow', scheduleEntranceOnRealFocus);
   document.addEventListener('visibilitychange', scheduleEntranceOnRealFocus);
 
-  prepareTransparentSvg().finally(() => waitForFocus());
+  // Let the logo settle before animating it, but never let a slow fetch hold
+  // the splash open — the markup already ships a usable logo.
+  Promise.race([
+    window.STEAKOUT_LOGO_READY || Promise.resolve(),
+    new Promise((resolve) => window.setTimeout(resolve, 600))
+  ]).finally(() => waitForFocus());
 
   window.setTimeout(() => {
     if (!entranceAnimation && !finished) startEntrance();
@@ -200,7 +180,9 @@
       splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
-      if (cleanLogoUrl) URL.revokeObjectURL(cleanLogoUrl);
+      // Hidden is not enough: it stays a full-screen fixed layer holding the
+      // logo, so any stray class or animation can flash it back over the page.
+      splash.remove();
     }, 820);
   };
 
