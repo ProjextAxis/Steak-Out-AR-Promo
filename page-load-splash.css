@@ -18,29 +18,58 @@ html.is-preloading-ar body { overflow:hidden !important; }
   will-change:transform,opacity,filter;
 }
 
+/* Set on the spans, not just the parent: styles.css has `.ar-splash span`
+   with a font shorthand that otherwise hijacks both of them. */
 #ar-splash .page-load-status {
-  min-width:132px; margin-top:22px !important; display:inline-flex !important; align-items:baseline;
-  justify-content:flex-start; color:#fff; opacity:0;
-  font:400 clamp(22px,5.8vw,31px)/1 'Bebas Neue','Arial Narrow',sans-serif !important;
-  letter-spacing:.12em;
+  position: relative;
+  margin-top: 30px !important;
+  display: inline-flex !important;
+  align-items: baseline;
+  justify-content: center !important;
+  color: #fff;
+  opacity: 0;
+  font: 400 clamp(17px, 4.8vw, 24px)/1 'Rustler', Georgia, serif !important;
+  letter-spacing: .16em;
+  white-space: nowrap;
 }
-#ar-splash.is-page-load.is-waiting .page-load-status { animation:pageLoadStatusIn .65s ease forwards; }
-#ar-splash .page-load-status__dots { width:34px; display:inline-block; margin-left:2px; text-align:left; letter-spacing:.05em; }
+
+#ar-splash .page-load-status__word,
+#ar-splash .page-load-status__dots {
+  font: inherit !important;
+  letter-spacing: inherit;
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+/* Trailing letter-spacing sits after the last glyph, so a centred box reads a
+   half-step left. Nudge the ink back to true optical centre. */
+#ar-splash .page-load-status__word { margin-left: .08em; }
+
+/* Out of flow so a 1-dot frame and a 3-dot frame centre identically. */
+#ar-splash .page-load-status__dots {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 2.2em;
+  margin-left: .06em;
+  text-align: left;
+}
+
+#ar-splash.is-page-load.is-waiting .page-load-status {
+  animation: pageLoadStatusIn .9s cubic-bezier(.18, .84, .27, 1.18) forwards;
+}
 #ar-splash.is-page-load-exit { animation:pageLoadSplashExit .78s ease forwards !important; pointer-events:none !important; }
 
-@keyframes pageLoadStatusIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+/* Rises, overshoots and settles, tracking opening out as it lands — the same
+   personality as the logo's pop rather than a flat fade. */
+@keyframes pageLoadStatusIn {
+  0%   { opacity: 0; transform: translateY(16px) scale(.9);   filter: blur(5px); letter-spacing: .06em; }
+  50%  { opacity: 1; transform: translateY(-3px) scale(1.04); filter: blur(0);   letter-spacing: .17em; }
+  72%  {             transform: translateY(1px)  scale(.99);                     letter-spacing: .155em; }
+  100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0);   letter-spacing: .16em; }
+}
 @keyframes pageLoadSplashExit { from{opacity:1} to{opacity:0} }
 
 @media(prefers-reduced-motion:reduce){
   #ar-splash.is-page-load img { opacity:1; transform:none; }
-}
-
-/* styles.css runs wordFade on every span inside an active splash, and that
-   keyframe ends at opacity 0. It was written for the old <span>STEAK OUT</span>.
-   The status line's word and dots are nested spans, so they inherited the rule
-   and faded themselves out permanently. Opt them back in. */
-#ar-splash .page-load-status__word,
-#ar-splash .page-load-status__dots {
-  animation: none !important;
-  opacity: 1 !important;
 }
