@@ -128,3 +128,15 @@
     top: 37%;
   }
 }
+
+/* One plain line telling people what the button actually does.
+   Beats .ar-hero>p on specificity so the big hero-paragraph size doesn't apply. */
+.ar-hero .ar-nudge {
+  position: relative;
+  z-index: 3;
+  max-width: 26ch;
+  margin: 14px auto 0;
+  color: #EBEBEB;
+  font: 400 clamp(16px, 4.2vw, 20px)/1.35 Arial, Helvetica, sans-serif;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .9);
+}
