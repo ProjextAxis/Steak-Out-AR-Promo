@@ -237,6 +237,21 @@ body:has(.ar-guide[open]) {
   stroke-linejoin: round;
 }
 
+.ar-guide__permission {
+  max-width: 430px;
+  margin: 18px auto 0;
+  padding: 12px 14px;
+  color: var(--white);
+  background: #171414;
+  border-radius: 14px;
+  font: 400 16px/1.4 Arial, sans-serif;
+}
+
+.ar-guide__permission strong {
+  color: var(--white);
+  font-weight: 700;
+}
+
 .ar-guide__start {
   width: min(100%, 430px);
   min-height: 62px;

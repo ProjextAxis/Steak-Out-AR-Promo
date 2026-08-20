@@ -37,8 +37,14 @@
     }
   };
 
+  // Marker mode hands off to the in-page camera flow in app.js, which shows no
+  // splash of its own. Only free placement needs the splash suppressed here.
+  const currentMode = () =>
+    document.querySelector('[data-ar-mode].is-active')?.dataset.arMode || 'free';
+
   // Stop app.js from replaying the full-page splash after the instruction sheet.
   guideStart?.addEventListener('click', (event) => {
+    if (currentMode() === 'marker') return;
     event.preventDefault();
     event.stopImmediatePropagation();
     activateARImmediately();
@@ -46,6 +52,7 @@
 
   // Fallback for browsers without <dialog> support: launch directly with no replayed splash.
   launchButton?.addEventListener('click', (event) => {
+    if (currentMode() === 'marker') return;
     if (guide && typeof guide.showModal === 'function') return;
     event.preventDefault();
     event.stopImmediatePropagation();

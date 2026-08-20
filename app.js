@@ -251,15 +251,10 @@
     }
 
     if (launchButton) {
-      if (activeMode === 'marker') {
-        launchButton.removeAttribute('aria-haspopup');
-        launchButton.removeAttribute('aria-controls');
-        launchButton.removeAttribute('aria-expanded');
-      } else {
-        launchButton.setAttribute('aria-haspopup', 'dialog');
-        launchButton.setAttribute('aria-controls', 'ar-guide');
-        launchButton.setAttribute('aria-expanded', 'false');
-      }
+      // The instruction sheet primes the camera permission, so it runs in both modes.
+      launchButton.setAttribute('aria-haspopup', 'dialog');
+      launchButton.setAttribute('aria-controls', 'ar-guide');
+      launchButton.setAttribute('aria-expanded', 'false');
     }
 
     setStatus(activeMode === 'marker' ? 'QR READY' : '3D READY', 'ready');
@@ -326,11 +321,6 @@
   };
 
   launchButton?.addEventListener('click', () => {
-    if (activeMode === 'marker') {
-      launchAR();
-      return;
-    }
-
     if (!arGuide || typeof arGuide.showModal !== 'function') {
       launchAR();
       return;
