@@ -36,8 +36,7 @@ window.STEAKOUT_AR_CONFIG = {
 };
 
 /* Warm the custom marker AR before the user taps VIEW IN AR.
-   This does not request camera permission or start MindAR. It only loads the
-   iframe, libraries, and model into the browser cache early. */
+   This does not request camera permission or start MindAR. */
 (() => {
   const modelUrl = window.STEAKOUT_AR_CONFIG.modelUrl;
 
@@ -60,12 +59,38 @@ window.STEAKOUT_AR_CONFIG = {
     }
   }, 0);
 
-  const loading = document.querySelector('#browser-ar-loading');
-  const loadingLogo = loading?.querySelector('img');
-  if (loadingLogo) loadingLogo.src = './assets/STEAK OUT LOGO.svg';
+  /* The uploaded SVG contains a full-canvas white path as its first path.
+     Strip only that background path in memory so the original source asset
+     remains untouched and the splash gets a true transparent logo. */
+  const installTransparentSplashLogo = async () => {
+    try {
+      const response = await fetch('./assets/STEAK OUT LOGO.svg', { cache: 'force-cache' });
+      if (!response.ok) throw new Error(`SVG ${response.status}`);
+      const source = await response.text();
+      const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
+      const svg = doc.documentElement;
+      const firstPath = svg.querySelector('path');
+      const fill = firstPath?.getAttribute('fill')?.toLowerCase();
+      const pathData = firstPath?.getAttribute('d') || '';
 
-  const pageSplashLogo = document.querySelector('#ar-splash img');
-  if (pageSplashLogo) pageSplashLogo.src = './assets/STEAK OUT LOGO.svg';
+      if ((fill === '#ffffff' || fill === '#fff' || fill === 'white') && /^M\s*0(?:\.0+)?\s+0(?:\.0+)?/i.test(pathData)) {
+        firstPath.remove();
+      }
+
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      const cleaned = new XMLSerializer().serializeToString(svg);
+      const url = URL.createObjectURL(new Blob([cleaned], { type: 'image/svg+xml' }));
+
+      document.querySelectorAll('#browser-ar-loading img, #ar-splash img').forEach((img) => {
+        img.src = url;
+      });
+    } catch (error) {
+      console.warn('Could not clean Steak Out SVG splash:', error);
+    }
+  };
+
+  installTransparentSplashLogo();
 
   const style = document.createElement('style');
   style.textContent = `
@@ -84,28 +109,18 @@ window.STEAKOUT_AR_CONFIG = {
       animation: steakoutOuterWord 1.05s .42s ease both !important;
     }
 
+    #meal-viewer {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
     @keyframes steakoutOuterSwingUp {
-      0% {
-        opacity: 0;
-        transform: translateY(54vh) rotate(-300deg) scale(.42);
-      }
-      54% {
-        opacity: 1;
-        transform: translateY(0) rotate(10deg) scale(1);
-      }
-      67% {
-        transform: translateY(0) rotate(-3deg) scale(1.18);
-      }
-      78% {
-        transform: translateY(0) rotate(0deg) scale(.96);
-      }
-      88% {
-        transform: translateY(0) rotate(0deg) scale(1.04);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) rotate(0deg) scale(1);
-      }
+      0% { opacity: 0; transform: translateY(54vh) rotate(-300deg) scale(.42); }
+      54% { opacity: 1; transform: translateY(0) rotate(10deg) scale(1); }
+      67% { transform: translateY(0) rotate(-3deg) scale(1.18); }
+      78% { transform: translateY(0) rotate(0deg) scale(.96); }
+      88% { transform: translateY(0) rotate(0deg) scale(1.04); }
+      100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
     }
 
     @keyframes steakoutOuterWord {
@@ -129,4 +144,42 @@ window.STEAKOUT_AR_CONFIG = {
       subtree: true
     });
   }
+
+  /* Safari was leaving model-viewer's first rendered frame behind its reveal
+     layer until the viewer received a touch. Explicitly dismiss the reveal
+     layer and kick the camera renderer as soon as the GLB is actually loaded. */
+  const installModelRevealFix = async () => {
+    if (!window.customElements) return;
+    try {
+      await customElements.whenDefined('model-viewer');
+    } catch (_) {
+      return;
+    }
+
+    const viewer = document.querySelector('#meal-viewer');
+    if (!viewer) return;
+
+    viewer.setAttribute('reveal', 'auto');
+    viewer.setAttribute('interaction-prompt', 'none');
+
+    const reveal = () => {
+      try { viewer.dismissPoster?.(); } catch (_) {}
+      try { viewer.jumpCameraToGoal?.(); } catch (_) {}
+      viewer.style.opacity = '1';
+      viewer.style.visibility = 'visible';
+
+      // Toggling auto-rotate for one frame forces Safari/WebGL to paint the
+      // first canvas frame without requiring a user tap.
+      const hadAutoRotate = viewer.hasAttribute('auto-rotate');
+      viewer.removeAttribute('auto-rotate');
+      requestAnimationFrame(() => {
+        if (hadAutoRotate) viewer.setAttribute('auto-rotate', '');
+      });
+    };
+
+    viewer.addEventListener('load', reveal);
+    if (viewer.loaded) reveal();
+  };
+
+  installModelRevealFix();
 })();
