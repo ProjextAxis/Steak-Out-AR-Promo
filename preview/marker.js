@@ -35,6 +35,9 @@
   let isRunning = false;
   let targetVisible = false;
   let progressAdvanceTimer;
+  let hasLocked = false;
+  let lostGraceTimer;
+  let lockedHideTimer;
 
   const setStatus = (label, state = '') => {
     if (!status) return;
@@ -142,6 +145,16 @@
     progressAdvanceTimer = undefined;
   };
 
+  const clearLostGrace = () => {
+    window.clearTimeout(lostGraceTimer);
+    lostGraceTimer = undefined;
+  };
+
+  const clearLockedHide = () => {
+    window.clearTimeout(lockedHideTimer);
+    lockedHideTimer = undefined;
+  };
+
   const start = () => {
     if (stopPromise) return stopPromise.then(start);
     if (isRunning) return Promise.resolve();
@@ -150,6 +163,9 @@
     startPromise = (async () => {
       try {
         clearProgressAdvance();
+        clearLostGrace();
+        clearLockedHide();
+        hasLocked = false;
         targetVisible = false;
         setPlacementGhost();
         intro.hidden = true;
@@ -221,12 +237,30 @@
     if (!isRunning) return;
     targetVisible = true;
     clearProgressAdvance();
+    clearLostGrace();
+
+    // Already locked once: re-acquiring after a wobble should be silent rather
+    // than replaying the whole walkthrough.
+    if (hasLocked) {
+      setPlacementSolid();
+      if (instruction) instruction.hidden = true;
+      return;
+    }
+
     setPlacementGhost();
     renderInstruction('holding');
     progressAdvanceTimer = window.setTimeout(() => {
       if (!isRunning || !targetVisible) return;
       setPlacementSolid();
       renderInstruction('locked');
+      hasLocked = true;
+
+      // The steps have done their job the moment the meal is on the table.
+      clearLockedHide();
+      lockedHideTimer = window.setTimeout(() => {
+        if (!isRunning || !targetVisible) return;
+        if (instruction) instruction.hidden = true;
+      }, 2200);
     }, 900);
   });
 
@@ -234,8 +268,16 @@
     if (!isRunning) return;
     targetVisible = false;
     clearProgressAdvance();
-    setPlacementGhost();
-    renderInstruction('lost');
+
+    // A momentary wobble should not tear the guidance back over the screen.
+    // Only admit we lost it if it stays lost.
+    clearLostGrace();
+    lostGraceTimer = window.setTimeout(() => {
+      if (!isRunning || targetVisible) return;
+      hasLocked = false;
+      setPlacementGhost();
+      renderInstruction('lost');
+    }, 1600);
   });
 
   startButton.addEventListener('click', start);
