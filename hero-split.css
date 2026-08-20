@@ -99,6 +99,10 @@
    --------------------------------------------------------------------------- */
 
 .dev-panel {
+  /* Testing UI, so it stays out of the customer-facing promo and only appears
+     inside the AR camera. Safe now that the branded camera is the only AR
+     surface — nothing can strand the toggle. */
+  display: none !important;
   position: fixed;
   z-index: 210;
   top: 27%;
@@ -138,6 +142,8 @@
 
 .dev-panel summary::-webkit-details-marker,
 .dev-panel summary::marker { display: none; content: ''; }
+
+body.browser-ar-open .dev-panel { display: flex !important; }
 
 /* A code chevron rather than a plain dot, flipping to face the panel. */
 .dev-panel summary::after {
