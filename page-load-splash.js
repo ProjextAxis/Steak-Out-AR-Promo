@@ -7,7 +7,7 @@
   const MAX_MS = 14000;
   const FOCUS_SETTLE_MS = 650;
   const ENTRANCE_MS = 3200;
-  const PULSE_MS = 7200;
+  const PULSE_MS = 6200;
   const started = performance.now();
 
   let modelReady = false;
@@ -67,9 +67,9 @@
     splash.classList.add('is-waiting');
     startDots();
     pulseAnimation = logo.animate([
-      { transform: 'translateY(0) rotate(0deg) scale(1)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' },
-      { transform: 'translateY(0) rotate(0deg) scale(1.09)', opacity: .93, filter: 'drop-shadow(0 0 28px rgba(186,31,44,.34))', offset: .5 },
-      { transform: 'translateY(0) rotate(0deg) scale(1)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' }
+      { transform: 'translateY(0) rotate(0deg) scale(.98)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' },
+      { transform: 'translateY(0) rotate(0deg) scale(1.14)', opacity: .9, filter: 'drop-shadow(0 0 40px rgba(186,31,44,.46))', offset: .5 },
+      { transform: 'translateY(0) rotate(0deg) scale(.98)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' }
     ], { duration: PULSE_MS, easing: 'ease-in-out', iterations: Infinity });
   };
 
