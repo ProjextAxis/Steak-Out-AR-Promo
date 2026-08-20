@@ -51,11 +51,14 @@ window.STEAKOUT_AR_CONFIG = {
     document.head.appendChild(preload);
   }
 
-  const frame = document.querySelector('#browser-ar-frame');
-  if (frame?.dataset.src && frame.src === 'about:blank') {
-    frame.src = frame.dataset.src;
-    frame.dataset.src = '';
-  }
+  // Let app.js attach its iframe message listener first, then warm the AR frame.
+  window.setTimeout(() => {
+    const frame = document.querySelector('#browser-ar-frame');
+    if (frame?.dataset.src && frame.src === 'about:blank') {
+      frame.src = frame.dataset.src;
+      frame.dataset.src = '';
+    }
+  }, 0);
 
   const loading = document.querySelector('#browser-ar-loading');
   const loadingLogo = loading?.querySelector('img');
