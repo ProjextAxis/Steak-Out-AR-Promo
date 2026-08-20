@@ -20,14 +20,21 @@ window.STEAKOUT_AR_CONFIG = {
 
   marker: {
     enabled: true,
-    // Temporary MindAR sample target. Replace both URLs after the final QR ad
-    // is designed and compiled to a .mind file.
-    targetMindUrl: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind',
-    targetPreviewUrl: 'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.png',
+    // The printed $12 LUNCH MYSTERY flyer, compiled with tools/compile-mind.js.
+    // Scores 92 tracking / 3999 matching points against the MindAR sample's
+    // 62 / 593, so it locks on well.
+    targetMindUrl: './assets/steakout-marker.mind',
+    targetPreviewUrl: './assets/steakout-marker.png',
 
-    modelPosition: '0 0 0.12',
+    // MindAR normalises the marker to 1 unit wide, so scale is relative to the
+    // printed width and needs no physical measurement. The model is 0.3521
+    // wide, so 1 / 0.3521 = 2.84 makes the plate exactly as wide as the flyer.
+    // 3.0 gives it a slight overhang so it covers the artwork.
+    //   2.84 = exactly the flyer's width
+    //   4.15 = tall enough to cover the whole portrait flyer
+    modelPosition: '0 0 0',
     modelRotation: '90 0 0',
-    modelScale: 0.32,
+    modelScale: 3.0,
     minScale: 0.08,
     maxScale: 1.25,
     scaleStep: 0.04
