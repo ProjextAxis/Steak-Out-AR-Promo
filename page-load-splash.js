@@ -8,6 +8,10 @@
   const FOCUS_SETTLE_MS = 650;
   const ENTRANCE_MS = 3200;
   const PULSE_MS = 6200;
+  // In-app WebViews often never report focus. Without these the entrance never
+  // starts, and every exit path below waits on it.
+  const ENTRANCE_FALLBACK_MS = 2600;
+  const AR_FRAME_GRACE_MS = 4200;
   const started = performance.now();
 
   let modelReady = false;
@@ -121,6 +125,17 @@
 
   prepareTransparentSvg().finally(() => waitForFocus());
 
+  window.setTimeout(() => {
+    if (!entranceAnimation && !finished) startEntrance();
+  }, ENTRANCE_FALLBACK_MS);
+
+  // The AR frame is only a warm-up; it must never hold the splash open.
+  window.setTimeout(() => {
+    if (arFrameReady) return;
+    arFrameReady = true;
+    maybeFinish();
+  }, AR_FRAME_GRACE_MS);
+
   const viewer = document.querySelector('#meal-viewer');
   if (viewer) {
     if (viewer.loaded) modelReady = true;
@@ -138,8 +153,9 @@
     }
   });
 
-  const finish = () => {
-    if (finished || !entranceDone) return;
+  const finish = (force) => {
+    if (finished) return;
+    if (!force && !entranceDone) return;
     finished = true;
     window.clearInterval(dotTimer);
     window.clearTimeout(focusTimer);
@@ -163,7 +179,6 @@
     if (modelReady && arFrameReady) finish();
   }
 
-  window.setTimeout(() => {
-    if (!finished && entranceDone) finish();
-  }, MAX_MS);
+  // Unconditional. Whatever stalled, the page must become usable.
+  window.setTimeout(() => finish(true), MAX_MS);
 })();
