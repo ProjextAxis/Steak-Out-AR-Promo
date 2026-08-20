@@ -3,15 +3,15 @@
   if (!splash) return;
 
   const logo = splash.querySelector('img');
-  const MIN_MS = 5200;
-  const MAX_MS = 14000;
-  const FOCUS_SETTLE_MS = 650;
-  const ENTRANCE_MS = 3200;
+  const MIN_MS = 1600;
+  const MAX_MS = 7000;
+  const FOCUS_SETTLE_MS = 220;
+  const ENTRANCE_MS = 1500;
   const PULSE_MS = 6200;
   // In-app WebViews often never report focus. Without these the entrance never
   // starts, and every exit path below waits on it.
-  const ENTRANCE_FALLBACK_MS = 2600;
-  const AR_FRAME_GRACE_MS = 4200;
+  const ENTRANCE_FALLBACK_MS = 850;
+  const AR_FRAME_GRACE_MS = 1400;
   const started = performance.now();
 
   let modelReady = false;
@@ -92,6 +92,12 @@
 
   const startEntrance = () => {
     if (!logo || finished || entranceAnimation) return;
+
+    // Run the loading line with the logo, not after it. The splash is now short
+    // enough that waiting for the entrance would cut the letters off.
+    splash.classList.add('is-waiting');
+    startDots();
+
     entranceAnimation = logo.animate([
       { transform: 'translateY(108vh) rotate(-220deg) scale(.28)', opacity: .08 },
       { transform: 'translateY(82vh) rotate(-175deg) scale(.38)', opacity: .42, offset: .16 },

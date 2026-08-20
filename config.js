@@ -1,6 +1,6 @@
 window.STEAKOUT_AR_CONFIG = {
   itemName: 'Cheesesteak Special',
-  modelUrl: './assets/cheesesteak-special-ar-optimized.glb',
+  modelUrl: './assets/cheesesteak-special-draco.glb',
   iosModelUrl: '',
   orderUrl: 'https://order.toasttab.com/online/steakout-sewell',
   demoAsset: false,

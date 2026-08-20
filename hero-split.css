@@ -1,0 +1,93 @@
+/* $12 and the 3D plate share the top row; LUNCH SPECIALS spans beneath both.
+   Buys back a lot of vertical space as well as pairing the price with the food. */
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.2fr);
+  grid-template-areas:
+    "price model"
+    "name  name";
+  align-items: center;
+  column-gap: 2px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* The h1 keeps its heading semantics while its two spans become grid items. */
+.ar-hero .offer-headline {
+  display: contents;
+}
+
+.ar-hero .offer-price {
+  grid-area: price;
+  position: relative;
+  isolation: isolate;
+  justify-self: center;
+  font-size: clamp(84px, 26vw, 146px);
+  line-height: .78;
+}
+
+.ar-hero .offer-name {
+  grid-area: name;
+  margin-top: 2px;
+  font-size: clamp(44px, 12.6vw, 74px);
+  line-height: .88;
+}
+
+.ar-hero .viewer-shell {
+  grid-area: model;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.ar-hero model-viewer#meal-viewer {
+  height: clamp(178px, 52vw, 320px) !important;
+  min-height: 0 !important;
+}
+
+/* display:contents drops the headline's own pseudo-elements, so the red glow
+   moves onto the price it was always sitting behind. */
+.ar-hero .offer-headline::before,
+.ar-hero .offer-headline::after {
+  content: none !important;
+}
+
+.ar-hero .offer-price::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  left: 50%;
+  top: 46%;
+  width: 200%;
+  height: 155%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 45%,
+      rgba(238, 20, 27, .50) 0%,
+      rgba(198, 5, 18, .42) 20%,
+      rgba(137, 0, 12, .30) 40%,
+      rgba(78, 0, 8, .18) 58%,
+      rgba(0, 0, 0, 0) 78%);
+  filter: blur(12px);
+  pointer-events: none;
+}
+
+/* The CTA is no longer overlaid on the viewer, but keeps its outlined look so
+   it stays distinct from the solid red ORDER NOW bar. */
+.ar-hero .primary-ar-button {
+  position: static !important;
+  width: min(100%, 620px) !important;
+  max-width: none !important;
+  margin: 14px auto 0 !important;
+  min-height: 62px !important;
+  border-radius: 38px !important;
+  background: rgba(0, 0, 0, .94) !important;
+  border: 3px solid var(--red) !important;
+}
+
+@media (max-width: 380px) {
+  .hero-grid { column-gap: 0; }
+  .ar-hero .offer-price { font-size: clamp(74px, 25vw, 110px); }
+  .ar-hero model-viewer#meal-viewer { height: clamp(158px, 48vw, 210px) !important; }
+}

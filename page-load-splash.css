@@ -71,9 +71,9 @@ html.is-preloading-ar body { overflow:hidden !important; }
 }
 
 #ar-splash.is-page-load.is-waiting .page-load-status__ch {
-  animation: statusCharIn .62s cubic-bezier(.2, .9, .25, 1.35) forwards !important;
+  animation: statusCharIn .5s cubic-bezier(.2, .9, .25, 1.35) forwards !important;
   /* Must be !important too: the shorthand above is !important and resets delay. */
-  animation-delay: calc(var(--i) * 34ms) !important;
+  animation-delay: calc(var(--i) * 22ms) !important;
 }
 
 /* Alternate the kick so the line reads as playful rather than mechanical. */
@@ -83,7 +83,7 @@ html.is-preloading-ar body { overflow:hidden !important; }
 
 /* Trails in once the last letter has landed. */
 #ar-splash.is-page-load.is-waiting .page-load-status__dots {
-  animation: statusDotsIn .42s cubic-bezier(.2, .9, .25, 1.35) .66s forwards !important;
+  animation: statusDotsIn .38s cubic-bezier(.2, .9, .25, 1.35) .46s forwards !important;
 }
 #ar-splash.is-page-load-exit { animation:pageLoadSplashExit .78s ease forwards !important; pointer-events:none !important; }
 
