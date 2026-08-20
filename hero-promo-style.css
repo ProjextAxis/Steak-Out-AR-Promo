@@ -1,0 +1,116 @@
+.ar-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-top: 28px;
+  background: #000;
+}
+
+/* Reference-style red halo behind the price. */
+.ar-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  top: 40px;
+  left: 50%;
+  width: min(118vw, 820px);
+  height: min(118vw, 820px);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 48%,
+      rgba(255, 19, 27, .82) 0%,
+      rgba(210, 0, 17, .62) 16%,
+      rgba(132, 0, 11, .42) 33%,
+      rgba(67, 0, 7, .22) 49%,
+      rgba(0, 0, 0, 0) 69%);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+/* Very subtle ring from the reference art. */
+.ar-hero::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 72px;
+  left: 50%;
+  width: min(108vw, 760px);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border: 2px solid rgba(186, 31, 44, .15);
+  border-radius: 50%;
+  box-shadow: 0 0 34px rgba(186, 31, 44, .08);
+  pointer-events: none;
+}
+
+.offer-window,
+.offer-headline {
+  position: relative;
+  z-index: 1;
+}
+
+.offer-window {
+  color: #fff;
+  font-size: clamp(18px, 5vw, 25px);
+  letter-spacing: .055em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .9);
+}
+
+.ar-hero .offer-headline {
+  margin-top: 16px;
+  line-height: .76;
+}
+
+.offer-price {
+  font-size: clamp(142px, 45vw, 248px);
+  line-height: .76;
+  letter-spacing: -.025em;
+  text-shadow:
+    0 2px 0 rgba(255, 255, 255, .12),
+    0 10px 30px rgba(0, 0, 0, .32);
+}
+
+.offer-name {
+  margin-top: 22px;
+  font-size: clamp(58px, 16.2vw, 92px);
+  line-height: .88;
+  letter-spacing: .006em;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, .38);
+}
+
+.viewer-shell {
+  position: relative;
+  z-index: 2;
+  margin-top: 30px;
+}
+
+@media (max-width: 410px) {
+  .ar-hero {
+    padding-top: 24px;
+  }
+
+  .ar-hero::before {
+    top: 36px;
+    width: 128vw;
+    height: 128vw;
+  }
+
+  .ar-hero::after {
+    top: 68px;
+    width: 116vw;
+  }
+
+  .offer-window {
+    font-size: 17px;
+  }
+
+  .offer-price {
+    font-size: clamp(136px, 46vw, 190px);
+  }
+
+  .offer-name {
+    margin-top: 19px;
+    font-size: clamp(54px, 16.5vw, 68px);
+  }
+}
