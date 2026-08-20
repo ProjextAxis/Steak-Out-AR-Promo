@@ -4,7 +4,7 @@
 
   const logo = splash.querySelector('img');
   const MIN_MS = 1600;
-  const MAX_MS = 7000;
+  const MAX_MS = 5000;
   const FOCUS_SETTLE_MS = 220;
   const ENTRANCE_MS = 1500;
   const PULSE_MS = 6200;
@@ -80,7 +80,7 @@
   };
 
   const startPulse = () => {
-    if (!logo || finished) return;
+    if (!logo || finished || pulseAnimation) return;
     splash.classList.add('is-waiting');
     startDots();
     pulseAnimation = logo.animate([
@@ -147,6 +147,16 @@
   window.setTimeout(() => {
     if (!entranceAnimation && !finished) startEntrance();
   }, ENTRANCE_FALLBACK_MS);
+
+  // A paused document (backgrounded tab, throttled WebView) can leave the
+  // entrance promise unresolved forever. Treat the entrance as done on time
+  // regardless, so the normal exit runs instead of falling through to MAX_MS.
+  window.setTimeout(() => {
+    if (entranceDone || finished) return;
+    entranceDone = true;
+    startPulse();
+    maybeFinish();
+  }, ENTRANCE_FALLBACK_MS + ENTRANCE_MS + 400);
 
   // The AR frame is only a warm-up; it must never hold the splash open.
   window.setTimeout(() => {
