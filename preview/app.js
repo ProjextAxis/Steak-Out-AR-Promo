@@ -121,8 +121,6 @@
   if (!viewer) return;
 
   if (config.modelUrl) viewer.src = config.modelUrl;
-  if (config.iosModelUrl) viewer.setAttribute('ios-src', config.iosModelUrl);
-  viewer.setAttribute('ar-scale', config.freePlace?.arScale || 'auto');
 
   document.querySelectorAll('[data-order-link]').forEach((link) => {
     if (config.orderUrl) link.href = config.orderUrl;
@@ -299,21 +297,9 @@
   const launchAR = async () => {
     track('ar_launch_tapped', { mode: activeMode, item: config.itemName || 'test-food' });
 
-    if (activeMode === 'marker') {
-      openBrowserAR();
-      return;
-    }
-
-    await runSplash();
-
-    try {
-      if (typeof viewer.activateAR !== 'function') throw new Error('AR unavailable');
-      await viewer.activateAR();
-    } catch (error) {
-      console.warn('AR launch failed:', error);
-      viewer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setStatus('USE AR BUTTON', 'error');
-    }
+    // Steak Out AR is always the branded in-page camera. Apple's AR Quick Look
+    // and Scene Viewer are never used, whatever mode the dev toggle is on.
+    openBrowserAR();
   };
 
   const closeARGuide = () => {
