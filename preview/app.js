@@ -4,7 +4,6 @@
   const modeToggle = document.querySelector('#mode-toggle');
   const modeButtons = [...document.querySelectorAll('[data-ar-mode]')];
   const modeCopy = document.querySelector('#mode-copy');
-  const splash = document.querySelector('#ar-splash');
   const launchButton = document.querySelector('#launch-ar-top');
   const arGuide = document.querySelector('#ar-guide');
   const arGuideStart = document.querySelector('#ar-guide-start');
@@ -256,14 +255,6 @@
     }
 
     setStatus(activeMode === 'marker' ? 'QR READY' : '3D READY', 'ready');
-  };
-
-  const runSplash = async () => {
-    if (!splash) return;
-    splash.classList.remove('is-active');
-    void splash.offsetWidth;
-    splash.classList.add('is-active');
-    await new Promise((resolve) => setTimeout(resolve, 900));
   };
 
   modeButtons.forEach((button) => {
