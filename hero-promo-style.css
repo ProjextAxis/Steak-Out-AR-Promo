@@ -6,41 +6,40 @@
   background: #000;
 }
 
-/* Reference-style red halo behind the price. */
+/* Reference-style red halo behind the price. Keep it ABOVE the section background. */
 .ar-hero::before {
   content: '';
   position: absolute;
-  z-index: -2;
-  top: 40px;
+  z-index: 0;
+  top: 22px;
   left: 50%;
-  width: min(118vw, 820px);
-  height: min(118vw, 820px);
+  width: min(126vw, 860px);
+  height: min(126vw, 860px);
   transform: translateX(-50%);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 48%,
-      rgba(255, 19, 27, .82) 0%,
-      rgba(210, 0, 17, .62) 16%,
-      rgba(132, 0, 11, .42) 33%,
-      rgba(67, 0, 7, .22) 49%,
-      rgba(0, 0, 0, 0) 69%);
-  filter: blur(4px);
+    radial-gradient(circle at 50% 46%,
+      rgba(255, 18, 26, .96) 0%,
+      rgba(224, 0, 18, .80) 16%,
+      rgba(151, 0, 13, .58) 34%,
+      rgba(81, 0, 8, .34) 50%,
+      rgba(0, 0, 0, 0) 72%);
+  filter: blur(3px);
   pointer-events: none;
 }
 
-/* Very subtle ring from the reference art. */
 .ar-hero::after {
   content: '';
   position: absolute;
-  z-index: -1;
-  top: 72px;
+  z-index: 0;
+  top: 60px;
   left: 50%;
-  width: min(108vw, 760px);
+  width: min(112vw, 780px);
   aspect-ratio: 1;
   transform: translateX(-50%);
-  border: 2px solid rgba(186, 31, 44, .15);
+  border: 2px solid rgba(186, 31, 44, .22);
   border-radius: 50%;
-  box-shadow: 0 0 34px rgba(186, 31, 44, .08);
+  box-shadow: 0 0 44px rgba(186, 31, 44, .14);
   pointer-events: none;
 }
 
@@ -91,14 +90,14 @@
   }
 
   .ar-hero::before {
-    top: 36px;
-    width: 128vw;
-    height: 128vw;
+    top: 18px;
+    width: 136vw;
+    height: 136vw;
   }
 
   .ar-hero::after {
-    top: 68px;
-    width: 116vw;
+    top: 54px;
+    width: 120vw;
   }
 
   .offer-window {
