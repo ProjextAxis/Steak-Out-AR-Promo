@@ -2,9 +2,9 @@
   const splash = document.querySelector('#ar-splash');
   if (!splash) return;
 
-  const MIN_MS = 2400;
-  const MAX_MS = 8000;
-  const PULSE_START_MS = 1550;
+  const MIN_MS = 3600;
+  const MAX_MS = 9000;
+  const PULSE_START_MS = 2850;
   const started = performance.now();
   let modelReady = false;
   let arFrameReady = false;
@@ -32,7 +32,7 @@
     dotTimer = window.setInterval(() => {
       dotCount = (dotCount % 3) + 1;
       dots.textContent = '.'.repeat(dotCount);
-    }, 430);
+    }, 680);
   };
 
   window.setTimeout(startWaitingPulse, PULSE_START_MS);
@@ -70,7 +70,7 @@
       splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
-    }, 650);
+    }, 760);
   };
 
   function maybeFinish() {
