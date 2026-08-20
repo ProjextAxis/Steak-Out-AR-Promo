@@ -2,17 +2,26 @@
   const splash = document.querySelector('#ar-splash');
   if (!splash) return;
 
-  const MIN_MS = 4200;
-  const MAX_MS = 10000;
+  const logo = splash.querySelector('img');
+  const MIN_MS = 5200;
+  const MAX_MS = 12000;
+  const ENTRANCE_DELAY_MS = 1200;
+  const ENTRANCE_MS = 3200;
+  const PULSE_MS = 10600;
   const started = performance.now();
+
   let modelReady = false;
   let arFrameReady = false;
+  let entranceDone = false;
   let finished = false;
   let dotTimer;
   let dotCount = 0;
+  let entranceAnimation;
+  let pulseAnimation;
+  let entranceScheduled = false;
 
   splash.classList.add('is-page-load', 'is-active');
-  splash.classList.remove('is-entering', 'is-waiting');
+  splash.classList.remove('is-entering', 'is-waiting', 'is-page-load-exit');
   splash.setAttribute('aria-hidden', 'false');
   document.documentElement.classList.add('is-preloading-ar');
 
@@ -21,35 +30,63 @@
     loadingText.className = 'page-load-status';
     loadingText.innerHTML = '<span class="page-load-status__word">LOADING</span><span class="page-load-status__dots" aria-hidden="true">.</span>';
   }
-
   const dots = splash.querySelector('.page-load-status__dots');
-  const logo = splash.querySelector('img');
 
   const startDots = () => {
     if (dotTimer || !dots) return;
     dotTimer = window.setInterval(() => {
       dotCount = (dotCount % 3) + 1;
       dots.textContent = '.'.repeat(dotCount);
-    }, 680);
+    }, 700);
   };
 
-  if (logo) {
-    const onEntranceEnd = (event) => {
-      if (event.target !== logo || event.animationName !== 'pageLoadSteakOutSwingVisible') return;
-      logo.removeEventListener('animationend', onEntranceEnd);
-      splash.classList.remove('is-entering');
-      splash.classList.add('is-waiting');
-      startDots();
-    };
-    logo.addEventListener('animationend', onEntranceEnd);
+  const startPulse = () => {
+    if (!logo || finished) return;
+    splash.classList.add('is-waiting');
+    startDots();
+    pulseAnimation = logo.animate([
+      { transform: 'translateY(0) rotate(0deg) scale(1)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' },
+      { transform: 'translateY(0) rotate(0deg) scale(1.05)', opacity: .95, filter: 'drop-shadow(0 0 18px rgba(186,31,44,.22))', offset: .5 },
+      { transform: 'translateY(0) rotate(0deg) scale(1)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' }
+    ], { duration: PULSE_MS, easing: 'ease-in-out', iterations: Infinity });
+  };
 
-    // Force a real first paint with the logo below the viewport before starting motion.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!finished) splash.classList.add('is-entering');
-      });
-    });
-  }
+  const startEntrance = () => {
+    if (!logo || finished || entranceAnimation) return;
+    splash.classList.add('has-started-entrance');
+    entranceAnimation = logo.animate([
+      { transform: 'translateY(108vh) rotate(-220deg) scale(.28)', opacity: .08 },
+      { transform: 'translateY(82vh) rotate(-175deg) scale(.38)', opacity: .42, offset: .16 },
+      { transform: 'translateY(54vh) rotate(-118deg) scale(.52)', opacity: .7, offset: .34 },
+      { transform: 'translateY(30vh) rotate(-66deg) scale(.68)', opacity: .9, offset: .52 },
+      { transform: 'translateY(12vh) rotate(-24deg) scale(.84)', opacity: 1, offset: .68 },
+      { transform: 'translateY(2vh) rotate(-5deg) scale(.96)', opacity: 1, offset: .8 },
+      { transform: 'translateY(0) rotate(3deg) scale(1.04)', opacity: 1, offset: .88 },
+      { transform: 'translateY(0) rotate(-1deg) scale(.99)', opacity: 1, offset: .95 },
+      { transform: 'translateY(0) rotate(0deg) scale(1)', opacity: 1 }
+    ], { duration: ENTRANCE_MS, easing: 'cubic-bezier(.16,.72,.18,1)', fill: 'forwards' });
+
+    entranceAnimation.finished.then(() => {
+      entranceDone = true;
+      startPulse();
+      maybeFinish();
+    }).catch(() => {});
+  };
+
+  const scheduleEntranceWhenVisible = () => {
+    if (finished || entranceAnimation || entranceScheduled || document.visibilityState !== 'visible') return;
+    entranceScheduled = true;
+    window.setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(startEntrance));
+    }, ENTRANCE_DELAY_MS);
+  };
+
+  window.addEventListener('pageshow', scheduleEntranceWhenVisible, { once: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') scheduleEntranceWhenVisible();
+  });
+  if (document.readyState === 'complete') scheduleEntranceWhenVisible();
+  else window.addEventListener('load', scheduleEntranceWhenVisible, { once: true });
 
   const viewer = document.querySelector('#meal-viewer');
   if (viewer) {
@@ -69,19 +106,20 @@
   });
 
   const finish = () => {
-    if (finished) return;
+    if (finished || !entranceDone) return;
     finished = true;
     window.clearInterval(dotTimer);
+    pulseAnimation?.cancel();
     splash.classList.add('is-page-load-exit');
     window.setTimeout(() => {
-      splash.classList.remove('is-active', 'is-page-load', 'is-entering', 'is-waiting', 'is-page-load-exit');
+      splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit', 'has-started-entrance');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
     }, 820);
   };
 
   function maybeFinish() {
-    if (finished) return;
+    if (finished || !entranceDone) return;
     const elapsed = performance.now() - started;
     if (elapsed < MIN_MS) {
       window.setTimeout(maybeFinish, MIN_MS - elapsed);
@@ -90,5 +128,10 @@
     if (modelReady && arFrameReady) finish();
   }
 
-  window.setTimeout(finish, MAX_MS);
+  window.setTimeout(() => {
+    if (!entranceAnimation) startEntrance();
+  }, 3200);
+  window.setTimeout(() => {
+    if (!finished && entranceDone) finish();
+  }, MAX_MS);
 })();

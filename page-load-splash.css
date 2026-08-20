@@ -1,5 +1,5 @@
 html.is-preloading-ar,
-html.is-preloading-ar body { overflow: hidden !important; }
+html.is-preloading-ar body { overflow:hidden !important; }
 
 #ar-splash.is-page-load {
   display:flex !important; position:fixed !important; inset:0 !important; z-index:100000 !important;
@@ -7,61 +7,30 @@ html.is-preloading-ar body { overflow: hidden !important; }
   align-items:center !important; justify-content:center !important; flex-direction:column !important;
 }
 
-/* IMPORTANT: no animation here. Safari must first paint this off-screen start state. */
 #ar-splash.is-page-load img {
   width:min(62vw,320px) !important; max-height:38vh !important; object-fit:contain !important;
   transform-origin:50% 58% !important;
-  opacity:.12 !important;
-  transform:translateY(108vh) rotate(-220deg) scale(.28) !important;
-  animation:none !important;
+  opacity:.08; transform:translateY(108vh) rotate(-220deg) scale(.28);
 }
 
-/* JS adds this only after two requestAnimationFrame paints. */
-#ar-splash.is-page-load.is-entering img {
-  animation:pageLoadSteakOutSwingVisible 3.4s cubic-bezier(.16,.72,.18,1) both !important;
-}
-
-/* This phase cannot begin until the entrance animationend event fires. */
+#ar-splash.is-page-load.has-started-entrance img,
 #ar-splash.is-page-load.is-waiting img {
-  opacity:1 !important;
-  transform:translateY(0) rotate(0) scale(1) !important;
-  animation:pageLoadSteakOutPulseQuarter 10.6s cubic-bezier(.45,0,.55,1) infinite !important;
+  will-change:transform,opacity,filter;
 }
 
 #ar-splash .page-load-status {
   min-width:132px; margin-top:22px !important; display:inline-flex !important; align-items:baseline;
-  justify-content:flex-start; color:#fff; opacity:0 !important;
+  justify-content:flex-start; color:#fff; opacity:0;
   font:400 clamp(22px,5.8vw,31px)/1 'Bebas Neue','Arial Narrow',sans-serif !important;
   letter-spacing:.12em;
 }
-#ar-splash.is-page-load.is-waiting .page-load-status { animation:pageLoadStatusIn .65s ease forwards !important; }
+#ar-splash.is-page-load.is-waiting .page-load-status { animation:pageLoadStatusIn .65s ease forwards; }
 #ar-splash .page-load-status__dots { width:34px; display:inline-block; margin-left:2px; text-align:left; letter-spacing:.05em; }
 #ar-splash.is-page-load-exit { animation:pageLoadSplashExit .78s ease forwards !important; pointer-events:none !important; }
 
-@keyframes pageLoadSteakOutSwingVisible {
-  0%   { opacity:.12; transform:translateY(108vh) rotate(-220deg) scale(.28); }
-  16%  { opacity:.45; transform:translateY(82vh) rotate(-175deg) scale(.38); }
-  34%  { opacity:.72; transform:translateY(54vh) rotate(-118deg) scale(.52); }
-  52%  { opacity:.92; transform:translateY(30vh) rotate(-66deg) scale(.68); }
-  68%  { opacity:1; transform:translateY(12vh) rotate(-24deg) scale(.84); }
-  80%  { transform:translateY(2vh) rotate(-5deg) scale(.96); }
-  88%  { transform:translateY(0) rotate(3deg) scale(1.04); }
-  95%  { transform:translateY(0) rotate(-1deg) scale(.99); }
-  100% { opacity:1; transform:translateY(0) rotate(0deg) scale(1); }
-}
-
-@keyframes pageLoadSteakOutPulseQuarter {
-  0%,100% { opacity:1; transform:scale(1); filter:drop-shadow(0 0 0 rgba(186,31,44,0)); }
-  25% { opacity:.99; transform:scale(1.01); }
-  50% { opacity:.95; transform:scale(1.05); filter:drop-shadow(0 0 18px rgba(186,31,44,.22)); }
-  75% { opacity:.99; transform:scale(1.01); }
-}
 @keyframes pageLoadStatusIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 @keyframes pageLoadSplashExit { from{opacity:1} to{opacity:0} }
 
 @media(prefers-reduced-motion:reduce){
-  #ar-splash.is-page-load img { opacity:1 !important; transform:none !important; }
-  #ar-splash.is-page-load.is-entering img,
-  #ar-splash.is-page-load.is-waiting img,
-  #ar-splash .page-load-status { animation-duration:.01ms !important; animation-delay:0ms !important; }
+  #ar-splash.is-page-load img { opacity:1; transform:none; }
 }
