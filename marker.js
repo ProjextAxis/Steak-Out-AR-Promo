@@ -22,6 +22,13 @@
 
   if (!scene || !anchor || !food || !startButton) return;
 
+  // marker.html hard-codes a sample target in its mindar-image attribute, so
+  // config.marker.targetMindUrl was doing nothing. Swapping the printed marker
+  // should be one config change, not an edit in two files.
+  if (markerConfig.targetMindUrl) {
+    scene.setAttribute('mindar-image', 'imageTargetSrc', markerConfig.targetMindUrl);
+  }
+
   let arSystem;
   let startPromise;
   let stopPromise;
