@@ -194,3 +194,13 @@ body.browser-ar-open .dev-panel { display: flex !important; }
 @media (max-width: 380px) {
   .dev-panel__body { width: 172px; }
 }
+
+/* The model fades up instead of popping in. The class is applied by script, so
+   if the script never runs the model is simply visible. */
+.ar-hero model-viewer#meal-viewer {
+  transition: opacity .45s ease;
+}
+
+.ar-hero model-viewer#meal-viewer.is-model-pending {
+  opacity: 0;
+}

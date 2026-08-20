@@ -4,7 +4,7 @@
 
   const logo = splash.querySelector('img');
   const MIN_MS = 1600;
-  const MAX_MS = 5000;
+  const MAX_MS = 9000;
   const FOCUS_SETTLE_MS = 220;
   const ENTRANCE_MS = 1500;
   const PULSE_MS = 6200;
@@ -61,12 +61,16 @@
 
   const prepareTransparentSvg = async () => {
     if (!logo) return;
+    // Swapping src after the entrance begins reloads the image and blanks the
+    // logo part-way through the animation.
+    if (entranceAnimation) return;
     try {
       const response = await fetch('./assets/STEAK%20OUT%20LOGO.svg', { cache: 'force-cache' });
       if (!response.ok) throw new Error('SVG load failed');
       let svg = await response.text();
       svg = svg.replace(/<path\b[^>]*fill=["']#ffffff["'][^>]*\/>/i, '');
       cleanLogoUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      if (entranceAnimation) return;
       await new Promise((resolve) => {
         const done = () => resolve();
         logo.addEventListener('load', done, { once: true });
@@ -168,8 +172,10 @@
   const viewer = document.querySelector('#meal-viewer');
   if (viewer) {
     if (viewer.loaded) modelReady = true;
-    viewer.addEventListener('load', () => { modelReady = true; maybeFinish(); }, { once: true });
-    viewer.addEventListener('error', () => { modelReady = true; maybeFinish(); }, { once: true });
+    else viewer.classList.add('is-model-pending');
+    const revealModel = () => viewer.classList.remove('is-model-pending');
+    viewer.addEventListener('load', () => { modelReady = true; revealModel(); maybeFinish(); }, { once: true });
+    viewer.addEventListener('error', () => { modelReady = true; revealModel(); maybeFinish(); }, { once: true });
   } else {
     modelReady = true;
   }
