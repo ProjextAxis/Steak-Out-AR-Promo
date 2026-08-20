@@ -134,7 +134,7 @@
 .ar-hero .ar-nudge {
   position: relative;
   z-index: 3;
-  max-width: 26ch;
+  max-width: 34ch;
   margin: 14px auto 0;
   color: #EBEBEB;
   font: 400 clamp(16px, 4.2vw, 20px)/1.35 Arial, Helvetica, sans-serif;
