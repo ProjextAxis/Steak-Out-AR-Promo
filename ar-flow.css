@@ -49,17 +49,27 @@
 }
 
 .ar-launch-button {
-  width: min(100%, 420px);
-  min-height: 56px;
-  margin-top: 18px;
+  position: relative;
+  z-index: 8;
+  width: min(calc(100% - 36px), 610px);
+  min-height: 58px;
+  margin: 18px auto -72px;
+  transform: translateY(28px);
   color: var(--white);
-  background: transparent;
+  background: rgba(0,0,0,.82);
   border: 2px solid var(--red);
+  border-radius: 999px;
   font-size: 30px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.28);
 }
 
 .viewer-shell {
   margin-top: 20px;
+}
+
+/* The AR CTA now occupies this top-of-preview position, so the old status badge is redundant. */
+.viewer-status {
+  display: none !important;
 }
 
 body:has(.ar-guide[open]) {
@@ -283,6 +293,14 @@ body:has(.ar-guide[open]) {
 
   .offer-promise {
     font-size: 15px !important;
+  }
+
+  .ar-launch-button {
+    width: calc(100% - 28px);
+    min-height: 56px;
+    margin-bottom: -68px;
+    transform: translateY(26px);
+    font-size: 29px;
   }
 
   .ar-guide__sheet {
