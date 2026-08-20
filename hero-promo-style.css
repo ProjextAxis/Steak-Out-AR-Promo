@@ -29,44 +29,42 @@
   line-height: .76;
 }
 
-/* Softer red field behind the price, still matching the reference direction. */
+/* Reference match: concentrated red center behind the price, with black edges. */
 .ar-hero .offer-headline::before {
   content: '';
   position: absolute;
   z-index: -2;
   left: 50%;
-  top: 43%;
-  width: min(132vw, 900px);
-  height: 146%;
+  top: 38%;
+  width: min(116vw, 800px);
+  height: 132%;
   transform: translate(-50%, -50%);
-  border-radius: 46%;
+  border-radius: 50%;
   background:
-    radial-gradient(ellipse at 50% 42%,
-      rgba(255, 31, 35, .62) 0%,
-      rgba(225, 7, 22, .54) 16%,
-      rgba(174, 0, 15, .42) 32%,
-      rgba(115, 0, 10, .30) 49%,
-      rgba(64, 0, 7, .18) 63%,
-      rgba(24, 0, 3, .08) 73%,
-      rgba(0, 0, 0, 0) 84%);
-  filter: blur(10px);
+    radial-gradient(ellipse at 50% 40%,
+      rgba(238, 20, 27, .50) 0%,
+      rgba(198, 5, 18, .43) 18%,
+      rgba(137, 0, 12, .32) 37%,
+      rgba(78, 0, 8, .20) 54%,
+      rgba(35, 0, 4, .10) 67%,
+      rgba(0, 0, 0, 0) 79%);
+  filter: blur(12px);
   pointer-events: none;
 }
 
-/* Stronger black falloff keeps the glow subtle at the edges. */
 .ar-hero .offer-headline::after {
   content: '';
   position: absolute;
   z-index: -1;
   left: 50%;
-  top: 43%;
-  width: min(138vw, 940px);
-  height: 152%;
+  top: 38%;
+  width: min(122vw, 840px);
+  height: 138%;
   transform: translate(-50%, -50%);
-  border-radius: 46%;
+  border-radius: 50%;
   box-shadow:
-    inset 0 0 118px 58px rgba(0, 0, 0, .50),
-    inset 0 0 185px 88px rgba(0, 0, 0, .22);
+    inset 0 0 120px 62px rgba(0, 0, 0, .58),
+    inset 0 0 190px 95px rgba(0, 0, 0, .22);
   pointer-events: none;
 }
 
@@ -81,23 +79,23 @@
   line-height: .76;
   letter-spacing: -.025em;
   text-shadow:
-    0 2px 0 rgba(255, 255, 255, .10),
-    0 9px 24px rgba(0, 0, 0, .30);
+    0 2px 0 rgba(255, 255, 255, .08),
+    0 8px 22px rgba(0, 0, 0, .28);
 }
 
 .offer-name {
-  margin-top: 22px;
-  font-size: clamp(58px, 16.2vw, 92px);
+  margin-top: 20px;
+  font-size: clamp(58px, 15.7vw, 90px);
   line-height: .88;
   letter-spacing: .006em;
-  text-shadow: 0 7px 20px rgba(0, 0, 0, .35);
+  text-shadow: 0 7px 20px rgba(0, 0, 0, .34);
 }
 
 /* Keep VIEW IN AR inside the 3D render card. */
 .viewer-shell {
   position: relative;
   z-index: 4;
-  margin-top: 30px;
+  margin-top: 22px;
 }
 
 @media (max-width: 410px) {
@@ -114,19 +112,19 @@
   }
 
   .offer-name {
-    margin-top: 19px;
-    font-size: clamp(54px, 16.5vw, 68px);
+    margin-top: 18px;
+    font-size: clamp(54px, 16vw, 66px);
   }
 
   .ar-hero .offer-headline::before {
-    width: 144vw;
-    height: 154%;
-    top: 41%;
+    width: 126vw;
+    height: 138%;
+    top: 37%;
   }
 
   .ar-hero .offer-headline::after {
-    width: 150vw;
-    height: 160%;
-    top: 41%;
+    width: 132vw;
+    height: 144%;
+    top: 37%;
   }
 }
