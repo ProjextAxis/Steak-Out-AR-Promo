@@ -239,8 +239,8 @@ body:has(.ar-guide[open]) {
 
 .ar-guide__permission {
   max-width: 430px;
-  margin: 18px auto 0;
-  padding: 12px 14px;
+  margin: 16px auto 0;
+  padding: 16px 16px;
   color: var(--white);
   background: #171414;
   border-radius: 14px;
