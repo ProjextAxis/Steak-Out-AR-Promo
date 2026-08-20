@@ -4,7 +4,6 @@
 
   const MIN_MS = 4200;
   const MAX_MS = 10000;
-  const PULSE_START_MS = 3250;
   const started = performance.now();
   let modelReady = false;
   let arFrameReady = false;
@@ -12,7 +11,6 @@
   let dotTimer;
   let dotCount = 0;
 
-  // This is a page-load/preload splash only. Camera permission remains tied to VIEW IN AR.
   splash.classList.add('is-page-load', 'is-active');
   splash.setAttribute('aria-hidden', 'false');
   document.documentElement.classList.add('is-preloading-ar');
@@ -24,10 +22,7 @@
   }
 
   const dots = splash.querySelector('.page-load-status__dots');
-
-  const startWaitingPulse = () => {
-    if (finished) return;
-    splash.classList.add('is-waiting');
+  const startDots = () => {
     if (dotTimer || !dots) return;
     dotTimer = window.setInterval(() => {
       dotCount = (dotCount % 3) + 1;
@@ -35,19 +30,17 @@
     }, 680);
   };
 
-  window.setTimeout(startWaitingPulse, PULSE_START_MS);
+  // The pulse phase is now controlled only by splash-sequence-fix.js after animationend.
+  const logo = splash.querySelector('img');
+  logo?.addEventListener('animationend', (event) => {
+    if (event.animationName === 'pageLoadSteakOutSwingVisible') startDots();
+  }, { once: true });
 
   const viewer = document.querySelector('#meal-viewer');
   if (viewer) {
     if (viewer.loaded) modelReady = true;
-    viewer.addEventListener('load', () => {
-      modelReady = true;
-      maybeFinish();
-    }, { once: true });
-    viewer.addEventListener('error', () => {
-      modelReady = true;
-      maybeFinish();
-    }, { once: true });
+    viewer.addEventListener('load', () => { modelReady = true; maybeFinish(); }, { once: true });
+    viewer.addEventListener('error', () => { modelReady = true; maybeFinish(); }, { once: true });
   } else {
     modelReady = true;
   }
@@ -66,7 +59,7 @@
     window.clearInterval(dotTimer);
     splash.classList.add('is-page-load-exit');
     window.setTimeout(() => {
-      splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
+      splash.classList.remove('is-active', 'is-page-load', 'is-entering', 'is-waiting', 'is-page-load-exit');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
     }, 820);
