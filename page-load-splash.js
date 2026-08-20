@@ -2,9 +2,9 @@
   const splash = document.querySelector('#ar-splash');
   if (!splash) return;
 
-  const MIN_MS = 3600;
-  const MAX_MS = 9000;
-  const PULSE_START_MS = 2850;
+  const MIN_MS = 4200;
+  const MAX_MS = 10000;
+  const PULSE_START_MS = 3250;
   const started = performance.now();
   let modelReady = false;
   let arFrameReady = false;
@@ -45,7 +45,6 @@
       maybeFinish();
     }, { once: true });
     viewer.addEventListener('error', () => {
-      // Do not trap the customer on the splash if the preview fails.
       modelReady = true;
       maybeFinish();
     }, { once: true });
@@ -70,7 +69,7 @@
       splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
-    }, 760);
+    }, 820);
   };
 
   function maybeFinish() {
@@ -80,7 +79,6 @@
       window.setTimeout(maybeFinish, MIN_MS - elapsed);
       return;
     }
-    // Prefer both assets ready, but never hold the page indefinitely.
     if (modelReady && arFrameReady) finish();
   }
 
