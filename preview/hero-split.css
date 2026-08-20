@@ -100,7 +100,7 @@
 
 .dev-panel {
   position: fixed;
-  z-index: 60;
+  z-index: 210;
   top: 27%;
   right: 7px;
   transform: translateY(-50%);
@@ -126,8 +126,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(255, 255, 255, .1);
-  border: 1px solid rgba(255, 255, 255, .26);
+  background: rgba(0, 0, 0, .55);
+  border: 1px solid rgba(255, 255, 255, .3);
   font-size: 0;
   line-height: 0;
   letter-spacing: 0;
@@ -139,13 +139,15 @@
 .dev-panel summary::-webkit-details-marker,
 .dev-panel summary::marker { display: none; content: ''; }
 
+/* A code chevron rather than a plain dot, flipping to face the panel. */
 .dev-panel summary::after {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--red);
+  content: '>';
+  color: var(--red);
+  font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transform: translateX(.5px);
 }
+
+.dev-panel[open] summary::after { content: '<'; }
 
 .dev-panel[open] summary {
   background: rgba(186, 31, 44, .26);
