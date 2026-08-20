@@ -1,0 +1,1100 @@
+:root {
+  --red: #b5121b;
+  --ink: #171311;
+  --paper: #fffaf2;
+  --gold: #e3ad32;
+  --display: 'Barlow Condensed', Arial Narrow, sans-serif;
+  --slab: 'Roboto Slab', Georgia, serif;
+  --brand: 'Rustler', 'Roboto Slab', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.marker-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #0f0d0c;
+}
+
+#marker-scene {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+}
+
+#marker-scene .a-canvas {
+  background: transparent !important;
+}
+
+/* MindAR injects the live camera video at z-index:-2. Keep it above the
+   shell background and below the transparent A-Frame model canvas. */
+.marker-shell > video {
+  z-index: 0 !important;
+  max-width: none !important;
+}
+
+.ar-splash {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  pointer-events: none;
+  transition: background .5s ease;
+}
+
+.ar-splash[hidden] {
+  display: none;
+}
+
+.ar-splash__glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72vw;
+  max-width: 430px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(181,18,27,.28), rgba(181,18,27,0) 68%);
+  opacity: 0;
+  transform: translate(-50%,-50%) scale(.5);
+}
+
+.ar-splash__logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(58vw,250px);
+  height: auto;
+  opacity: 0;
+  filter: drop-shadow(0 16px 30px rgba(0,0,0,.55));
+  transform: translate(-50%,-50%) scale(.58) rotate(-4deg);
+  will-change: left, top, width, transform, opacity;
+}
+
+.ar-splash.is-live .ar-splash__glow {
+  animation: splashGlow .7s .08s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.ar-splash.is-live .ar-splash__logo {
+  animation: splashPop .62s .08s cubic-bezier(.16,1,.3,1) forwards;
+}
+
+.ar-splash.is-revealing {
+  background: rgba(0,0,0,0);
+}
+
+.ar-splash.is-revealing .ar-splash__glow {
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+
+.ar-splash.is-revealing .ar-splash__logo {
+  animation: splashDock .58s cubic-bezier(.22,.85,.25,1) forwards;
+}
+
+@keyframes splashPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(.58) rotate(-4deg);
+  }
+  62% {
+    opacity: 1;
+    transform: translate(-50%,-50%) scale(1.1) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%,-50%) scale(1);
+  }
+}
+
+@keyframes splashGlow {
+  0% {
+    opacity: 0;
+    transform: translate(-50%,-50%) scale(.45);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%,-50%) scale(1);
+  }
+}
+
+@keyframes splashDock {
+  0% {
+    left: 50%;
+    top: 50%;
+    width: min(58vw,250px);
+    opacity: 1;
+    transform: translate(-50%,-50%) scale(1);
+  }
+  100% {
+    left: max(20px,env(safe-area-inset-left));
+    top: max(18px,env(safe-area-inset-top));
+    width: 46px;
+    opacity: 1;
+    transform: translate(0,0) scale(1);
+  }
+}
+
+.marker-hud {
+  position: fixed;
+  z-index: 20;
+  left: max(12px,env(safe-area-inset-left));
+  right: max(12px,env(safe-area-inset-right));
+  top: max(12px,env(safe-area-inset-top));
+  min-height: 58px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  background: rgba(23,19,17,.9);
+  border: 2px solid rgba(255,255,255,.15);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.marker-logo-home {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+.marker-logo-home img {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.marker-brand {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  line-height: 1;
+}
+
+.marker-brand strong {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 400 21px/.9 var(--brand);
+  letter-spacing: -.04em;
+}
+
+.marker-brand strong b {
+  padding: 4px 5px 3px;
+  color: #fff;
+  background: var(--red);
+  font: 900 13px/1 var(--display);
+  letter-spacing: .04em;
+}
+
+.marker-brand small {
+  color: var(--gold);
+  font: 900 9px/1 var(--display);
+  letter-spacing: .12em;
+}
+
+.marker-status {
+  padding: 7px 9px 6px;
+  color: var(--ink);
+  background: var(--gold);
+  font: 900 11px/1 var(--display);
+  letter-spacing: .08em;
+}
+
+.marker-status[data-state="active"] {
+  background: #dfffaf;
+}
+
+.marker-status[data-state="error"] {
+  color: #7f0d14;
+  background: #ffd5d5;
+}
+
+.marker-status[data-state="busy"] {
+  background: var(--paper);
+}
+
+.marker-intro {
+  position: fixed;
+  z-index: 18;
+  inset: 0;
+  padding: calc(100px + env(safe-area-inset-top)) 22px calc(34px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--ink);
+  background: radial-gradient(circle at 18% 12%,rgba(181,18,27,.09) 0 2px,transparent 2px 100%), var(--paper);
+  background-size: 24px 24px, auto;
+  text-align: center;
+}
+
+.marker-intro[hidden] {
+  display: none;
+}
+
+.marker-intro__eyebrow {
+  color: var(--red);
+  font: 900 13px/1 var(--display);
+  letter-spacing: .13em;
+}
+
+.marker-intro h1 {
+  margin: 12px 0 18px;
+  font: 900 clamp(55px,15vw,85px)/.82 var(--display);
+  letter-spacing: -.035em;
+}
+
+.marker-intro p {
+  max-width: 520px;
+  margin: 0;
+  color: #463d38;
+  font: 700 17px/1.45 Arial,sans-serif;
+}
+
+.marker-intro__actions {
+  width: min(100%,430px);
+  margin: 28px auto 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.marker-intro button,
+.marker-intro a {
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  font: 900 19px/1 var(--display);
+  letter-spacing: .04em;
+}
+
+.marker-intro button {
+  color: #fff;
+  background: var(--red);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.marker-intro a {
+  color: var(--ink);
+  background: transparent;
+}
+
+.marker-intro > small {
+  max-width: 450px;
+  color: #6e625b;
+  font: 700 12px/1.4 Arial,sans-serif;
+}
+
+.marker-scan-guide {
+  position: fixed;
+  z-index: 15;
+  left: 50%;
+  top: 45%;
+  width: min(76vw,360px);
+  aspect-ratio: 1.65/1;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+  transition: opacity .24s ease, transform .24s ease;
+}
+
+.marker-scan-guide[hidden] {
+  display: none;
+}
+
+.marker-scan-guide.is-found {
+  opacity: 0;
+  transform: translate(-50%,-50%) scale(.94);
+}
+
+.scan-corners {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255,255,255,.28);
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,.65));
+}
+
+.scan-corners::before,
+.scan-corners::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background:
+    linear-gradient(var(--red),var(--red)) left top/46px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) left top/5px 46px no-repeat,
+    linear-gradient(var(--red),var(--red)) right top/46px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) right top/5px 46px no-repeat,
+    linear-gradient(var(--red),var(--red)) left bottom/46px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) left bottom/5px 46px no-repeat,
+    linear-gradient(var(--red),var(--red)) right bottom/46px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) right bottom/5px 46px no-repeat;
+}
+
+.marker-instruction {
+  position: fixed;
+  z-index: 24;
+  left: max(14px,env(safe-area-inset-left));
+  right: max(14px,env(safe-area-inset-right));
+  bottom: calc(180px + env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin: auto;
+  color: #fff;
+  transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .25s ease;
+}
+
+.marker-instruction[hidden],
+.marker-social[hidden],
+.marker-order[hidden],
+.marker-size-control[hidden] {
+  display: none;
+}
+
+.marker-instruction__surface {
+  width: 100%;
+  min-height: 104px;
+  padding: 14px 42px 14px 14px;
+  display: grid;
+  grid-template-columns: 60px minmax(0,1fr);
+  align-items: center;
+  gap: 13px;
+  border: 2px solid rgba(255,255,255,.2);
+  border-radius: 18px;
+  color: inherit;
+  background: rgba(15,13,12,.9);
+  box-shadow: 0 18px 50px rgba(0,0,0,.44);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  text-align: left;
+  cursor: pointer;
+  transition: min-height .3s ease, padding .3s ease, border-color .25s ease;
+}
+
+.marker-instruction__icon {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--red);
+  transition: width .3s ease, height .3s ease, background .25s ease;
+}
+
+.marker-instruction__icon svg {
+  width: 38px;
+  height: 38px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marker-instruction__qr {
+  fill: currentColor;
+  stroke: none;
+}
+
+.marker-instruction__check {
+  opacity: 0;
+  stroke-width: 4;
+}
+
+.marker-instruction__copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.marker-instruction__eyebrow {
+  color: var(--gold);
+  font: 900 11px/1 var(--display);
+  letter-spacing: .13em;
+}
+
+.marker-instruction strong {
+  font: 900 clamp(23px,6.4vw,31px)/.92 var(--display);
+  letter-spacing: .005em;
+}
+
+.marker-instruction__body {
+  color: rgba(255,255,255,.8);
+  font: 700 12px/1.35 Arial,sans-serif;
+}
+
+.marker-instruction__chevron {
+  position: absolute;
+  right: 17px;
+  top: 50%;
+  color: rgba(255,255,255,.58);
+  font: 900 21px/1 Arial,sans-serif;
+  transform: translateY(-50%);
+  transition: transform .3s ease;
+}
+
+.marker-instruction[data-state="locked"] .marker-instruction__surface {
+  border-color: rgba(223,255,175,.65);
+}
+
+.marker-instruction[data-state="locked"] .marker-instruction__icon {
+  color: var(--ink);
+  background: #dfffaf;
+}
+
+.marker-instruction[data-state="locked"] .marker-instruction__frame,
+.marker-instruction[data-state="locked"] .marker-instruction__qr {
+  opacity: 0;
+}
+
+.marker-instruction[data-state="locked"] .marker-instruction__check {
+  opacity: 1;
+}
+
+.marker-instruction.is-collapsed {
+  left: 50%;
+  right: auto;
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  transform: translateX(-50%);
+}
+
+.marker-instruction.is-collapsed .marker-instruction__surface {
+  width: auto;
+  min-height: 54px;
+  padding: 8px 40px 8px 9px;
+  grid-template-columns: 38px minmax(0,1fr);
+  gap: 9px;
+  border-radius: 999px;
+}
+
+.marker-instruction.is-collapsed .marker-instruction__icon {
+  width: 38px;
+  height: 38px;
+}
+
+.marker-instruction.is-collapsed .marker-instruction__icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.marker-instruction.is-collapsed .marker-instruction__eyebrow,
+.marker-instruction.is-collapsed .marker-instruction__body {
+  display: none;
+}
+
+.marker-instruction.is-collapsed strong {
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.marker-instruction.is-collapsed .marker-instruction__chevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.marker-size-control {
+  position: fixed;
+  z-index: 22;
+  left: 50%;
+  bottom: calc(124px + env(safe-area-inset-bottom));
+  min-width: 244px;
+  padding: 5px;
+  display: grid;
+  grid-template-columns: 1fr 38px 54px 38px;
+  align-items: center;
+  gap: 5px;
+  color: #fff;
+  background: rgba(23,19,17,.92);
+  border: 2px solid rgba(255,255,255,.18);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+}
+
+.marker-size-control > span {
+  padding-left: 8px;
+  font: 900 11px/1 var(--display);
+  letter-spacing: .08em;
+}
+
+.marker-size-control button {
+  height: 34px;
+  border: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font: 900 24px/1 var(--display);
+}
+
+.marker-size-control output {
+  color: var(--gold);
+  text-align: center;
+  font: 900 13px/1 var(--display);
+}
+
+.marker-social {
+  position: fixed;
+  z-index: 25;
+  right: max(14px,env(safe-area-inset-right));
+  bottom: calc(73px + env(safe-area-inset-bottom));
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(15,13,12,.82);
+  box-shadow: 0 10px 24px rgba(0,0,0,.34);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.marker-social a {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  text-decoration: none;
+}
+
+.marker-social a:first-child {
+  background: var(--red);
+}
+
+.marker-social svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.marker-social .social-icon-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.marker-order {
+  position: fixed;
+  z-index: 23;
+  left: max(14px,env(safe-area-inset-left));
+  right: max(14px,env(safe-area-inset-right));
+  bottom: max(10px,env(safe-area-inset-bottom));
+  max-width: 520px;
+  min-height: 54px;
+  margin: auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--red);
+  box-shadow: 0 14px 32px rgba(0,0,0,.4);
+  text-decoration: none;
+  font: 900 28px/1 var(--display);
+  letter-spacing: .035em;
+}
+
+@media (max-width:480px) {
+  .marker-brand strong {
+    font-size: 19px;
+  }
+
+  .marker-status {
+    font-size: 10px;
+  }
+}
+
+@media (max-height:690px) {
+  .marker-instruction {
+    bottom: calc(170px + env(safe-area-inset-bottom));
+  }
+
+  .marker-instruction__surface {
+    min-height: 88px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .marker-instruction__icon {
+    width: 50px;
+    height: 50px;
+  }
+
+  .marker-instruction__body {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .ar-splash.is-live .ar-splash__logo,
+  .ar-splash.is-live .ar-splash__glow,
+  .ar-splash.is-revealing .ar-splash__logo {
+    animation-duration: .01ms !important;
+    animation-delay: 0s !important;
+  }
+
+  .marker-instruction,
+  .marker-instruction__surface,
+  .marker-instruction__icon,
+  .marker-instruction__chevron,
+  .marker-scan-guide {
+    transition-duration: .01ms !important;
+  }
+}
+
+.is-embedded .marker-intro {
+  display: none;
+}
+
+.is-embedded .marker-logo-home {
+  position: relative;
+}
+
+.is-embedded .marker-logo-home::after {
+  content: '×';
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--red);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  font: 700 15px/12px Arial, sans-serif;
+}
+
+/* Customer AR camera UI */
+.marker-hud {
+  left: max(10px,env(safe-area-inset-left));
+  right: max(10px,env(safe-area-inset-right));
+  top: max(10px,env(safe-area-inset-top));
+  min-height: 82px;
+  padding: 11px 14px;
+  grid-template-columns: 54px minmax(0,1fr) auto;
+  gap: 11px;
+  background: rgba(12,12,12,.86);
+  border: 1px solid rgba(255,255,255,.25);
+  box-shadow: 0 16px 42px rgba(0,0,0,.25);
+}
+
+.marker-logo-home,
+.marker-logo-home img {
+  width: 50px;
+  height: 50px;
+}
+
+.marker-brand {
+  gap: 7px;
+}
+
+.marker-brand strong {
+  gap: 9px;
+  font-size: clamp(20px,5.6vw,27px);
+  letter-spacing: -.025em;
+}
+
+.marker-brand strong b {
+  padding: 6px 7px 5px;
+  font-size: 15px;
+}
+
+.marker-brand small {
+  color: #f1b82f;
+  font-size: clamp(10px,2.8vw,13px);
+  letter-spacing: .13em;
+}
+
+.marker-social {
+  position: static;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  padding: 4px;
+  gap: 3px;
+  flex: 0 0 auto;
+  background: rgba(11,11,11,.68);
+  border-color: rgba(255,255,255,.24);
+  box-shadow: none;
+}
+
+.marker-social a {
+  width: 40px;
+  height: 40px;
+}
+
+.marker-social svg {
+  width: 23px;
+  height: 23px;
+}
+
+.marker-scan-guide {
+  left: 50%;
+  top: calc(max(10px,env(safe-area-inset-top)) + 112px);
+  width: min(calc(100vw - 88px),520px);
+  height: clamp(250px,40dvh,500px);
+  aspect-ratio: auto;
+  transform: translateX(-50%);
+}
+
+.marker-scan-guide.is-found {
+  transform: translateX(-50%) scale(.96);
+}
+
+.scan-corners {
+  border-color: rgba(255,255,255,.3);
+}
+
+.scan-corners::before,
+.scan-corners::after {
+  background:
+    linear-gradient(var(--red),var(--red)) left top/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) left top/5px 48px no-repeat,
+    linear-gradient(var(--red),var(--red)) right top/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) right top/5px 48px no-repeat,
+    linear-gradient(var(--red),var(--red)) left bottom/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) left bottom/5px 48px no-repeat,
+    linear-gradient(var(--red),var(--red)) right bottom/48px 5px no-repeat,
+    linear-gradient(var(--red),var(--red)) right bottom/5px 48px no-repeat;
+}
+
+.marker-instruction {
+  left: max(16px,env(safe-area-inset-left));
+  right: max(16px,env(safe-area-inset-right));
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  min-height: 268px;
+  padding: 16px 17px 62px;
+  color: #fff;
+  background: rgba(13,13,13,.9);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 22px;
+  box-shadow: 0 22px 58px rgba(0,0,0,.48);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.marker-progress {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(10px,24px) minmax(0,1fr) minmax(10px,24px) minmax(0,1fr) minmax(10px,24px) minmax(0,1fr);
+  align-items: start;
+}
+
+.marker-progress__step {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.marker-progress__circle {
+  position: relative;
+  width: clamp(54px,16vw,74px);
+  height: clamp(54px,16vw,74px);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(5,5,5,.88);
+  border: 2px solid var(--red);
+  border-radius: 50%;
+  transition: color .22s ease, background .22s ease, border-color .22s ease, transform .22s ease;
+}
+
+.marker-progress__number {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  color: #fff;
+  font: 800 11px/1 Arial,sans-serif;
+  transform: translateX(-50%);
+}
+
+.marker-progress__circle svg {
+  width: clamp(28px,8vw,38px);
+  height: clamp(28px,8vw,38px);
+  margin-top: 8px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marker-progress__step > strong {
+  max-width: 92px;
+  margin-top: 9px;
+  color: #fff;
+  font: 900 clamp(10px,2.8vw,13px)/1.05 var(--display);
+  letter-spacing: .02em;
+}
+
+.marker-progress__line {
+  height: 2px;
+  margin-top: clamp(27px,8vw,37px);
+  background: var(--red);
+  opacity: .95;
+}
+
+.marker-progress__step[data-state="active"] .marker-progress__circle {
+  background: #c91f2c;
+  border-color: #c91f2c;
+  box-shadow: 0 0 0 3px rgba(201,31,44,.13), 0 10px 24px rgba(181,18,27,.28);
+  transform: scale(1.04);
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__circle {
+  color: rgba(255,255,255,.82);
+  background: rgba(22,14,14,.88);
+  border-color: rgba(181,18,27,.7);
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__number {
+  color: var(--red);
+  font-size: 0;
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__number::after {
+  content: '✓';
+  font: 900 12px/1 Arial,sans-serif;
+}
+
+.marker-progress__step[data-state="upcoming"] {
+  opacity: .9;
+}
+
+.marker-instruction__copy {
+  margin-top: 18px;
+  padding: 0 4px;
+  gap: 7px;
+}
+
+.marker-instruction .marker-instruction__copy > strong {
+  max-width: 100%;
+  color: #fff;
+  font: 900 clamp(25px,7vw,35px)/.95 var(--display);
+  letter-spacing: .012em;
+}
+
+.marker-instruction__body {
+  max-width: 475px;
+  color: rgba(255,255,255,.86);
+  font: 600 clamp(12px,3.4vw,15px)/1.35 Arial,sans-serif;
+}
+
+.marker-instruction .marker-status {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  min-height: 38px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  background: rgba(25,22,21,.9);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  font: 900 15px/1 var(--display);
+  letter-spacing: .08em;
+}
+
+.marker-instruction .marker-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  background: #d31f2e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(211,31,46,.12);
+}
+
+.marker-instruction .marker-status[data-state="active"] {
+  color: #fff;
+  background: rgba(25,22,21,.9);
+}
+
+.marker-instruction .marker-status[data-state="active"]::before {
+  background: #bfe76d;
+  box-shadow: 0 0 0 3px rgba(191,231,109,.12);
+}
+
+.marker-instruction .marker-status[data-state="error"] {
+  color: #fff;
+  background: rgba(105,12,19,.94);
+}
+
+.marker-order {
+  left: max(16px,env(safe-area-inset-left));
+  right: max(16px,env(safe-area-inset-right));
+  bottom: max(10px,env(safe-area-inset-bottom));
+  max-width: 640px;
+  min-height: 64px;
+  background: #c91f2c;
+  font-size: clamp(31px,8.6vw,40px);
+}
+
+@media (max-width:390px) {
+  .marker-hud {
+    min-height: 74px;
+    padding: 9px 10px;
+    grid-template-columns: 46px minmax(0,1fr) auto;
+    gap: 8px;
+  }
+
+  .marker-logo-home,
+  .marker-logo-home img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .marker-brand {
+    gap: 5px;
+  }
+
+  .marker-brand strong {
+    gap: 6px;
+    font-size: clamp(17px,5vw,21px);
+  }
+
+  .marker-brand strong b {
+    padding: 5px 6px 4px;
+    font-size: 12px;
+  }
+
+  .marker-brand small {
+    font-size: clamp(8px,2.5vw,10px);
+  }
+
+  .marker-social a {
+    width: 34px;
+    height: 34px;
+  }
+
+  .marker-social svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .marker-scan-guide {
+    top: calc(max(10px,env(safe-area-inset-top)) + 101px);
+    width: calc(100vw - 72px);
+  }
+
+  .marker-instruction {
+    left: max(10px,env(safe-area-inset-left));
+    right: max(10px,env(safe-area-inset-right));
+    padding-inline: 12px;
+  }
+
+  .marker-progress {
+    grid-template-columns: minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr) 12px minmax(0,1fr);
+  }
+
+  .marker-progress__step > strong {
+    font-size: clamp(9px,2.7vw,11px);
+  }
+}
+
+@media (max-height:720px) {
+  .marker-hud {
+    top: max(7px,env(safe-area-inset-top));
+    min-height: 70px;
+  }
+
+  .marker-scan-guide {
+    top: calc(max(7px,env(safe-area-inset-top)) + 91px);
+    height: clamp(190px,31dvh,250px);
+  }
+
+  .marker-instruction {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    min-height: 224px;
+    padding-top: 11px;
+    padding-bottom: 49px;
+  }
+
+  .marker-progress__circle {
+    width: clamp(48px,14vw,58px);
+    height: clamp(48px,14vw,58px);
+  }
+
+  .marker-progress__circle svg {
+    width: clamp(25px,7vw,31px);
+    height: clamp(25px,7vw,31px);
+  }
+
+  .marker-progress__line {
+    margin-top: clamp(24px,7vw,29px);
+  }
+
+  .marker-progress__step > strong {
+    margin-top: 6px;
+  }
+
+  .marker-instruction__copy {
+    margin-top: 11px;
+  }
+
+  .marker-instruction .marker-instruction__copy > strong {
+    font-size: clamp(22px,6.2vw,28px);
+  }
+
+  .marker-instruction__body {
+    display: block;
+    font-size: 12px;
+  }
+
+  .marker-instruction .marker-status {
+    min-height: 32px;
+    bottom: 10px;
+    font-size: 12px;
+  }
+
+  .marker-order {
+    min-height: 56px;
+    font-size: 30px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .marker-progress__circle {
+    transition: none;
+  }
+}

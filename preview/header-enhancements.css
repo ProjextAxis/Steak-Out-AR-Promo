@@ -1,0 +1,65 @@
+.announcement__inner {
+  width: 100%;
+  min-width: 0;
+}
+
+.announcement__viewport {
+  width: 100%;
+  height: 18px;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.announcement__track {
+  display: flex;
+  width: 100%;
+  transform: translate3d(-100%, 0, 0);
+  will-change: transform;
+}
+
+.announcement__copy {
+  display: grid;
+  flex: 0 0 100%;
+  min-width: 0;
+  place-items: center;
+  white-space: nowrap;
+}
+
+.menu-button {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.menu-button svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.site-logo {
+  gap: 4px;
+}
+
+.site-logo span {
+  transform: translateY(2px);
+}
+
+.gift-icon {
+  width: 14px;
+  height: 18px;
+}
+
+.gift-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Keep customers inside the branded Steak Out AR flow. The native model-viewer
+   AR shortcut remains hidden; FREE PLACE is still available through the dev toggle. */
+model-viewer::part(default-ar-button) {
+  display: none !important;
+}

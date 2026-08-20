@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>Steak Out AR | $12 Lunch Preview</title>
+  <script>if (new URLSearchParams(location.search).get('embedded') === '1') document.documentElement.classList.add('is-embedded');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Roboto+Slab:wght@800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.cdnfonts.com/css/rustler" rel="stylesheet" />
+  <link rel="stylesheet" href="./marker.css?v=20260819-camera-stack" />
+  <link rel="stylesheet" href="./marker-target.css?v=20260819-approved-target" />
+  <link rel="stylesheet" href="./marker-panel-tight.css?v=20260819-tight-panel" />
+  <link rel="stylesheet" href="./marker-panel-compact.css?v=20260819-force-compact-1" />
+  <link rel="stylesheet" href="./marker-ghost-placement.css?v=20260819-ghost-placement" />
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script defer src="./config.js?v=20260819-progress-ui"></script>
+  <script defer src="./marker.js?v=20260819-ghost-placement"></script>
+  <script defer src="./marker-splash-fix.js?v=20260819-transparent-svg"></script>
+</head>
+<body>
+  <div class="marker-shell" id="marker-shell">
+    <div class="ar-splash" id="ar-splash" hidden aria-hidden="true">
+      <div class="ar-splash__glow"></div>
+      <img class="ar-splash__logo" id="splash-logo" src="./assets/STEAK OUT LOGO.svg" alt="" />
+    </div>
+
+    <header class="marker-hud marker-hud--top" id="marker-hud">
+      <a class="marker-logo-home" href="./index.html" aria-label="Back to AR preview">
+        <img src="./assets/steakout-logo.webp" alt="Steak Out" />
+      </a>
+      <div class="marker-brand">
+        <strong><span>STEAK OUT</span><b>AR</b></strong>
+        <small>$12 LUNCH PREVIEW</small>
+      </div>
+      <nav class="marker-social" id="marker-social" aria-label="Follow Steak Out" hidden>
+        <a id="marker-instagram" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4.1" /><circle class="social-icon-fill" cx="17.5" cy="6.7" r="1.1" /></svg>
+        </a>
+        <a id="marker-facebook" href="#" target="_blank" rel="noopener" aria-label="Steak Out on Facebook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="social-icon-fill" d="M14.3 8.2V6.6c0-.8.5-1 1-1h2.5V2.1L14.6 2C11.4 2 9.9 3.9 9.9 6.3v1.9H7v4h2.9V22h4.4v-9.8h3.2l.5-4h-3.7Z" /></svg>
+        </a>
+      </nav>
+    </header>
+
+    <div class="marker-intro" id="marker-intro">
+      <span class="marker-intro__eyebrow">TABLE MARKER TEST</span>
+      <h1>LOCK THE MEAL<br />TO ONE SPOT.</h1>
+      <p>This prototype uses MindAR's sample tracking card until your Steak Out QR ad is finished.</p>
+      <div class="marker-intro__actions">
+        <button id="marker-start" type="button">START CAMERA</button>
+        <a href="./test-target.html" target="_blank" rel="noopener">OPEN TEST MARKER</a>
+      </div>
+      <small>For a phone-only test, print the test marker. Or show it on a second screen.</small>
+    </div>
+
+    <div class="marker-scan-guide" id="marker-scan-guide" hidden aria-hidden="true"><span class="scan-corners"></span></div>
+
+    <aside class="marker-instruction" id="marker-instruction" data-state="scanning" data-current-step="2" role="status" aria-live="polite" hidden>
+      <div class="marker-progress" id="marker-progress" role="list" aria-label="AR preview progress">
+        <div class="marker-progress__step" data-step="1" data-state="complete" role="listitem"><span class="marker-progress__circle"><span class="marker-progress__number">1</span><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 24V13a3 3 0 0 1 6 0v8-11a3 3 0 0 1 6 0v11-8a3 3 0 0 1 6 0v12-7a3 3 0 0 1 6 0v11c0 8-6 14-14 14h-2c-6 0-10-3-13-8l-5-8a3.5 3.5 0 0 1 6-3l4 6Z" /><path d="M8 12c1-3 3-5 6-7M9 19c-3-1-5-3-7-6" /></svg></span><strong>VIEW IN AR</strong></div>
+        <span class="marker-progress__line" aria-hidden="true"></span>
+        <div class="marker-progress__step" data-step="2" data-state="active" role="listitem"><span class="marker-progress__circle"><span class="marker-progress__number">2</span><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="11" y="5" width="26" height="38" rx="4" /><path d="M20 9h8M21 38h6" /><rect x="16" y="15" width="6" height="6" /><rect x="27" y="15" width="5" height="5" /><rect x="16" y="26" width="5" height="5" /><path d="M26 25h6v7h-3v-3h-3zM21 21h5v5h-5z" /></svg></span><strong>POINT AT GRAPHIC</strong></div>
+        <span class="marker-progress__line" aria-hidden="true"></span>
+        <div class="marker-progress__step" data-step="3" data-state="upcoming" role="listitem"><span class="marker-progress__circle"><span class="marker-progress__number">3</span><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 18V8h10M31 8h10v10M41 30v10H31M17 40H7V30" /><rect x="17" y="17" width="6" height="6" /><rect x="27" y="17" width="5" height="5" /><rect x="17" y="27" width="5" height="5" /><path d="M27 27h5v5h-5zM22 22h5v5h-5z" /></svg></span><strong>KEEP IN FRAME</strong></div>
+        <span class="marker-progress__line" aria-hidden="true"></span>
+        <div class="marker-progress__step" data-step="4" data-state="upcoming" role="listitem"><span class="marker-progress__circle"><span class="marker-progress__number">4</span><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 22c1-8 6-12 14-12s13 4 14 12H10zM8 27h32M10 32h28M12 37h24" /><path d="M38 5v7M34.5 8.5h7M8 7v5M5.5 9.5h5" /></svg></span><strong>MEAL APPEARS</strong></div>
+      </div>
+      <div class="marker-instruction__copy"><strong id="marker-instruction-title">POINT BACK AT THE TABLE GRAPHIC</strong><span class="marker-instruction__body" id="marker-instruction-body">Keep the full graphic in frame. Your $12 lunch will appear here.</span></div>
+      <span class="marker-status" id="marker-status" data-state="busy">SCANNING</span>
+    </aside>
+
+    <a class="marker-order" id="marker-order" href="https://order.toasttab.com/online/steakout-sewell" target="_top" aria-label="Order Steak Out on Toast" hidden>ORDER NOW</a>
+
+    <a-scene id="marker-scene" mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no; filterMinCF: 0.001; filterBeta: 10" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-entity id="marker-anchor" mindar-image-target="targetIndex: 0"><a-gltf-model id="marker-food"></a-gltf-model></a-entity>
+    </a-scene>
+  </div>
+</body>
+</html>

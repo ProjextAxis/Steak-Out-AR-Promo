@@ -1,0 +1,27 @@
+.viewer-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Keep VIEW IN AR fully contained inside the 3D render card. */
+.viewer-ar-button {
+  position: absolute !important;
+  z-index: 9 !important;
+  top: 16px !important;
+  left: 18px !important;
+  right: 18px !important;
+  transform: none !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 620px) {
+  .viewer-ar-button {
+    top: 14px !important;
+    left: 14px !important;
+    right: 14px !important;
+    width: auto !important;
+  }
+}

@@ -1,0 +1,52 @@
+/* Tighten only the rounded progress panel to reduce vertical dead space. */
+.marker-instruction {
+  min-height: 178px;
+  padding: 16px 14px 52px;
+  border-radius: 24px;
+}
+
+.marker-progress__circle {
+  width: clamp(56px, 15.5vw, 70px);
+  height: clamp(56px, 15.5vw, 70px);
+}
+
+.marker-progress__circle svg {
+  width: clamp(30px, 8vw, 38px);
+  height: clamp(30px, 8vw, 38px);
+}
+
+.marker-progress__line {
+  margin-top: clamp(27px, 7.8vw, 35px);
+}
+
+.marker-progress__step > strong {
+  margin-top: 8px;
+  font-size: clamp(10px, 2.85vw, 13px);
+}
+
+.marker-instruction .marker-status {
+  bottom: 10px;
+  min-height: 38px;
+}
+
+@media (max-width: 430px) {
+  .marker-instruction {
+    min-height: 166px;
+    padding: 14px 12px 48px;
+    border-radius: 22px;
+  }
+
+  .marker-progress__circle {
+    width: clamp(52px, 14.5vw, 64px);
+    height: clamp(52px, 14.5vw, 64px);
+  }
+
+  .marker-progress__step > strong {
+    margin-top: 7px;
+    font-size: clamp(9px, 2.7vw, 12px);
+  }
+
+  .marker-instruction .marker-status {
+    bottom: 9px;
+  }
+}

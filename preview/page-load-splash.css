@@ -1,0 +1,123 @@
+html.is-preloading-ar,
+html.is-preloading-ar body { overflow:hidden !important; }
+
+#ar-splash.is-page-load {
+  display:flex !important; position:fixed !important; inset:0 !important; z-index:100000 !important;
+  opacity:1 !important; visibility:visible !important; pointer-events:auto !important; background:#000 !important;
+  align-items:center !important; justify-content:center !important; flex-direction:column !important;
+}
+
+#ar-splash.is-page-load img {
+  width:min(62vw,320px) !important; max-height:38vh !important; object-fit:contain !important;
+  transform-origin:50% 58% !important;
+  opacity:.08; transform:translateY(108vh) rotate(-220deg) scale(.28);
+}
+
+#ar-splash.is-page-load.has-started-entrance img,
+#ar-splash.is-page-load.is-waiting img {
+  will-change:transform,opacity,filter;
+}
+
+/* Set on the spans, not just the parent: styles.css has `.ar-splash span`
+   with a font shorthand that otherwise hijacks both of them. */
+#ar-splash .page-load-status {
+  position: relative;
+  margin-top: 30px !important;
+  display: inline-flex !important;
+  align-items: baseline;
+  justify-content: center !important;
+  color: #fff;
+  opacity: 0;
+  font: 400 clamp(17px, 4.8vw, 24px)/1 'Rustler', Georgia, serif !important;
+  letter-spacing: .16em;
+  white-space: nowrap;
+}
+
+/* The wrapper must stay put and stay lit, or wordFade drags the letters down
+   with it. The letters animate individually. */
+#ar-splash .page-load-status__word {
+  font: inherit !important;
+  letter-spacing: inherit;
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+#ar-splash .page-load-status__ch,
+#ar-splash .page-load-status__dots {
+  display: inline-block;
+  font: inherit !important;
+  letter-spacing: inherit;
+  animation: none !important;
+  opacity: 0;
+}
+
+/* Trailing letter-spacing sits after the last glyph, so a centred box reads a
+   half-step left. Nudge the ink back to true optical centre. */
+#ar-splash .page-load-status__word { margin-left: .08em; }
+
+/* Out of flow so a 1-dot frame and a 3-dot frame centre identically. */
+#ar-splash .page-load-status__dots {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 2.2em;
+  margin-left: .06em;
+  text-align: left;
+}
+
+/* Container just lifts the lights; the letters do the performing. */
+#ar-splash.is-page-load.is-waiting .page-load-status {
+  animation: pageLoadStatusIn .28s linear forwards;
+}
+
+#ar-splash.is-page-load.is-waiting .page-load-status__ch {
+  animation: statusCharIn .5s cubic-bezier(.2, .9, .25, 1.35) forwards !important;
+  /* Must be !important too: the shorthand above is !important and resets delay. */
+  animation-delay: calc(var(--i) * 22ms) !important;
+}
+
+/* Alternate the kick so the line reads as playful rather than mechanical. */
+#ar-splash.is-page-load.is-waiting .page-load-status__ch:nth-child(even) {
+  animation-name: statusCharInAlt !important;
+}
+
+/* Trails in once the last letter has landed. */
+#ar-splash.is-page-load.is-waiting .page-load-status__dots {
+  animation: statusDotsIn .38s cubic-bezier(.2, .9, .25, 1.35) .46s forwards !important;
+}
+#ar-splash.is-page-load-exit { animation:pageLoadSplashExit .78s ease forwards !important; pointer-events:none !important; }
+
+@keyframes pageLoadStatusIn { from { opacity: 0 } to { opacity: 1 } }
+
+/* Each letter is flung up from under the line, squashing on launch and
+   stretching as it overshoots, then settling. */
+@keyframes statusCharIn {
+  0%   { opacity: 0; transform: translateY(30px) rotate(-9deg) scale(.72, 1.18); }
+  55%  { opacity: 1; transform: translateY(-7px) rotate(3deg)  scale(1.1, .92); }
+  78%  { opacity: 1; transform: translateY(2px)  rotate(-1deg) scale(.97, 1.03); }
+  100% { opacity: 1; transform: translateY(0)    rotate(0)     scale(1, 1); }
+}
+
+@keyframes statusCharInAlt {
+  0%   { opacity: 0; transform: translateY(30px) rotate(9deg)  scale(.72, 1.18); }
+  55%  { opacity: 1; transform: translateY(-7px) rotate(-3deg) scale(1.1, .92); }
+  78%  { opacity: 1; transform: translateY(2px)  rotate(1deg)  scale(.97, 1.03); }
+  100% { opacity: 1; transform: translateY(0)    rotate(0)     scale(1, 1); }
+}
+
+@keyframes statusDotsIn {
+  0%   { opacity: 0; transform: translateY(14px) scale(.7); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes pageLoadSplashExit { from{opacity:1} to{opacity:0} }
+
+@media(prefers-reduced-motion:reduce){
+  #ar-splash.is-page-load img { opacity:1; transform:none; }
+  #ar-splash .page-load-status__ch,
+  #ar-splash .page-load-status__dots {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

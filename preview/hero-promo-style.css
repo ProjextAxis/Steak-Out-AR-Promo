@@ -1,0 +1,142 @@
+.ar-hero {
+  position: relative;
+  overflow: hidden;
+  padding-top: 28px;
+  background: #000;
+}
+
+.ar-hero::before,
+.ar-hero::after {
+  content: none;
+}
+
+.offer-window {
+  position: relative;
+  z-index: 3;
+  color: #fff;
+  font-size: clamp(18px, 5vw, 25px);
+  letter-spacing: .055em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .9);
+}
+
+.ar-hero .offer-headline {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  width: fit-content;
+  max-width: 100%;
+  margin: 16px auto 0;
+  line-height: .76;
+}
+
+/* Reference match: concentrated red center behind the price, with black edges. */
+.ar-hero .offer-headline::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  left: 50%;
+  top: 38%;
+  width: min(116vw, 800px);
+  height: 132%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 40%,
+      rgba(238, 20, 27, .50) 0%,
+      rgba(198, 5, 18, .43) 18%,
+      rgba(137, 0, 12, .32) 37%,
+      rgba(78, 0, 8, .20) 54%,
+      rgba(35, 0, 4, .10) 67%,
+      rgba(0, 0, 0, 0) 79%);
+  filter: blur(12px);
+  pointer-events: none;
+}
+
+.ar-hero .offer-headline::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 38%;
+  width: min(122vw, 840px);
+  height: 138%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 120px 62px rgba(0, 0, 0, .58),
+    inset 0 0 190px 95px rgba(0, 0, 0, .22);
+  pointer-events: none;
+}
+
+.offer-price,
+.offer-name {
+  position: relative;
+  z-index: 2;
+}
+
+.offer-price {
+  font-size: clamp(142px, 45vw, 248px);
+  line-height: .76;
+  letter-spacing: -.025em;
+  text-shadow:
+    0 2px 0 rgba(255, 255, 255, .08),
+    0 8px 22px rgba(0, 0, 0, .28);
+}
+
+.offer-name {
+  margin-top: 20px;
+  font-size: clamp(58px, 15.7vw, 90px);
+  line-height: .88;
+  letter-spacing: .006em;
+  text-shadow: 0 7px 20px rgba(0, 0, 0, .34);
+}
+
+/* Keep VIEW IN AR inside the 3D render card. */
+.viewer-shell {
+  position: relative;
+  z-index: 4;
+  margin-top: 22px;
+}
+
+@media (max-width: 410px) {
+  .ar-hero {
+    padding-top: 24px;
+  }
+
+  .offer-window {
+    font-size: 17px;
+  }
+
+  .offer-price {
+    font-size: clamp(136px, 46vw, 190px);
+  }
+
+  .offer-name {
+    margin-top: 18px;
+    font-size: clamp(54px, 16vw, 66px);
+  }
+
+  .ar-hero .offer-headline::before {
+    width: 126vw;
+    height: 138%;
+    top: 37%;
+  }
+
+  .ar-hero .offer-headline::after {
+    width: 132vw;
+    height: 144%;
+    top: 37%;
+  }
+}
+
+/* One plain line telling people what the button actually does.
+   Beats .ar-hero>p on specificity so the big hero-paragraph size doesn't apply. */
+.ar-hero .ar-nudge {
+  position: relative;
+  z-index: 3;
+  max-width: 34ch;
+  margin: 14px auto 0;
+  color: #EBEBEB;
+  font: 400 clamp(16px, 4.2vw, 20px)/1.35 Arial, Helvetica, sans-serif;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .9);
+}
