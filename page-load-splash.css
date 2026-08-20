@@ -33,12 +33,22 @@ html.is-preloading-ar body { overflow:hidden !important; }
   white-space: nowrap;
 }
 
-#ar-splash .page-load-status__word,
-#ar-splash .page-load-status__dots {
+/* The wrapper must stay put and stay lit, or wordFade drags the letters down
+   with it. The letters animate individually. */
+#ar-splash .page-load-status__word {
   font: inherit !important;
   letter-spacing: inherit;
   animation: none !important;
   opacity: 1 !important;
+}
+
+#ar-splash .page-load-status__ch,
+#ar-splash .page-load-status__dots {
+  display: inline-block;
+  font: inherit !important;
+  letter-spacing: inherit;
+  animation: none !important;
+  opacity: 0;
 }
 
 /* Trailing letter-spacing sits after the last glyph, so a centred box reads a
@@ -55,21 +65,59 @@ html.is-preloading-ar body { overflow:hidden !important; }
   text-align: left;
 }
 
+/* Container just lifts the lights; the letters do the performing. */
 #ar-splash.is-page-load.is-waiting .page-load-status {
-  animation: pageLoadStatusIn .9s cubic-bezier(.18, .84, .27, 1.18) forwards;
+  animation: pageLoadStatusIn .28s linear forwards;
+}
+
+#ar-splash.is-page-load.is-waiting .page-load-status__ch {
+  animation: statusCharIn .62s cubic-bezier(.2, .9, .25, 1.35) forwards !important;
+  /* Must be !important too: the shorthand above is !important and resets delay. */
+  animation-delay: calc(var(--i) * 34ms) !important;
+}
+
+/* Alternate the kick so the line reads as playful rather than mechanical. */
+#ar-splash.is-page-load.is-waiting .page-load-status__ch:nth-child(even) {
+  animation-name: statusCharInAlt !important;
+}
+
+/* Trails in once the last letter has landed. */
+#ar-splash.is-page-load.is-waiting .page-load-status__dots {
+  animation: statusDotsIn .42s cubic-bezier(.2, .9, .25, 1.35) .66s forwards !important;
 }
 #ar-splash.is-page-load-exit { animation:pageLoadSplashExit .78s ease forwards !important; pointer-events:none !important; }
 
-/* Rises, overshoots and settles, tracking opening out as it lands — the same
-   personality as the logo's pop rather than a flat fade. */
-@keyframes pageLoadStatusIn {
-  0%   { opacity: 0; transform: translateY(16px) scale(.9);   filter: blur(5px); letter-spacing: .06em; }
-  50%  { opacity: 1; transform: translateY(-3px) scale(1.04); filter: blur(0);   letter-spacing: .17em; }
-  72%  {             transform: translateY(1px)  scale(.99);                     letter-spacing: .155em; }
-  100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0);   letter-spacing: .16em; }
+@keyframes pageLoadStatusIn { from { opacity: 0 } to { opacity: 1 } }
+
+/* Each letter is flung up from under the line, squashing on launch and
+   stretching as it overshoots, then settling. */
+@keyframes statusCharIn {
+  0%   { opacity: 0; transform: translateY(30px) rotate(-9deg) scale(.72, 1.18); }
+  55%  { opacity: 1; transform: translateY(-7px) rotate(3deg)  scale(1.1, .92); }
+  78%  { opacity: 1; transform: translateY(2px)  rotate(-1deg) scale(.97, 1.03); }
+  100% { opacity: 1; transform: translateY(0)    rotate(0)     scale(1, 1); }
+}
+
+@keyframes statusCharInAlt {
+  0%   { opacity: 0; transform: translateY(30px) rotate(9deg)  scale(.72, 1.18); }
+  55%  { opacity: 1; transform: translateY(-7px) rotate(-3deg) scale(1.1, .92); }
+  78%  { opacity: 1; transform: translateY(2px)  rotate(1deg)  scale(.97, 1.03); }
+  100% { opacity: 1; transform: translateY(0)    rotate(0)     scale(1, 1); }
+}
+
+@keyframes statusDotsIn {
+  0%   { opacity: 0; transform: translateY(14px) scale(.7); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
 }
 @keyframes pageLoadSplashExit { from{opacity:1} to{opacity:0} }
 
 @media(prefers-reduced-motion:reduce){
   #ar-splash.is-page-load img { opacity:1; transform:none; }
+  #ar-splash .page-load-status__ch,
+  #ar-splash .page-load-status__dots {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

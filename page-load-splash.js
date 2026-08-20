@@ -36,6 +36,19 @@
     loadingText.className = 'page-load-status';
     loadingText.innerHTML = '<span class="page-load-status__word">LOADING EXPERIENCE</span><span class="page-load-status__dots" aria-hidden="true">.</span>';
   }
+  // Split into per-letter spans so they can stagger up from below. The letters
+  // are decorative once split, so the word keeps the readable label.
+  const wordEl = splash.querySelector('.page-load-status__word');
+  if (wordEl) {
+    const label = wordEl.textContent;
+    wordEl.setAttribute('aria-label', label);
+    wordEl.innerHTML = label
+      .split('')
+      .map((ch, i) => '<span class="page-load-status__ch" aria-hidden="true" style="--i:' + i + '">'
+        + (ch === ' ' ? '&nbsp;' : ch) + '</span>')
+      .join('');
+  }
+
   const dots = splash.querySelector('.page-load-status__dots');
 
   const startDots = () => {
