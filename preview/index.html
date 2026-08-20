@@ -7,6 +7,10 @@
   <meta name="description" content="Preview a Steak Out $12 lunch special on your table in augmented reality." />
   <title>Steak Out | $12 Lunch Specials in AR</title>
 
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="preload" as="fetch" crossorigin="anonymous" data-steakout-model-preload
+        href="./assets/cheesesteak-special-draco.glb" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
@@ -16,13 +20,13 @@
   <link rel="stylesheet" href="./ar-flow.css?v=20260820-sheet-stripped" />
   <link rel="stylesheet" href="./viewer-button-position.css?v=20260820-top-strip" />
   <link rel="stylesheet" href="./hero-promo-style.css?v=20260820-nudge-portion" />
-  <link rel="stylesheet" href="./hero-split.css?v=20260820-branded-only" />
+  <link rel="stylesheet" href="./hero-split.css?v=20260820-model-wait" />
   <link rel="stylesheet" href="./page-load-splash.css?v=20260820-fast-splash" />
 
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
   <script defer src="./config.js?v=20260820-branded-only"></script>
   <script defer src="./app.js?v=20260820-branded-only"></script>
-  <script defer src="./page-load-splash.js?v=20260820-fast-splash-2"></script>
+  <script defer src="./page-load-splash.js?v=20260820-model-wait"></script>
   <script defer src="./ar-launch-no-splash.js?v=20260820-branded-only"></script>
 </head>
 <body>
