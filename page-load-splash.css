@@ -25,10 +25,29 @@ html.is-preloading-ar body {
   animation: pageLoadSteakOutSwing 1.55s cubic-bezier(.18,.86,.22,1) both !important;
 }
 
-#ar-splash.is-page-load span {
-  margin-top: 18px !important;
+#ar-splash.is-page-load.is-waiting img {
+  animation: pageLoadSteakOutPulse 1.15s ease-in-out infinite !important;
+}
+
+#ar-splash .page-load-status {
+  min-width: 132px;
+  margin-top: 22px !important;
+  display: inline-flex !important;
+  align-items: baseline;
+  justify-content: flex-start;
+  color: #fff;
   opacity: 0 !important;
-  animation: pageLoadSteakOutWord .55s .95s ease forwards !important;
+  font: 400 clamp(22px, 5.8vw, 31px)/1 'Bebas Neue', 'Arial Narrow', sans-serif !important;
+  letter-spacing: .12em;
+  animation: pageLoadStatusIn .42s 1.08s ease forwards !important;
+}
+
+#ar-splash .page-load-status__dots {
+  width: 34px;
+  display: inline-block;
+  margin-left: 2px;
+  text-align: left;
+  letter-spacing: .05em;
 }
 
 #ar-splash.is-page-load-exit {
@@ -45,8 +64,13 @@ html.is-preloading-ar body {
   100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
 }
 
-@keyframes pageLoadSteakOutWord {
-  from { opacity: 0; transform: translateY(10px); }
+@keyframes pageLoadSteakOutPulse {
+  0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 0 rgba(186,31,44,0)); }
+  50% { opacity: .88; transform: scale(1.075); filter: drop-shadow(0 0 22px rgba(186,31,44,.34)); }
+}
+
+@keyframes pageLoadStatusIn {
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -57,7 +81,8 @@ html.is-preloading-ar body {
 
 @media (prefers-reduced-motion: reduce) {
   #ar-splash.is-page-load img,
-  #ar-splash.is-page-load span {
+  #ar-splash.is-page-load.is-waiting img,
+  #ar-splash .page-load-status {
     animation-duration: .01ms !important;
     animation-delay: 0ms !important;
   }
