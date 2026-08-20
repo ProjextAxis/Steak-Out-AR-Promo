@@ -12,6 +12,7 @@
   let dotCount = 0;
 
   splash.classList.add('is-page-load', 'is-active');
+  splash.classList.remove('is-entering', 'is-waiting');
   splash.setAttribute('aria-hidden', 'false');
   document.documentElement.classList.add('is-preloading-ar');
 
@@ -22,6 +23,8 @@
   }
 
   const dots = splash.querySelector('.page-load-status__dots');
+  const logo = splash.querySelector('img');
+
   const startDots = () => {
     if (dotTimer || !dots) return;
     dotTimer = window.setInterval(() => {
@@ -30,11 +33,23 @@
     }, 680);
   };
 
-  // The pulse phase is now controlled only by splash-sequence-fix.js after animationend.
-  const logo = splash.querySelector('img');
-  logo?.addEventListener('animationend', (event) => {
-    if (event.animationName === 'pageLoadSteakOutSwingVisible') startDots();
-  }, { once: true });
+  if (logo) {
+    const onEntranceEnd = (event) => {
+      if (event.target !== logo || event.animationName !== 'pageLoadSteakOutSwingVisible') return;
+      logo.removeEventListener('animationend', onEntranceEnd);
+      splash.classList.remove('is-entering');
+      splash.classList.add('is-waiting');
+      startDots();
+    };
+    logo.addEventListener('animationend', onEntranceEnd);
+
+    // Force a real first paint with the logo below the viewport before starting motion.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!finished) splash.classList.add('is-entering');
+      });
+    });
+  }
 
   const viewer = document.querySelector('#meal-viewer');
   if (viewer) {
