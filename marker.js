@@ -35,6 +35,33 @@
     status.dataset.state = state;
   };
 
+  const setFoodOpacity = (opacity) => {
+    const root = food.getObject3D('mesh');
+    if (!root) return;
+    root.traverse((node) => {
+      if (!node.isMesh || !node.material) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      materials.forEach((material) => {
+        material.transparent = opacity < 1;
+        material.opacity = opacity;
+        material.depthWrite = opacity >= 1;
+        material.needsUpdate = true;
+      });
+    });
+  };
+
+  const setPlacementGhost = () => {
+    food.classList.remove('is-placement-solid');
+    food.classList.add('is-placement-ghost');
+    setFoodOpacity(0.34);
+  };
+
+  const setPlacementSolid = () => {
+    food.classList.remove('is-placement-ghost');
+    food.classList.add('is-placement-solid');
+    setFoodOpacity(1);
+  };
+
   const postToParent = (type) => {
     if (!isEmbedded || window.parent === window) return;
     window.parent.postMessage({ type }, window.location.origin);
@@ -42,56 +69,20 @@
 
   const setProgressStep = (currentStep) => {
     if (instruction) instruction.dataset.currentStep = String(currentStep);
-
     progressSteps.forEach((progressStep) => {
       const stepNumber = Number(progressStep.dataset.step);
-      const state = stepNumber === currentStep
-        ? 'active'
-        : stepNumber < currentStep
-          ? 'complete'
-          : 'upcoming';
-
+      const state = stepNumber === currentStep ? 'active' : stepNumber < currentStep ? 'complete' : 'upcoming';
       progressStep.dataset.state = state;
       progressStep.setAttribute('aria-current', state === 'active' ? 'step' : 'false');
     });
   };
 
   const instructionStates = {
-    scanning: {
-      step: 2,
-      title: 'POINT BACK AT THE TABLE GRAPHIC',
-      body: 'Keep the full graphic in frame. Your $12 lunch will appear here.',
-      status: 'SCANNING',
-      statusState: 'busy'
-    },
-    holding: {
-      step: 3,
-      title: 'KEEP THE FULL GRAPHIC IN FRAME',
-      body: 'Hold steady while Steak Out locks your $12 lunch to this table.',
-      status: 'HOLD STEADY',
-      statusState: 'busy'
-    },
-    locked: {
-      step: 4,
-      title: 'YOUR $12 LUNCH IS RIGHT HERE',
-      body: 'Move around it to see the portion before you order.',
-      status: 'MEAL READY',
-      statusState: 'active'
-    },
-    lost: {
-      step: 2,
-      title: 'POINT BACK AT THE TABLE GRAPHIC',
-      body: 'Bring the full graphic back into frame and reduce glare.',
-      status: 'SEARCHING',
-      statusState: 'busy'
-    },
-    error: {
-      step: 2,
-      title: 'ALLOW THE CAMERA TO CONTINUE',
-      body: 'Allow camera access, then close and reopen Steak Out AR.',
-      status: 'CAMERA ERROR',
-      statusState: 'error'
-    }
+    scanning: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Keep the full graphic in frame. Your $12 lunch will appear here.', status: '', statusState: '' },
+    holding: { step: 3, title: 'KEEP THE FULL GRAPHIC IN FRAME', body: 'Hold steady while Steak Out locks your $12 lunch to this table.', status: '', statusState: '' },
+    locked: { step: 4, title: 'YOUR $12 LUNCH IS RIGHT HERE', body: 'Move around it to see the portion before you order.', status: '', statusState: 'active' },
+    lost: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Bring the full graphic back into frame and reduce glare.', status: '', statusState: '' },
+    error: { step: 2, title: 'ALLOW THE CAMERA TO CONTINUE', body: 'Allow camera access, then close and reopen Steak Out AR.', status: 'CAMERA ERROR', statusState: 'error' }
   };
 
   const renderInstruction = (state) => {
@@ -110,6 +101,7 @@
   food.setAttribute('rotation', markerConfig.modelRotation || '90 0 0');
   const modelScale = Number(markerConfig.modelScale || 0.32);
   food.setAttribute('scale', `${modelScale} ${modelScale} ${modelScale}`);
+  food.addEventListener('model-loaded', () => setPlacementGhost());
 
   if (orderLink && config.orderUrl) orderLink.href = config.orderUrl;
   if (instagramLink && config.social?.instagramUrl) instagramLink.href = config.social.instagramUrl;
@@ -117,9 +109,7 @@
 
   const getArSystem = async () => {
     if (arSystem) return arSystem;
-    if (!scene.hasLoaded) {
-      await new Promise((resolve) => scene.addEventListener('loaded', resolve, { once: true }));
-    }
+    if (!scene.hasLoaded) await new Promise((resolve) => scene.addEventListener('loaded', resolve, { once: true }));
     arSystem = scene.systems['mindar-image-system'];
     return arSystem;
   };
@@ -154,7 +144,7 @@
       try {
         clearProgressAdvance();
         targetVisible = false;
-        setStatus('STARTING', 'busy');
+        setPlacementGhost();
         intro.hidden = true;
         guide.hidden = true;
         if (instruction) instruction.hidden = true;
@@ -163,15 +153,12 @@
         showSplash();
         window.dispatchEvent(new Event('resize'));
 
-        const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1050));
+        const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1250));
         const system = await getArSystem();
         if (!system) throw new Error('MindAR image system failed to initialize.');
-
         await system.start();
         isRunning = true;
         await minSplashTime;
-        guide.hidden = false;
-        guide.classList.remove('is-found');
         renderInstruction('scanning');
         if (socialDock) socialDock.hidden = false;
         if (orderLink) orderLink.hidden = false;
@@ -200,32 +187,26 @@
 
   const stop = () => {
     if (stopPromise) return stopPromise;
-
     stopPromise = (async () => {
       targetVisible = false;
       clearProgressAdvance();
       if (startPromise) await startPromise;
-
       try {
         const system = await getArSystem();
         if (isRunning && system?.stop) await system.stop();
       } catch (error) {
         console.warn('Unable to stop AR cleanly:', error);
       }
-
       isRunning = false;
+      setPlacementGhost();
       if (splash) splash.hidden = true;
       guide.hidden = true;
-      guide.classList.remove('is-found');
       if (instruction) instruction.hidden = true;
       if (socialDock) socialDock.hidden = true;
       if (orderLink) orderLink.hidden = true;
       intro.hidden = isEmbedded;
-      setStatus('READY');
-    })().finally(() => {
-      stopPromise = null;
-    });
-
+      setStatus('');
+    })().finally(() => { stopPromise = null; });
     return stopPromise;
   };
 
@@ -233,11 +214,11 @@
     if (!isRunning) return;
     targetVisible = true;
     clearProgressAdvance();
-    guide?.classList.add('is-found');
+    setPlacementGhost();
     renderInstruction('holding');
-
     progressAdvanceTimer = window.setTimeout(() => {
       if (!isRunning || !targetVisible) return;
+      setPlacementSolid();
       renderInstruction('locked');
     }, 900);
   });
@@ -246,7 +227,7 @@
     if (!isRunning) return;
     targetVisible = false;
     clearProgressAdvance();
-    guide?.classList.remove('is-found');
+    setPlacementGhost();
     renderInstruction('lost');
   });
 
@@ -255,23 +236,13 @@
   if (isEmbedded) {
     intro.hidden = true;
     logoHome?.setAttribute('aria-label', 'Close Steak Out AR');
-    logoHome?.addEventListener('click', (event) => {
-      event.preventDefault();
-      postToParent('steakout-ar-close');
-    });
-
+    logoHome?.addEventListener('click', (event) => { event.preventDefault(); postToParent('steakout-ar-close'); });
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent || event.origin !== window.location.origin) return;
       if (event.data?.type === 'steakout-ar-start') start();
       else if (event.data?.type === 'steakout-ar-stop') stop();
     });
-
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') postToParent('steakout-ar-close');
-    });
-
-    getArSystem()
-      .then(() => postToParent('steakout-ar-ready'))
-      .catch(() => postToParent('steakout-ar-camera-error'));
+    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') postToParent('steakout-ar-close'); });
+    getArSystem().then(() => postToParent('steakout-ar-ready')).catch(() => postToParent('steakout-ar-camera-error'));
   }
 })();
