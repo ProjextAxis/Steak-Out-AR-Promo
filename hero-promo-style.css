@@ -1,55 +1,19 @@
 .ar-hero {
   position: relative;
-  isolation: isolate;
   overflow: hidden;
   padding-top: 28px;
   background: #000;
 }
 
-/* Reference-style red halo behind the price. Keep it ABOVE the section background. */
-.ar-hero::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  top: 22px;
-  left: 50%;
-  width: min(126vw, 860px);
-  height: min(126vw, 860px);
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 46%,
-      rgba(255, 18, 26, .96) 0%,
-      rgba(224, 0, 18, .80) 16%,
-      rgba(151, 0, 13, .58) 34%,
-      rgba(81, 0, 8, .34) 50%,
-      rgba(0, 0, 0, 0) 72%);
-  filter: blur(3px);
-  pointer-events: none;
-}
-
+/* Keep the section itself black. The red treatment belongs only behind the headline. */
+.ar-hero::before,
 .ar-hero::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  top: 60px;
-  left: 50%;
-  width: min(112vw, 780px);
-  aspect-ratio: 1;
-  transform: translateX(-50%);
-  border: 2px solid rgba(186, 31, 44, .22);
-  border-radius: 50%;
-  box-shadow: 0 0 44px rgba(186, 31, 44, .14);
-  pointer-events: none;
-}
-
-.offer-window,
-.offer-headline {
-  position: relative;
-  z-index: 1;
+  content: none;
 }
 
 .offer-window {
+  position: relative;
+  z-index: 2;
   color: #fff;
   font-size: clamp(18px, 5vw, 25px);
   letter-spacing: .055em;
@@ -57,8 +21,57 @@
 }
 
 .ar-hero .offer-headline {
-  margin-top: 16px;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  width: fit-content;
+  max-width: 100%;
+  margin: 16px auto 0;
   line-height: .76;
+}
+
+/* Bright red center glow, fading to black at the edges like the reference. */
+.ar-hero .offer-headline::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 48%;
+  width: min(112vw, 760px);
+  height: 108%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(255, 24, 30, .98) 0%,
+      rgba(224, 3, 20, .92) 16%,
+      rgba(164, 0, 14, .70) 34%,
+      rgba(92, 0, 9, .46) 51%,
+      rgba(38, 0, 4, .22) 65%,
+      rgba(0, 0, 0, 0) 78%);
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+/* Soft dark edge vignette keeps the reference-style black perimeter. */
+.ar-hero .offer-headline::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 48%;
+  width: min(116vw, 790px);
+  height: 114%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  box-shadow: inset 0 0 85px 42px rgba(0, 0, 0, .38);
+  pointer-events: none;
+}
+
+.offer-price,
+.offer-name {
+  position: relative;
+  z-index: 2;
 }
 
 .offer-price {
@@ -67,7 +80,7 @@
   letter-spacing: -.025em;
   text-shadow:
     0 2px 0 rgba(255, 255, 255, .12),
-    0 10px 30px rgba(0, 0, 0, .32);
+    0 10px 30px rgba(0, 0, 0, .34);
 }
 
 .offer-name {
@@ -75,29 +88,19 @@
   font-size: clamp(58px, 16.2vw, 92px);
   line-height: .88;
   letter-spacing: .006em;
-  text-shadow: 0 8px 24px rgba(0, 0, 0, .38);
+  text-shadow: 0 8px 24px rgba(0, 0, 0, .42);
 }
 
+/* The AR pill remains contained inside the 3D render card. */
 .viewer-shell {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   margin-top: 30px;
 }
 
 @media (max-width: 410px) {
   .ar-hero {
     padding-top: 24px;
-  }
-
-  .ar-hero::before {
-    top: 18px;
-    width: 136vw;
-    height: 136vw;
-  }
-
-  .ar-hero::after {
-    top: 54px;
-    width: 120vw;
   }
 
   .offer-window {
@@ -111,5 +114,15 @@
   .offer-name {
     margin-top: 19px;
     font-size: clamp(54px, 16.5vw, 68px);
+  }
+
+  .ar-hero .offer-headline::before {
+    width: 124vw;
+    height: 112%;
+  }
+
+  .ar-hero .offer-headline::after {
+    width: 128vw;
+    height: 118%;
   }
 }
