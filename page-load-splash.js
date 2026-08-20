@@ -4,8 +4,8 @@
 
   const logo = splash.querySelector('img');
   const MIN_MS = 5200;
-  const MAX_MS = 12000;
-  const ENTRANCE_DELAY_MS = 1200;
+  const MAX_MS = 14000;
+  const FOCUS_SETTLE_MS = 650;
   const ENTRANCE_MS = 3200;
   const PULSE_MS = 10600;
   const started = performance.now();
@@ -19,6 +19,8 @@
   let entranceAnimation;
   let pulseAnimation;
   let entranceScheduled = false;
+  let focusTimer;
+  let cleanLogoUrl;
 
   splash.classList.add('is-page-load', 'is-active');
   splash.classList.remove('is-entering', 'is-waiting', 'is-page-load-exit');
@@ -40,6 +42,26 @@
     }, 700);
   };
 
+  const prepareTransparentSvg = async () => {
+    if (!logo) return;
+    try {
+      const response = await fetch('./assets/STEAK%20OUT%20LOGO.svg', { cache: 'force-cache' });
+      if (!response.ok) throw new Error('SVG load failed');
+      let svg = await response.text();
+      svg = svg.replace(/<path\b[^>]*fill=["']#ffffff["'][^>]*\/>/i, '');
+      cleanLogoUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      await new Promise((resolve) => {
+        const done = () => resolve();
+        logo.addEventListener('load', done, { once: true });
+        logo.addEventListener('error', done, { once: true });
+        logo.src = cleanLogoUrl;
+      });
+    } catch (error) {
+      console.warn('Using fallback splash logo:', error);
+      logo.src = './assets/steakout-logo.webp';
+    }
+  };
+
   const startPulse = () => {
     if (!logo || finished) return;
     splash.classList.add('is-waiting');
@@ -53,7 +75,6 @@
 
   const startEntrance = () => {
     if (!logo || finished || entranceAnimation) return;
-    splash.classList.add('has-started-entrance');
     entranceAnimation = logo.animate([
       { transform: 'translateY(108vh) rotate(-220deg) scale(.28)', opacity: .08 },
       { transform: 'translateY(82vh) rotate(-175deg) scale(.38)', opacity: .42, offset: .16 },
@@ -73,20 +94,32 @@
     }).catch(() => {});
   };
 
-  const scheduleEntranceWhenVisible = () => {
-    if (finished || entranceAnimation || entranceScheduled || document.visibilityState !== 'visible') return;
+  const pageIsActuallyForeground = () =>
+    document.visibilityState === 'visible' && document.hasFocus();
+
+  const scheduleEntranceOnRealFocus = () => {
+    if (finished || entranceAnimation || entranceScheduled || !pageIsActuallyForeground()) return;
     entranceScheduled = true;
-    window.setTimeout(() => {
+    window.clearTimeout(focusTimer);
+    focusTimer = window.setTimeout(() => {
+      if (!pageIsActuallyForeground()) {
+        entranceScheduled = false;
+        return;
+      }
       requestAnimationFrame(() => requestAnimationFrame(startEntrance));
-    }, ENTRANCE_DELAY_MS);
+    }, FOCUS_SETTLE_MS);
   };
 
-  window.addEventListener('pageshow', scheduleEntranceWhenVisible, { once: true });
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') scheduleEntranceWhenVisible();
-  });
-  if (document.readyState === 'complete') scheduleEntranceWhenVisible();
-  else window.addEventListener('load', scheduleEntranceWhenVisible, { once: true });
+  const waitForFocus = () => {
+    scheduleEntranceOnRealFocus();
+    if (!entranceAnimation && !finished) window.setTimeout(waitForFocus, 120);
+  };
+
+  window.addEventListener('focus', scheduleEntranceOnRealFocus);
+  window.addEventListener('pageshow', scheduleEntranceOnRealFocus);
+  document.addEventListener('visibilitychange', scheduleEntranceOnRealFocus);
+
+  prepareTransparentSvg().finally(() => waitForFocus());
 
   const viewer = document.querySelector('#meal-viewer');
   if (viewer) {
@@ -109,12 +142,14 @@
     if (finished || !entranceDone) return;
     finished = true;
     window.clearInterval(dotTimer);
+    window.clearTimeout(focusTimer);
     pulseAnimation?.cancel();
     splash.classList.add('is-page-load-exit');
     window.setTimeout(() => {
-      splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit', 'has-started-entrance');
+      splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
+      if (cleanLogoUrl) URL.revokeObjectURL(cleanLogoUrl);
     }, 820);
   };
 
@@ -128,9 +163,6 @@
     if (modelReady && arFrameReady) finish();
   }
 
-  window.setTimeout(() => {
-    if (!entranceAnimation) startEntrance();
-  }, 3200);
   window.setTimeout(() => {
     if (!finished && entranceDone) finish();
   }, MAX_MS);
