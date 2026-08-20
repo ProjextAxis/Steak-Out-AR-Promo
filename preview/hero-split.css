@@ -91,3 +91,98 @@
   .ar-hero .offer-price { font-size: clamp(104px, 36vw, 152px); }
   .ar-hero model-viewer#meal-viewer { height: clamp(140px, 42vw, 190px) !important; }
 }
+
+/* ---------------------------------------------------------------------------
+   Dev-only mode switch. It was a full-width bar competing with the CTA; it is
+   testing UI, so it becomes a small dot pinned to the right wall of the viewer
+   that slides its panel out on tap.
+   --------------------------------------------------------------------------- */
+
+.dev-panel {
+  position: fixed;
+  z-index: 60;
+  top: 27%;
+  right: 7px;
+  transform: translateY(-50%);
+  width: auto;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+/* The dot itself. Stays at the wall while the panel slides out beside it. */
+.dev-panel summary {
+  order: 2;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .26);
+  font-size: 0;
+  line-height: 0;
+  letter-spacing: 0;
+  cursor: pointer;
+  list-style: none;
+  transition: background .2s ease, border-color .2s ease;
+}
+
+.dev-panel summary::-webkit-details-marker,
+.dev-panel summary::marker { display: none; content: ''; }
+
+.dev-panel summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.dev-panel[open] summary {
+  background: rgba(186, 31, 44, .26);
+  border-color: rgba(186, 31, 44, .6);
+}
+
+/* Kept in the layout so it can animate; <details> would otherwise pop it in. */
+.dev-panel__body {
+  display: block !important;
+  order: 1;
+  width: 188px;
+  margin-right: 8px;
+  padding: 11px 12px;
+  background: rgba(13, 13, 13, .97);
+  border: 1px solid #2a2525;
+  border-radius: 14px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(14px);
+  pointer-events: none;
+  transition: transform .26s cubic-bezier(.2, .9, .25, 1.2), opacity .2s ease, visibility .26s;
+}
+
+.dev-panel[open] .dev-panel__body {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* The long explainer makes the slide-out too tall for what it is. */
+.dev-panel__body > p { display: none; }
+
+.dev-panel .mode-switch { margin: 0 0 8px; }
+.dev-panel .mode-switch__button { height: 34px; font-size: 15px; }
+.dev-panel .mode-copy { font-size: 11px; line-height: 1.3; }
+
+@media (max-width: 380px) {
+  .dev-panel__body { width: 172px; }
+}
