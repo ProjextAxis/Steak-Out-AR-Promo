@@ -112,13 +112,17 @@
       g.font = '600 13px ui-monospace,Menlo,monospace';
       const lines = [
         'feed ' + vw + 'x' + vh + '   crop ' + state.cropSize,
-        'patch ' + (window.__steakoutCameraPatch || '?') + '   ' +
-          ((window.__steakoutCameraTrail||[]).slice(-1)[0] || 'no result yet'),
+        'patch ' + (window.__steakoutCameraPatch || '?'),
+        'cam ' + ((window.__steakoutCameraTrail||[]).join(' > ').slice(-40) || 'never called'),
         'features ' + state.points.length,
         'match ' + state.matches + '/' + state.attempts + (live ? '   LOCKED' : '   searching'),
         state.lastMatchAt ? 'last match ' + (since / 1000).toFixed(1) + 's ago' : 'no match yet'
       ];
-      const wBox = 230, hBox = lines.length * 18 + 12;
+      // Size the panel to the longest line; fixed widths clipped off-screen.
+      let wBox = 0;
+      lines.forEach((t) => { wBox = Math.max(wBox, g.measureText(t).width); });
+      wBox += 20;
+      const hBox = lines.length * 18 + 12;
       g.fillStyle = 'rgba(0,0,0,.62)';
       g.fillRect(pad, pad + 96, wBox, hBox);
       g.fillStyle = live ? '#5cff8c' : '#ffd34d';
