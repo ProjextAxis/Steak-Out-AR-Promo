@@ -38,6 +38,7 @@ window.STEAKOUT_AR_CONFIG = {
     // frame and 40% smaller, with 36 points on the 128px keyframe against the
     // full build's 33 and the sample card's 32. Measured as equal on
     // acquisition, so this is a cost saving, not a robustness gain.
+    // Overridden below by ?ar=A|B|C|D for the acquisition A/B.
     targetMindUrl: './assets/steakout-marker-lean.mind',
     targetPreviewUrl: './assets/steakout-marker.png',
 
@@ -62,6 +63,43 @@ window.STEAKOUT_AR_CONFIG = {
 
 /* Warm the custom marker AR before the user taps VIEW IN AR.
    This does not request camera permission or start MindAR. */
+/* Acquisition A/B. The screen recording measured 20% uptime, and two changes
+ * landed immediately before it: the 720p camera cap and the lean target. Rather
+ * than argue about which, both are switchable from the URL so the same scene can
+ * be recorded against each build.
+ *
+ *   ?ar=A  720p  + lean   (current)
+ *   ?ar=B  720p  + full
+ *   ?ar=C  1080p + lean
+ *   ?ar=D  1080p + full   (as before either change)
+ */
+(() => {
+  const VARIANTS = {
+    A: { target: './assets/steakout-marker-lean.mind', label: 'A 720p/lean' },
+    B: { target: './assets/steakout-marker.mind',      label: 'B 720p/full' },
+    C: { target: './assets/steakout-marker-lean.mind', label: 'C 1080p/lean' },
+    D: { target: './assets/steakout-marker.mind',      label: 'D 1080p/full' }
+  };
+  const key = (new URLSearchParams(location.search).get('ar') || 'A').toUpperCase();
+  const variant = VARIANTS[key] || VARIANTS.A;
+
+  window.STEAKOUT_AR_VARIANT = key in VARIANTS ? key : 'A';
+  window.STEAKOUT_AR_CONFIG.marker.targetMindUrl = variant.target;
+
+  // Label it on screen, or the test is not worth running.
+  const badge = () => {
+    const host = document.querySelector('.marker-brand');
+    if (!host || host.querySelector('[data-ar-variant-badge]')) return;
+    const tag = document.createElement('span');
+    tag.setAttribute('data-ar-variant-badge', '');
+    tag.textContent = ' \u00b7 ' + variant.label;
+    tag.style.cssText = 'font:600 11px/1 Arial,sans-serif;color:#ffd34d;letter-spacing:.04em';
+    host.appendChild(tag);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', badge);
+  else badge();
+})();
+
 (() => {
   const modelUrl = window.STEAKOUT_AR_CONFIG.modelUrl;
 
@@ -79,7 +117,8 @@ window.STEAKOUT_AR_CONFIG = {
   window.setTimeout(() => {
     const frame = document.querySelector('#browser-ar-frame');
     if (frame?.dataset.src && frame.src === 'about:blank') {
-      frame.src = frame.dataset.src;
+      const v = window.STEAKOUT_AR_VARIANT || 'A';
+      frame.src = frame.dataset.src + (frame.dataset.src.indexOf('?') === -1 ? '?' : '&') + 'ar=' + v;
       frame.dataset.src = '';
     }
   }, 0);
