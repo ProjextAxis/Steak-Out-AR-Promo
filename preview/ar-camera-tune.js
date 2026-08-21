@@ -6,19 +6,22 @@
    *   this.controller = new Controller({
    *     inputWidth: video.videoWidth, inputHeight: video.videoHeight, ...
    *
-   * Detection crops a power-of-two square from the centre of the frame, sized
-   * from the smaller dimension:
+   * Detection crops a power-of-two square from the centre of the frame, and the
+   * size comes off HALF the smaller dimension, which is easy to misread:
    *
-   *   cropSize = 2 ** Math.round(Math.log2(minDimension))
+   *   let minDimension = Math.min(width, height) / 2;
+   *   let cropSize = 2 ** Math.round(Math.log2(minDimension));
    *
-   * so a 1080p feed costs a 1024x1024 crop every frame, while 720p costs
-   * 512x512 -- four times fewer pixels -- and tracking, which runs on the full
-   * frame, roughly halves as well. On a phone that is the difference between a
-   * steady lock and a stuttering one, and it compounds, because sustained load
-   * makes the device throttle.
+   * So the real crops are 512 at 1080p and 256 at both 720p and 480p. Capping
+   * at 720p therefore quarters acquisition work relative to 1080p, but there is
+   * nothing further to gain below 720p -- the crop is already 256 -- and the
+   * picture only gets worse. That is why 720 and not 480.
    *
-   * Trade-off: the smaller crop covers less of the frame, so the marker has to
-   * be nearer the centre to be ACQUIRED. Tracking once locked is unaffected.
+   * Tracking is the other half, and it runs on the full frame via
+   * tf.browser.fromPixels, so it scales with total pixels and roughly halves.
+   *
+   * Trade-off: the crop covers less of the frame, so the marker has to be
+   * nearer the centre to be ACQUIRED. Tracking once locked is unaffected.
    *
    * This wraps getUserMedia rather than forking MindAR. Only a request that
    * specifies no size at all is modified, so any other caller is left alone.
