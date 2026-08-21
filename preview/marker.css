@@ -1137,3 +1137,71 @@ a {
   letter-spacing: .06em;
   text-shadow: 0 1px 4px rgba(0, 0, 0, .85);
 }
+
+/* ---------------------------------------------------------------------------
+   Camera fault surface.
+
+   Deliberately not built on .marker-instruction: marker-target.css hides
+   .marker-instruction__copy with display:none !important and
+   marker-ghost-placement.css does the same to .marker-status, so the existing
+   'error' instruction state renders nothing a customer can see. This panel
+   owns its own class so no later sheet suppresses it.
+   --------------------------------------------------------------------------- */
+.marker-fault {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 10, 9, .88);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.marker-fault[hidden] { display: none; }
+
+.marker-fault__panel {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 26px 22px;
+  border: 1px solid rgba(255, 211, 77, .34);
+  border-radius: 18px;
+  background: #17130f;
+  text-align: center;
+}
+
+.marker-fault__panel > strong {
+  color: #ffd34d;
+  font: 900 clamp(23px, 6.4vw, 30px)/1.02 var(--display);
+  letter-spacing: .014em;
+}
+
+.marker-fault__panel > span {
+  color: rgba(255, 255, 255, .82);
+  font: 500 15px/1.42 var(--body, system-ui, sans-serif);
+}
+
+.marker-fault__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 6px;
+}
+
+.marker-fault__actions button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 11px;
+  font: 800 15px/1 var(--body, system-ui, sans-serif);
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+
+#marker-fault-retry { background: #ffd34d; color: #17130f; }
+#marker-fault-back {
+  background: transparent;
+  color: rgba(255, 255, 255, .7);
+  border: 1px solid rgba(255, 255, 255, .22);
+}

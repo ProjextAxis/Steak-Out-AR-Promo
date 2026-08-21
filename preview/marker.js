@@ -20,6 +20,11 @@
   const status = document.querySelector('#marker-status');
   const splash = document.querySelector('#ar-splash');
   const logoHome = document.querySelector('.marker-logo-home');
+  const fault = document.querySelector('#marker-fault');
+  const faultTitle = document.querySelector('#marker-fault-title');
+  const faultBody = document.querySelector('#marker-fault-body');
+  const faultRetry = document.querySelector('#marker-fault-retry');
+  const faultBack = document.querySelector('#marker-fault-back');
 
   if (!scene || !anchor || !food || !startButton) return;
 
@@ -118,10 +123,15 @@
     setStatus(next.status, next.statusState);
   };
 
+  /* These fallbacks must match what config.js actually ships, or a dropped key
+   * renders the plate at a wildly wrong size. '0 0 0.12' and 0.32 were
+   * README-era values: 0.32 puts the meal at about 11% of the flyer's width
+   * instead of 3.2x it, a 28-fold error that would look like a broken model
+   * rather than a missing config value. */
   food.setAttribute('src', config.modelUrl || '');
-  food.setAttribute('position', markerConfig.modelPosition || '0 0 0.12');
+  food.setAttribute('position', markerConfig.modelPosition || '0 0 0');
   food.setAttribute('rotation', markerConfig.modelRotation || '90 0 0');
-  const modelScale = Number(markerConfig.modelScale || 0.32);
+  const modelScale = Number(markerConfig.modelScale || 9.0);
   food.setAttribute('scale', `${modelScale} ${modelScale} ${modelScale}`);
   food.addEventListener('model-loaded', () => setPlacementGhost());
 
@@ -167,6 +177,98 @@
     lockedHideTimer = undefined;
   };
 
+  /* Camera failure used to be completely silent, for three stacked reasons:
+   *   - mind-ar's system.start() is synchronous and returns undefined, so the
+   *     `await system.start()` below always resolves even when the camera died;
+   *   - _startVideo catches the getUserMedia rejection itself and re-emits it
+   *     as an `arError` event, which nothing in this repo listened for;
+   *   - the 'error' instruction state renders into .marker-instruction__copy
+   *     and .marker-status, both of which the compact-layout sheets hide with
+   *     display:none !important.
+   * The customer was left on a black screen reading "POINT BACK AT THE TABLE
+   * GRAPHIC". This is the missing detection and the missing surface.
+   *
+   * ar-camera-tune.js already recorded WHY the request failed, so name the
+   * cause rather than offering one generic apology for four different faults. */
+  let faultShown = false;
+  let cameraWatchdog;
+
+  const clearCameraWatchdog = () => {
+    window.clearTimeout(cameraWatchdog);
+    cameraWatchdog = undefined;
+  };
+
+  const cameraLooksLive = () => {
+    const v = document.querySelector('.marker-shell video, a-scene video');
+    return !!(v && v.videoWidth > 0);
+  };
+
+  const faultCopy = () => {
+    const summary = (window.__steakoutCamera && window.__steakoutCamera.summary) || '';
+    if (/NotAllowedError|SecurityError|PermissionDenied/i.test(summary)) {
+      return {
+        title: 'CAMERA ACCESS IS OFF',
+        body: 'Tap Allow when your phone asks. If you already said no, turn the camera on for this site in your browser settings.'
+      };
+    }
+    if (/NotReadableError|AbortError|TrackStartError/i.test(summary)) {
+      return {
+        title: 'THE CAMERA IS BUSY',
+        body: 'Another app may be using it. Close your other camera apps, then try again.'
+      };
+    }
+    if (/NotFoundError|OverconstrainedError|DevicesNotFound/i.test(summary)) {
+      return {
+        title: 'NO CAMERA AVAILABLE',
+        body: 'This device did not offer a camera we can use. Try opening this page in Safari or Chrome directly.'
+      };
+    }
+    // No report at all: the wrapper never ran, so A-Frame or mind-ar never
+    // arrived. That is the CDN case HANDOFF section 9 flags as unmitigated.
+    return {
+      title: 'AR COULDN\u2019T LOAD',
+      body: 'Check your connection and try again. If you opened this from another app, try opening it in your browser instead.'
+    };
+  };
+
+  const showFault = () => {
+    if (!fault || faultShown) return;
+    faultShown = true;
+    clearCameraWatchdog();
+    clearProgressAdvance();
+    const copy = faultCopy();
+    if (faultTitle) faultTitle.textContent = copy.title;
+    if (faultBody) faultBody.textContent = copy.body;
+    if (splash) splash.hidden = true;
+    guide.hidden = true;
+    if (instruction) instruction.hidden = true;
+    if (socialDock) socialDock.hidden = true;
+    if (orderLink) orderLink.hidden = true;
+    fault.hidden = false;
+    postToParent('steakout-ar-camera-error');
+  };
+
+  const hideFault = () => {
+    faultShown = false;
+    if (fault) fault.hidden = true;
+  };
+
+  // mind-ar emits this for a failed getUserMedia and for an unsupported
+  // browser. It is the fast, definite signal; the watchdog below is the
+  // backstop for the cases that hang instead of erroring.
+  scene.addEventListener('arError', showFault);
+
+  const armCameraWatchdog = () => {
+    clearCameraWatchdog();
+    /* Generous on purpose. The permission prompt sits in front of the user for
+     * an unknown time, and mind-ar only fetches the .mind target AFTER
+     * getUserMedia resolves -- half a megabyte on a restaurant connection.
+     * This fires only if nothing is producing frames well past both. */
+    cameraWatchdog = window.setTimeout(() => {
+      if (!cameraLooksLive()) showFault();
+    }, 20000);
+  };
+
   const start = () => {
     if (stopPromise) return stopPromise.then(start);
     if (isRunning) return Promise.resolve();
@@ -179,6 +281,8 @@
         clearLockedHide();
         hasLocked = false;
         targetVisible = false;
+        hideFault();
+        armCameraWatchdog();
         setPlacementGhost();
         intro.hidden = true;
         guide.hidden = true;
@@ -194,24 +298,25 @@
         await system.start();
         isRunning = true;
         await minSplashTime;
+        /* mind-ar's start() is synchronous and returns undefined, so getting
+         * here proves nothing about whether the camera came up. If the arError
+         * listener has already raised the fault, stop -- otherwise the scanning
+         * HUD is painted underneath the error the customer is reading. */
+        if (faultShown) return;
         renderInstruction('scanning');
         if (socialDock) socialDock.hidden = false;
         if (orderLink) orderLink.hidden = false;
+        clearCameraWatchdog();
         await revealCamera();
         postToParent('steakout-ar-camera-live');
       } catch (error) {
         console.error(error);
         isRunning = false;
         targetVisible = false;
-        clearProgressAdvance();
-        if (splash) splash.hidden = true;
         intro.hidden = isEmbedded;
-        guide.hidden = true;
-        if (socialDock) socialDock.hidden = true;
-        if (orderLink) orderLink.hidden = true;
-        if (isEmbedded) renderInstruction('error');
-        else if (instruction) instruction.hidden = true;
-        postToParent('steakout-ar-camera-error');
+        // showFault() clears the progress timer, hides the splash and the rest
+        // of the HUD, and posts steakout-ar-camera-error itself.
+        showFault();
       } finally {
         startPromise = null;
       }
@@ -224,6 +329,8 @@
     if (stopPromise) return stopPromise;
     stopPromise = (async () => {
       targetVisible = false;
+      // Or it fires 20s later and drops a camera error over a closed session.
+      clearCameraWatchdog();
       clearProgressAdvance();
       if (startPromise) await startPromise;
       try {
@@ -293,6 +400,18 @@
   });
 
   startButton.addEventListener('click', start);
+
+  faultRetry?.addEventListener('click', () => {
+    hideFault();
+    // A fresh attempt needs a fresh permission request, so drop any half-built
+    // session first rather than resolving straight out of the isRunning guard.
+    stop().then(start);
+  });
+  faultBack?.addEventListener('click', () => {
+    hideFault();
+    if (isEmbedded) postToParent('steakout-ar-close');
+    else { stop(); intro.hidden = false; }
+  });
 
   if (isEmbedded) {
     intro.hidden = true;

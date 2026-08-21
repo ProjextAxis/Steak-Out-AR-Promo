@@ -11,20 +11,20 @@
   <link rel="preload" as="font" type="font/woff" crossorigin
         href="./assets/fonts/rustler.woff" />
   <link rel="stylesheet" href="./fonts.css?v=20260820-self-hosted" />
-  <link rel="stylesheet" href="./marker.css?v=20260821-reticle2" />
+  <link rel="stylesheet" href="./marker.css?v=20260821-camreport" />
   <link rel="stylesheet" href="./marker-target.css?v=20260819-approved-target" />
   <link rel="stylesheet" href="./marker-panel-tight.css?v=20260819-tight-panel" />
   <link rel="stylesheet" href="./marker-panel-compact.css?v=20260819-force-compact-1" />
   <link rel="stylesheet" href="./marker-ghost-placement.css?v=20260819-ghost-placement" />
-  <script src="./ar-camera-tune.js?v=20260821-proto"></script>
+  <script src="./ar-camera-tune.js?v=20260821-camreport"></script>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <script defer src="./config.js?v=20260821-xray"></script>
+  <script defer src="./config.js?v=20260821-camreport"></script>
   <script defer src="./ar-reticle.js?v=20260821-reticle"></script>
-  <script defer src="./ar-xray.js?v=20260821-trace"></script>
+  <script defer src="./ar-xray.js?v=20260821-camreport"></script>
   <script defer src="./ar-lighting.js?v=20260821-ibl"></script>
   <script defer src="./ar-shadow.js?v=20260820-contact-shadow"></script>
-  <script defer src="./marker.js?v=20260821-reticle"></script>
+  <script defer src="./marker.js?v=20260821-camreport"></script>
   <script defer src="./marker-splash-fix.js?v=20260819-transparent-svg"></script>
 </head>
 <body>
@@ -64,6 +64,24 @@
     </div>
 
     <div class="marker-scan-guide" id="marker-scan-guide" hidden aria-hidden="true"><span class="scan-corners"></span></div>
+
+    <!-- The camera can fail in ways nothing else in this page surfaces: a
+         denied permission, an in-app webview that blocks getUserMedia, or a
+         CDN that never delivers A-Frame. mind-ar swallows all of them into an
+         `arError` event nobody used to listen for, leaving the customer on a
+         black screen being told to aim at a flyer. This is that missing
+         surface. Its own class, so the compact-layout sheets that hide
+         .marker-instruction__copy and .marker-status cannot hide it too. -->
+    <div class="marker-fault" id="marker-fault" hidden role="alert" aria-live="assertive">
+      <div class="marker-fault__panel">
+        <strong id="marker-fault-title">THE CAMERA DIDN&rsquo;T START</strong>
+        <span id="marker-fault-body">Check your connection and try again.</span>
+        <div class="marker-fault__actions">
+          <button type="button" id="marker-fault-retry">TRY AGAIN</button>
+          <button type="button" id="marker-fault-back">GO BACK</button>
+        </div>
+      </div>
+    </div>
 
     <aside class="marker-instruction" id="marker-instruction" data-state="scanning" data-current-step="2" role="status" aria-live="polite" hidden>
       <div class="marker-progress" id="marker-progress" role="list" aria-label="AR preview progress">

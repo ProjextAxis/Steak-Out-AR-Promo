@@ -1,21 +1,28 @@
 /*
- * The camera must be asked for resolution, or it hands back far too little.
+ * Ask the camera for resolution, and record what it actually hands back.
  *
- * Measured on a real device with the x-ray overlay, an UNCONSTRAINED
- * getUserMedia returned 480x640. That is 0.3 megapixels, and at that size the
- * printed flyer has almost no resolvable detail: the detector still finds 180-280
- * feature points per frame, but they scatter across the table and the matcher
- * scored single-digit successes across 500+ attempts.
+ * Measured on a real device, an UNCONSTRAINED getUserMedia returned 480x640.
+ * That is 0.3 megapixels, and at that size the printed flyer has almost no
+ * resolvable detail: the detector still finds 180-280 feature points a frame,
+ * but they scatter across the room and the matcher scored single digits across
+ * 500+ attempts. Tracking uptime sits at 10-14%.
  *
- * This file originally capped resolution DOWN to 720p to cut per-frame work.
- * That was solving the wrong problem. Detection cost was never the bottleneck;
- * having enough pixels on the marker is.
+ * This is not known to be a device ceiling. It is a new iPhone, and Apple's own
+ * ARKit is unaffected because it gets native camera access, while the web only
+ * gets getUserMedia -- which on iOS defaults low unless explicitly constrained.
  *
- * So: ask for 1080p, and fall back through 720p rather than accept the default.
- * `ideal` is a request, not a guarantee, so what was actually granted is
- * published on window.__steakoutCamera and shown in the x-ray HUD.
+ * THREE previous attempts to constrain it failed, each looking verified in
+ * Chrome first (see tools/HANDOFF.md section 5b). The lesson from all three is
+ * that reasoning about this from source produces confident wrong answers. So
+ * this file's job is only half constraint. The other half is measurement: every
+ * request made and every answer received is recorded on window.__steakoutCamera
+ * and drawn in the ?xray=1 overlay, so a phone recording settles it.
  *
- * For reference, the detection crop is sized from HALF the smaller dimension:
+ * The single most decisive line it reports is `caps`, from getCapabilities():
+ * a track that says it can do 1920 while handing back 480x640 proves this is a
+ * constraint problem and not a hardware limit. That ends the argument.
+ *
+ * For reference, the acquisition crop is sized from HALF the smaller dimension:
  *     cropSize = 2 ** Math.round(Math.log2(Math.min(w, h) / 2))
  * so 480x640 gives 256, and 1080p gives 512.
  */
@@ -23,115 +30,183 @@
   const md = navigator.mediaDevices;
   if (!md || typeof md.getUserMedia !== 'function') return;
 
-  // ?ar=C|D leaves the request untouched, so the browser default can still be
-  // measured against a constrained one.
-  const VARIANT = (new URLSearchParams(location.search).get('ar') || 'A').toUpperCase();
+  const params = new URLSearchParams(location.search);
+  const VARIANT = (params.get('ar') || 'A').toUpperCase();
+  // C and D deliberately leave the request alone, so the browser's own default
+  // is measurable as a control against a constrained run in the same session.
   const LEAVE_ALONE = VARIANT === 'C' || VARIANT === 'D';
+  // The exact-constraint ladder tells a refusal apart from a silent downgrade,
+  // but it costs extra getUserMedia calls. A customer never runs it.
+  const DIAGNOSTIC = params.get('xray') === '1';
 
   const native = md.getUserMedia.bind(md);
 
-  const publish = (stream) => {
+  // One object, one source of truth. The overlay reads this and infers nothing.
+  const report = {
+    rungs: [],       // every request made, and what came back
+    granted: null,   // what mind-ar finally receives
+    caps: null,      // what the track claims it is capable of
+    applied: null,   // result of the applyConstraints attempt, if one was made
+    crop: null,      // the acquisition window that resolution implies
+    constrained: !LEAVE_ALONE,
+    summary: 'not started'
+  };
+  window.__steakoutCamera = report;
+
+  const HD_EDGE = 1200; // long edge above which we have a genuinely HD feed
+
+  const trackOf = (s) => { try { return s.getVideoTracks()[0] || null; } catch (e) { return null; } };
+  const sizeOf = (s) => {
+    const t = trackOf(s);
+    const g = t && t.getSettings && t.getSettings();
+    return g && g.width ? { w: g.width, h: g.height } : null;
+  };
+  const area = (z) => (z ? z.w * z.h : 0);
+  const isSmall = (s) => { const z = sizeOf(s); return !z || Math.max(z.w, z.h) < HD_EDGE; };
+  const release = (s) => { try { if (s) s.getTracks().forEach((t) => t.stop()); } catch (e) { /* best effort */ } };
+
+  // Only a constraint refusal is worth retrying differently. A denied
+  // permission or a missing camera will refuse every rung identically, and
+  // retrying just costs the customer three failures instead of one.
+  const retryable = (e) =>
+    !!e && (e.name === 'OverconstrainedError' || e.name === 'ConstraintNotSatisfiedError');
+
+  const askOnce = async (tag, videoExtra, base) => {
     try {
-      const s = stream.getVideoTracks()[0]?.getSettings?.();
-      if (s) {
-        const min = Math.min(s.width || 0, s.height || 0);
-        window.__steakoutCamera = {
-          width: s.width, height: s.height, frameRate: s.frameRate,
-          constrained: !LEAVE_ALONE,
-          detectionCrop: min ? Math.pow(2, Math.round(Math.log2(min / 2))) : null
-        };
+      const s = await native({ ...base, video: { ...base.video, ...videoExtra } });
+      const z = sizeOf(s);
+      report.rungs.push(tag + '=' + (z ? z.w + 'x' + z.h : 'granted'));
+      return s;
+    } catch (e) {
+      report.rungs.push(tag + '=' + ((e && e.name) || 'Error'));
+      if (!retryable(e)) throw e;
+      return null;
+    }
+  };
+
+  const run = async (base) => {
+    /* Rung 1 is the entire customer path: one call, one permission prompt.
+     *
+     * `ideal` is orientation-tolerant -- the browser picks the nearest mode it
+     * has rather than refusing -- and per spec it can never raise
+     * OverconstrainedError. So this rung either honours the hint or quietly
+     * ignores it, and the recorded size says which. */
+    let best = await askOnce('ideal1080', { width: { ideal: 1920 }, height: { ideal: 1080 } }, base);
+
+    /* A device that ignores `ideal` returns its default with no error at all,
+     * which is indistinguishable from "this is genuinely the best I have".
+     * `exact` REJECTS instead, which is a real answer. But `exact` also pins
+     * the orientation, and a phone held in portrait can refuse 1920x1080 while
+     * happily delivering 1080x1920 -- so a single exact request would read as a
+     * hardware refusal when it is nothing of the kind. Try both ways round. */
+    if (DIAGNOSTIC && isSmall(best)) {
+      const rungs = [['exact1080land', 1920, 1080], ['exact1080port', 1080, 1920]];
+      for (const [tag, w, h] of rungs) {
+        const s = await askOnce(tag, { width: { exact: w }, height: { exact: h } }, base);
+        if (!s) continue;
+        if (area(sizeOf(s)) > area(sizeOf(best))) { release(best); best = s; }
+        else release(s);
       }
-    } catch (error) { /* reporting only */ }
+    }
+
+    // Nothing took. Hand back the plain request so AR still works.
+    if (!best) { report.rungs.push('plain'); best = await native(base); }
+    return best;
+  };
+
+  const finish = async (stream) => {
+    const t = trackOf(stream);
+
+    /* What does the hardware say it can do? This is the datum that ends the
+     * argument. Older engines omit getCapabilities entirely -- report that
+     * plainly rather than letting a missing value read as a low ceiling. */
+    try {
+      const c = t && t.getCapabilities && t.getCapabilities();
+      if (!c) report.caps = 'unsupported';
+      else if (c.width && c.width.max) report.caps = 'max ' + c.width.max + 'x' + (c.height && c.height.max);
+      else report.caps = 'no size range';
+    } catch (e) { report.caps = 'threw'; }
+
+    /* Second, independent lever: raise the live track instead of re-requesting
+     * it. Some engines ignore the getUserMedia hint but honour this.
+     *
+     * It must complete BEFORE this promise resolves. mind-ar assigns
+     * video.srcObject in its own .then and reads videoWidth on loadedmetadata,
+     * so a resize that lands after that point would leave the controller sized
+     * to a frame the video no longer produces. */
+    if (t && t.applyConstraints && !LEAVE_ALONE && isSmall(stream)) {
+      try {
+        await t.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 } });
+        const after = sizeOf(stream);
+        report.applied = after ? after.w + 'x' + after.h : 'no reading';
+      } catch (e) { report.applied = (e && e.name) || 'failed'; }
+    }
+
+    const z = sizeOf(stream);
+    report.granted = z ? z.w + 'x' + z.h : 'unknown';
+    const min = z ? Math.min(z.w, z.h) : 0;
+    report.crop = min ? Math.pow(2, Math.round(Math.log2(min / 2))) : null;
+    report.summary = report.rungs.join(' ') +
+      (report.applied ? ' ac=' + report.applied : '') +
+      ' caps=' + report.caps;
     return stream;
   };
 
-  const wrapped = function (constraints) {
-    // Log the call before any branching, so "was the wrapper even reached" is
-    // answerable rather than inferred.
-    window.__steakoutCameraTrail = window.__steakoutCameraTrail || [];
-    window.__steakoutCameraTrail.push('called');
+  // A failure is a measurement too. Without this the report would still read
+  // "not started" after a rung had already recorded why it failed.
+  const failed = (e) => {
+    report.granted = 'FAILED';
+    report.summary = (report.rungs.join(' ') || 'no request made') +
+                     ' -> ' + ((e && e.name) || 'Error');
+    throw e;
+  };
 
+  const wrapped = function (constraints) {
     const video = constraints && constraints.video;
+    // mind-ar 1.2.5 asks for {audio:false, video:{facingMode:'environment'}} --
+    // an object carrying no size. Verified in the shipped bundle, not assumed.
     const unsized = video && typeof video === 'object' &&
                     video.width === undefined && video.height === undefined;
 
     if (LEAVE_ALONE || !unsized) {
-      window.__steakoutCameraTrail.push(LEAVE_ALONE ? 'skipped: variant' : 'skipped: already sized');
-      return native(constraints).then(publish);
+      report.rungs.push(LEAVE_ALONE ? 'untouched(control)' : 'untouched(already sized)');
+      return native(constraints).then(finish, failed);
     }
-
-    const ask = (w, h) => native({
-      ...constraints,
-      video: { ...video, width: { ideal: w }, height: { ideal: h } }
-    });
-
-    // `ideal` is advisory and gets silently ignored, which is indistinguishable
-    // from the device genuinely not offering the mode. Try `exact` first: if the
-    // camera cannot do it, it REJECTS, and that is a definitive answer rather
-    // than a quiet downgrade. Fall back through ideal, then the plain request.
-    const exact = (w, h) => native({
-      ...constraints,
-      video: { ...video, width: { exact: w }, height: { exact: h } }
-    });
-
-    const note = (t) => { window.__steakoutCameraTrail.push(t); };
-
-    return exact(1920, 1080).then((s) => (note('exact 1920x1080 OK'), s))
-      .catch(() => { note('exact 1920x1080 REJECTED'); return exact(1280, 720); })
-      .then((s) => (note('exact 1280x720 OK'), s))
-      .catch(() => { note('exact 1280x720 REJECTED'); return ask(1920, 1080); })
-      .then((s) => (note('fell back to ideal'), s))
-      .catch(() => { note('ideal failed, using plain request'); return native(constraints); })
-      .then(publish);
+    return run(constraints).then(finish, failed);
   };
 
   /* Installing the wrapper is not just an assignment.
    *
    * getUserMedia lives on MediaDevices.prototype and on some browsers is
-   * non-writable. A plain `md.getUserMedia = fn` then fails SILENTLY in
-   * non-strict code: no error, no override, and the library keeps calling the
-   * native method. That is what happened here. Chrome accepted the assignment
-   * so it looked installed under test, and Safari ignored it, so on the phone
-   * the constraint never applied and the feed stayed at the default.
+   * non-writable, so a plain `md.getUserMedia = fn` fails SILENTLY in
+   * non-strict code. Chrome accepted it and Safari ignored it, which is how an
+   * override that looked installed under test never applied on the phone.
    *
-   * Define it, verify it took, and fall back to the prototype. Record which
-   * route worked so the overlay can show it instead of us assuming.
-   */
-  /* Patch BOTH the instance and the prototype.
-   *
-   * The previous version returned as soon as the instance assignment verified,
-   * so the prototype was never touched. On the device that reported
-   * "patch instance" and then "cam never called": the override was installed on
-   * the object we captured, and the library reached the camera through one we
-   * had not. Patching MediaDevices.prototype covers any instance.
-   */
+   * A later attempt defined it on the instance only and returned on first
+   * success, so the prototype was never touched -- and the device then reported
+   * the wrapper was never called. Patch both, plus the legacy alias, and record
+   * which routes took so the overlay shows it instead of us assuming. */
   const install = () => {
     const done = [];
-
     try {
       const proto = Object.getPrototypeOf(md);
       if (proto && proto.getUserMedia) {
-        Object.defineProperty(proto, 'getUserMedia',
-          { value: wrapped, writable: true, configurable: true });
+        Object.defineProperty(proto, 'getUserMedia', { value: wrapped, writable: true, configurable: true });
         if (proto.getUserMedia === wrapped) done.push('proto');
       }
-    } catch (error) { /* keep going */ }
+    } catch (e) { /* keep going */ }
 
     try {
-      Object.defineProperty(md, 'getUserMedia',
-        { value: wrapped, writable: true, configurable: true });
+      Object.defineProperty(md, 'getUserMedia', { value: wrapped, writable: true, configurable: true });
       if (md.getUserMedia === wrapped) done.push('inst');
-    } catch (error) { /* keep going */ }
+    } catch (e) { /* keep going */ }
 
-    // Last resort: some engines expose it only through the legacy alias.
     try {
       if (navigator.getUserMedia && navigator.getUserMedia !== wrapped) {
-        navigator.getUserMedia = function (c, ok, err) {
-          wrapped(c).then(ok, err);
-        };
+        navigator.getUserMedia = function (c, ok, err) { wrapped(c).then(ok, err); };
         done.push('legacy');
       }
-    } catch (error) { /* keep going */ }
+    } catch (e) { /* keep going */ }
 
     return done.length ? done.join('+') : 'FAILED';
   };
