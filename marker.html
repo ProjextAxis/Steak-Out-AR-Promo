@@ -19,6 +19,7 @@
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script defer src="./config.js?v=20260820-smaller-9"></script>
+  <script defer src="./ar-shadow.js?v=20260820-contact-shadow"></script>
   <script defer src="./marker.js?v=20260820-responsive"></script>
   <script defer src="./marker-splash-fix.js?v=20260819-transparent-svg"></script>
 </head>
@@ -78,7 +79,9 @@
 
     <a-scene id="marker-scene" mindar-image="imageTargetSrc: ./assets/steakout-marker.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000; missTolerance: 10; warmupTolerance: 2" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-      <a-entity id="marker-anchor" mindar-image-target="targetIndex: 0"><a-gltf-model id="marker-food"></a-gltf-model></a-entity>
+      <!-- Both children stay untransformed: ar-shadow.js measures the meal in the
+           anchor's own space and drops the shadow straight into it. -->
+      <a-entity id="marker-anchor" mindar-image-target="targetIndex: 0"><a-entity id="marker-shadow" ar-contact-shadow="caster: #marker-food"></a-entity><a-gltf-model id="marker-food" shadow="cast: true; receive: false"></a-gltf-model></a-entity>
     </a-scene>
   </div>
 </body>
