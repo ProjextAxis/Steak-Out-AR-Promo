@@ -112,6 +112,7 @@
       g.font = '600 13px ui-monospace,Menlo,monospace';
       const lines = [
         'feed ' + vw + 'x' + vh + '   crop ' + state.cropSize,
+        'asked ' + ((window.__steakoutCamera||{}).constrained ? '1080p' : 'browser default'),
         'features ' + state.points.length,
         'match ' + state.matches + '/' + state.attempts + (live ? '   LOCKED' : '   searching'),
         state.lastMatchAt ? 'last match ' + (since / 1000).toFixed(1) + 's ago' : 'no match yet'
