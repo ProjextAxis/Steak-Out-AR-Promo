@@ -29,6 +29,11 @@
   const md = navigator.mediaDevices;
   if (!md || typeof md.getUserMedia !== 'function') return;
 
+  // Variants C and D deliberately skip the cap so 1080p can be measured against
+  // 720p on a real print. See config.js.
+  const VARIANT = (new URLSearchParams(location.search).get('ar') || 'A').toUpperCase();
+  if (VARIANT === 'C' || VARIANT === 'D') return;
+
   const IDEAL_WIDTH = 1280;
   const IDEAL_HEIGHT = 720;
 
