@@ -28,7 +28,7 @@
   const state = {
     crop: null, sweep: null, points: [], lastMatchAt: 0, matches: 0, attempts: 0,
     matched: false, vw: 0, vh: 0, cropSize: 0,
-    firstLockAt: 0, startedAt: 0, procTimes: []
+    firstMatchAt: 0, firstShowAt: 0, startedAt: 0, procTimes: [], lastProcAt: 0
   };
 
   /* Where detectMoving's window actually is this frame.
@@ -66,7 +66,10 @@
              h: Math.max(...ys) + c - Math.min(...ys) };
   };
 
+  let ctrl = null;
+
   const hook = (controller) => {
+    ctrl = controller;
     const cd = controller.cropDetector;
     if (!cd || cd.__xray) return false;
     cd.__xray = true;
@@ -81,6 +84,7 @@
         const result = original(input);
         Promise.resolve(result).then((r) => {
           state.procTimes.push(t0);
+          state.lastProcAt = performance.now();
           if (state.procTimes.length > 120) state.procTimes.shift();
           if (!r) return;
           state.points = r.featurePoints || [];
@@ -112,7 +116,7 @@
           if (ok) {
             state.matches++;
             state.lastMatchAt = performance.now();
-            if (!state.firstLockAt) state.firstLockAt = state.lastMatchAt;
+            if (!state.firstMatchAt) state.firstMatchAt = state.lastMatchAt;
           }
         }).catch(() => {});
         return p;
@@ -174,7 +178,21 @@
       const X = (x) => ox + x * scale, Y = (y) => oy + y * scale;
 
       const since = performance.now() - state.lastMatchAt;
-      const live = state.lastMatchAt && since < 400;
+
+      /* "LOCKED" now means the model is actually SHOWING, read from the
+       * library's own state, not "we matched within the last 400ms".
+       *
+       * Those are different, and the difference is not cosmetic: once a target
+       * is tracked the controller STOPS matching entirely (processVideo only
+       * calls _detectAndMatch while nTracking < maxTrack), so the old rule went
+       * dark during exactly the periods it was meant to report. A recording
+       * read on that indicator would show ~9% "locked" while the meal was on
+       * screen for 60% of the time. */
+      const ts = ctrl && ctrl.trackingStates && ctrl.trackingStates[0];
+      const showing = !!(ts && ts.showing);
+      const tracking = !!(ts && ts.isTracking);
+      if (showing && !state.firstShowAt) state.firstShowAt = performance.now();
+      const live = showing || tracking;
 
       // The whole area the sweep reaches over nine frames: dashed, faint. This
       // is what the aiming reticle is sized to.
@@ -226,7 +244,8 @@
        * hardware limit. */
       const cam = window.__steakoutCamera;
       const camLines = cam ? [
-        'CAPS  ' + cam.caps
+        'CAPS  ' + cam.caps,
+        'zoom  ' + (cam.zoom || '?') + '   torch ' + (cam.torch || '?')
       ].concat(
         cam.rungs.length ? cam.rungs.map((r, i) => (i ? '      ' : 'ask   ') + r)
                          : ['ask   (none recorded)'],
@@ -238,22 +257,26 @@
       // second. This is the number that says whether a higher camera
       // resolution is affordable, and it is invisible without measuring.
       const win = state.procTimes;
-      const hz = win.length > 4
+      // Stale guard: without it a stalled detector leaves the last rate frozen
+      // on screen, which reads as healthy on a recording.
+      const fresh = state.lastProcAt && (performance.now() - state.lastProcAt) < 1000;
+      const hz = (fresh && win.length > 4)
         ? (win.length - 1) / ((win[win.length - 1] - win[0]) / 1000)
         : 0;
-      const ttl = state.firstLockAt && state.startedAt
-        ? ((state.firstLockAt - state.startedAt) / 1000).toFixed(1) + 's'
-        : 'none yet';
+      const secs = (t) => (t && state.startedAt)
+        ? ((t - state.startedAt) / 1000).toFixed(1) + 's' : 'none yet';
 
       const lines = [
         'feed  ' + (vw && vh ? vw + 'x' + vh + '   crop ' + state.cropSize : 'no frames yet'),
         'sweep ' + (state.sweep ? state.sweep.w + 'x' + state.sweep.h : '?'),
         'patch ' + (window.__steakoutCameraPatch || '?')
       ].concat(camLines, [
-        'feat  ' + state.points.length + '   ' + (hz ? hz.toFixed(1) + ' win/s' : ''),
-        'match ' + state.matches + '/' + state.attempts + (live ? '   LOCKED' : '   searching'),
-        '1st   ' + ttl,
-        state.lastMatchAt ? 'last  ' + (since / 1000).toFixed(1) + 's ago' : 'last  no match yet'
+        'feat  ' + state.points.length + '   ' + (fresh ? hz.toFixed(1) + ' win/s' : '-- win/s'),
+        'match ' + state.matches + '/' + state.attempts +
+          (showing ? '   SHOWING' : tracking ? '   tracking' : '   searching'),
+        '1stMch ' + secs(state.firstMatchAt),
+        '1stShow ' + secs(state.firstShowAt),
+        state.lastMatchAt ? 'matched ' + (since / 1000).toFixed(1) + 's ago' : 'matched never'
       ]);
       // Size the panel to the longest line; fixed widths clipped off-screen.
       const widest = () => lines.reduce((m, t) => Math.max(m, g.measureText(t).width), 0);
