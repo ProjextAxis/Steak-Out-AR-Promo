@@ -3,9 +3,10 @@
   --ink: #171311;
   --paper: #fffaf2;
   --gold: #e3ad32;
-  --display: 'Barlow Condensed', Arial Narrow, sans-serif;
-  --slab: 'Roboto Slab', Georgia, serif;
-  --brand: 'Rustler', 'Roboto Slab', Georgia, serif;
+  /* Same two faces as the promo page. --display was Barlow Condensed, which
+     is a different face entirely, and --slab was declared but never used. */
+  --display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --brand: 'Rustler', Georgia, serif;
 }
 
 * {
