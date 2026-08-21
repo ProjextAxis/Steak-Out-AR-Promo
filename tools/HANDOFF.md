@@ -97,6 +97,43 @@ one factor the tuning study explicitly could not model.
 Variants are switchable at runtime: `?ar=A|B|C|D`, each labelled on screen.
 `?xray=1` overlays the live search window, feature points and match state.
 
+## 5b. The camera resolution thread — read before touching `ar-camera-tune.js`
+
+Measured on device with `?xray=1`: the camera feed is **480x640**, 0.3 MP. At that
+size the flyer has almost no resolvable detail. The detector still returns 120-290
+feature points a frame but they scatter across the room, and the matcher scored
+single digits across 500+ attempts.
+
+**This is NOT a device ceiling.** It is a new iPhone, and Apple's own AR is
+unaffected because ARKit gets native camera access while the web only gets
+getUserMedia, which on iOS defaults low unless explicitly constrained.
+
+Three attempts were made to constrain it, and all three failed for different
+reasons. Each looked verified in Chrome first. Recorded so nobody repeats them:
+
+1. **Capping DOWN to 720p.** Wrong problem entirely. Detection cost was never the
+   bottleneck; pixels on the marker are.
+2. **`md.getUserMedia = fn`.** `getUserMedia` lives on `MediaDevices.prototype` and
+   is non-writable on some browsers, so the assignment fails **silently** in
+   non-strict code. Chrome accepted it, Safari ignored it.
+3. **`Object.defineProperty` on the instance only.** Reported `patch instance`, and
+   the device then reported `cam never called` — the override was installed on the
+   object captured at load, and mind-ar reached the camera through another one.
+   `install()` returned on first success so the prototype was never patched.
+
+Current state patches prototype + instance + legacy alias and traces entry and
+every exit path. **As of this writing the 1080p request has still never been
+exercised on hardware** — every 480x640 measurement so far is the UNCONSTRAINED
+default, not a refusal.
+
+The lesson worth carrying: reasoning from the mind-ar source repeatedly produced
+confident wrong answers. What worked was putting a trace in the code and letting
+the phone report. Do that first.
+
+One genuine improvement did land alongside this: the run after the reticle showed
+`match 2/294 LOCKED`, the first successful locks observed, where earlier runs sat
+at zero across 400+ attempts.
+
 ## 6. Do not redo these — negative results, already paid for
 
 - **Print-simulation variants of the marker.** 26 tested. Both stages are already
