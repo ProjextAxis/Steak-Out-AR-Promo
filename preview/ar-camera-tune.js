@@ -45,7 +45,7 @@
     return stream;
   };
 
-  md.getUserMedia = function (constraints) {
+  const wrapped = function (constraints) {
     const video = constraints && constraints.video;
     const unsized = video && typeof video === 'object' &&
                     video.width === undefined && video.height === undefined;
@@ -77,4 +77,35 @@
       .catch(() => { note('ideal failed, using plain request'); return native(constraints); })
       .then(publish);
   };
+
+  /* Installing the wrapper is not just an assignment.
+   *
+   * getUserMedia lives on MediaDevices.prototype and on some browsers is
+   * non-writable. A plain `md.getUserMedia = fn` then fails SILENTLY in
+   * non-strict code: no error, no override, and the library keeps calling the
+   * native method. That is what happened here. Chrome accepted the assignment
+   * so it looked installed under test, and Safari ignored it, so on the phone
+   * the constraint never applied and the feed stayed at the default.
+   *
+   * Define it, verify it took, and fall back to the prototype. Record which
+   * route worked so the overlay can show it instead of us assuming.
+   */
+  const install = () => {
+    try {
+      Object.defineProperty(md, 'getUserMedia',
+        { value: wrapped, writable: true, configurable: true });
+      if (md.getUserMedia === wrapped) return 'instance';
+    } catch (error) { /* fall through */ }
+
+    try {
+      const proto = Object.getPrototypeOf(md);
+      Object.defineProperty(proto, 'getUserMedia',
+        { value: wrapped, writable: true, configurable: true });
+      if (navigator.mediaDevices.getUserMedia === wrapped) return 'prototype';
+    } catch (error) { /* fall through */ }
+
+    return 'FAILED';
+  };
+
+  window.__steakoutCameraPatch = install();
 })();

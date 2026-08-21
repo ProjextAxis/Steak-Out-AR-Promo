@@ -112,7 +112,8 @@
       g.font = '600 13px ui-monospace,Menlo,monospace';
       const lines = [
         'feed ' + vw + 'x' + vh + '   crop ' + state.cropSize,
-        'cam ' + ((window.__steakoutCameraTrail||[]).slice(-1)[0] || 'no result yet'),
+        'patch ' + (window.__steakoutCameraPatch || '?') + '   ' +
+          ((window.__steakoutCameraTrail||[]).slice(-1)[0] || 'no result yet'),
         'features ' + state.points.length,
         'match ' + state.matches + '/' + state.attempts + (live ? '   LOCKED' : '   searching'),
         state.lastMatchAt ? 'last match ' + (since / 1000).toFixed(1) + 's ago' : 'no match yet'
