@@ -206,10 +206,10 @@
 
     /*
       A-Frame leaves renderer.shadowMap.enabled false until something asks for
-      it, and its shadow system can only apply the flag once the renderer
-      exists — which is after the system itself initialises. So ask twice: once
-      through the system (keeps its bookkeeping honest and respects
-      `shadow="enabled: false"` on the scene) and once directly.
+      it. Ask through the shadow system first, so its bookkeeping stays honest
+      and a scene-level `shadow="enabled: false"` still wins — then fall back to
+      setting the flag directly, because that system initialises before the
+      renderer exists and its request can end up stranded.
     */
     enableShadowMap() {
       const sceneEl = this.el.sceneEl;
@@ -218,8 +218,15 @@
 
       try {
         const system = sceneEl.systems && sceneEl.systems.shadow;
-        if (system && system.setShadowMapEnabled) system.setShadowMapEnabled(true);
-        renderer.shadowMap.enabled = true;
+        if (system && system.setShadowMapEnabled) {
+          // The scene can opt out with shadow="enabled: false". Honour it
+          // rather than forcing the flag back on behind its back.
+          if (system.data && system.data.enabled === false) return false;
+          system.setShadowMapEnabled(true);
+        }
+        // Only force the flag if the system left it off — it initialises
+        // before the renderer exists, so its request can be stranded.
+        if (!renderer.shadowMap.enabled) renderer.shadowMap.enabled = true;
         renderer.shadowMap.autoUpdate = true;
         if (THREE.PCFSoftShadowMap !== undefined) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       } catch (error) {
