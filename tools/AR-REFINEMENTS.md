@@ -4,8 +4,10 @@
 > the A/B/C/D experiment as future work. That experiment has since been run:
 > `tools/HANDOFF.md` section 5 reports 10-14% across all four builds, which
 > supersedes both the 20% number and the "proposed next step" below. What is
-> still live here is the suspect list, and suspect 1 in particular — physical
-> print size — which nothing has yet tested.
+> still live here is **suspect 1** — physical print size — which nothing has yet
+> tested. Suspect 2 describes a 720p cap the build no longer has (it now asks for
+> 1080p), and the A/B/C/D letters below no longer mean what they say: at the tip
+> **A and B ask for 1080p, C and D leave the request untouched as a control.**
 
 
 Measured from `ScreenRecording_08-20-2026 23-42-17_1.mov`, 38.6s, 1320x2868, 120fps.

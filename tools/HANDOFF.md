@@ -144,9 +144,11 @@ It either honours the hint or ignores it silently, and the recorded size says
 which. Only `OverconstrainedError` is ever retried, so a denied permission costs
 one failure rather than three.
 
-With `?xray=1` it additionally runs an `exact` ladder in **both** orientations —
-a portrait phone can refuse 1920x1080 while happily delivering 1080x1920 — then
-tries `applyConstraints` on the live track as an independent lever.
+`applyConstraints` then runs on the live track as an independent lever, on the
+normal path as well as under `?xray=1` — some engines ignore the getUserMedia
+hint but honour it. Only the `exact` ladder is diagnostic-only: it costs extra
+`getUserMedia` calls, and it is tried in **both** orientations because a portrait
+phone can refuse 1920x1080 while happily delivering 1080x1920.
 
 **As of this writing the 1080p request has still never been exercised on
 hardware.** Every 480x640 measurement so far is the UNCONSTRAINED default, not a
@@ -248,8 +250,15 @@ There is no camera or gyro in the dev environment. Any claim about how the AR
   covers a fraction of a percent of the plate.
 - **A-Frame may already have fired `loaded`** before a component's `init` runs, so
   a listener alone never fires. Check `el.hasLoaded` too.
-- `marker.html` carries its own `imageTargetSrc` as well as taking one from config.
-  **Change both** or the markup silently wins on first load.
+- **`config.js` wins the `imageTargetSrc`, not `marker.html` — the opposite of
+  what this note used to say.** `marker.js` calls `setAttribute('mindar-image',
+  'imageTargetSrc', ...)` before A-Frame initialises the component, and the
+  `mindar-image` component has an `init` and **no `update`** (confirmed in the
+  shipped 1.2.5 bundle), so the one read it ever does happens after that write.
+  The markup value is only a fallback, used when `marker.js`'s early-return
+  guard fires. The real hazard is the reverse of the old advice: "fixing"
+  `marker.html` to match config hard-codes one target and silently breaks the
+  `?ar=` switch.
 - Cache-bust `?v=` on every changed file, and bump the iframe's
   `marker.html?embedded=1&v=` in `index.html` when `marker.html` changes, or
   returning users run a stale AR page.
