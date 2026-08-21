@@ -55,10 +55,14 @@
    * x-ray HUD reports windows/second so that cost is measurable rather than
    * argued. */
   const RES = {
-    '1080': [1920, 1080],   // default, crop 512
-    '1536': [2048, 1536],   // 4:3,     crop 1024
-    '2160': [3840, 2160],   // 4K 16:9, crop 1024
-    'max':  [4032, 3024]    // 4:3,     crop 2048
+    '1080': [1920, 1080],   // DEFAULT and fallback. Do not remove: line below
+                            // resolves through it, so deleting it throws on the
+                            // customer path and kills the camera outright.
+    '960':  [1280, 960],    // 4:3,  crop 512 but covers 100% of the frame
+    '1512': [2016, 1512],   // 4:3,  crop 1024 at ~1/4 the cost of 12MP
+    '1536': [2048, 1536],   // 4:3,  crop 1024
+    '2160': [3840, 2160],   // 4K,   crop 1024 but 8.3MP per frame
+    'max':  [4032, 3024]    // 12MP. Diagnostic only; never put a customer here.
   };
   const askFor = RES[(params.get('res') || '1080').toLowerCase()] || RES['1080'];
 
@@ -73,6 +77,9 @@
     caps: null,      // what the track claims it is capable of
     applied: null,   // result of the applyConstraints attempt, if one was made
     wanted: null,    // what ?res= asked for
+    zoom: null,      // camera zoom range, if the device offers one
+    torch: null,
+    focus: null,
     cropIfHonoured: null, // the detection window that request would produce
     crop: null,      // the acquisition window that resolution implies
     constrained: !LEAVE_ALONE,
@@ -166,6 +173,19 @@
       if (!c) report.caps = 'unsupported';
       else if (c.width && c.width.max) report.caps = 'max ' + c.width.max + 'x' + (c.height && c.height.max);
       else report.caps = 'no size range';
+
+      /* Zoom is the only lever that makes the flyer bigger in frame without
+       * reprinting it, and whether this device offers it at all is currently
+       * unknown. Reporting it costs one read and turns the next recording into
+       * the answer. Torch and focus are reported alongside because they are
+       * free once we are here and both bear on a dim restaurant table. */
+      if (c) {
+        const z = c.zoom;
+        report.zoom = z ? (z.min + '-' + z.max + (z.step ? '/' + z.step : '')) : 'none';
+        report.torch = ('torch' in c) ? String(!!c.torch) : 'none';
+        report.focus = c.focusDistance ? ('min ' + c.focusDistance.min) :
+                       (c.focusMode ? String(c.focusMode) : 'none');
+      }
     } catch (e) { report.caps = 'threw'; }
 
     /* Second, independent lever: raise the live track instead of re-requesting

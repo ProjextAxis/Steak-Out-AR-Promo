@@ -10,18 +10,26 @@
         href="./assets/fonts/bebas-neue-latin.woff2" />
   <link rel="preload" as="font" type="font/woff" crossorigin
         href="./assets/fonts/rustler.woff" />
+  <!-- mind-ar only fetches the tracking target inside _startAR, i.e. AFTER
+       getUserMedia resolves, so on a slow connection the customer gets a live
+       camera that cannot possibly track until half a megabyte arrives, with
+       uiLoading:no suppressing any indicator. Starting the fetch here overlaps
+       it with the permission prompt. Keep in sync with config.js targetMindUrl;
+       ?ar=B and ?ar=D load the larger full target instead and are not covered. -->
+  <link rel="preload" as="fetch" crossorigin
+        href="./assets/steakout-marker-lean.mind" />
   <link rel="stylesheet" href="./fonts.css?v=20260820-self-hosted" />
   <link rel="stylesheet" href="./marker.css?v=20260821-camlive" />
   <link rel="stylesheet" href="./marker-target.css?v=20260819-approved-target" />
   <link rel="stylesheet" href="./marker-panel-tight.css?v=20260819-tight-panel" />
   <link rel="stylesheet" href="./marker-panel-compact.css?v=20260819-force-compact-1" />
   <link rel="stylesheet" href="./marker-ghost-placement.css?v=20260819-ghost-placement" />
-  <script src="./ar-camera-tune.js?v=20260821-sweep"></script>
+  <script src="./ar-camera-tune.js?v=20260821-honest"></script>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script defer src="./config.js?v=20260821-sweep"></script>
   <script defer src="./ar-reticle.js?v=20260821-span1"></script>
-  <script defer src="./ar-xray.js?v=20260821-sweep"></script>
+  <script defer src="./ar-xray.js?v=20260821-honest"></script>
   <script defer src="./ar-lighting.js?v=20260821-ibl"></script>
   <script defer src="./ar-shadow.js?v=20260820-contact-shadow-0f6e623"></script>
   <script defer src="./marker.js?v=20260821-sweep"></script>
