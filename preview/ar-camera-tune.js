@@ -101,11 +101,21 @@
      * hardware refusal when it is nothing of the kind. Try both ways round. */
     if (DIAGNOSTIC && isSmall(best)) {
       const rungs = [['exact1080land', 1920, 1080], ['exact1080port', 1080, 1920]];
-      for (const [tag, w, h] of rungs) {
-        const s = await askOnce(tag, { width: { exact: w }, height: { exact: h } }, base);
-        if (!s) continue;
-        if (area(sizeOf(s)) > area(sizeOf(best))) { release(best); best = s; }
-        else release(s);
+      /* try/finally, not just the happy path: rung 1's stream is LIVE while
+       * these run, and askOnce rethrows anything that is not a constraint
+       * refusal. Asking for a second stream while one is open is exactly where
+       * iOS raises NotReadableError, and without this the camera would stay on
+       * with no reference left to stop it. */
+      try {
+        for (const [tag, w, h] of rungs) {
+          const s = await askOnce(tag, { width: { exact: w }, height: { exact: h } }, base);
+          if (!s) continue;
+          if (area(sizeOf(s)) > area(sizeOf(best))) { release(best); best = s; }
+          else release(s);
+        }
+      } catch (e) {
+        release(best);
+        throw e;
       }
     }
 
@@ -162,6 +172,22 @@
   };
 
   const wrapped = function (constraints) {
+    /* Reset per attempt.
+     *
+     * mind-ar issues a fresh getUserMedia on every system.start(), and the
+     * retry button re-enters start(). Without this the rungs array accumulates
+     * across attempts, and marker.js classifies its fault copy by regex over
+     * the joined summary in a fixed order -- so a first attempt that was
+     * DENIED and a second that failed because the camera was BUSY would still
+     * be reported as "CAMERA ACCESS IS OFF", sending the customer into browser
+     * settings to fix a permission they had already granted. */
+    report.rungs = [];
+    report.granted = null;
+    report.caps = null;
+    report.applied = null;
+    report.crop = null;
+    report.summary = 'in progress';
+
     const video = constraints && constraints.video;
     // mind-ar 1.2.5 asks for {audio:false, video:{facingMode:'environment'}} --
     // an object carrying no size. Verified in the shipped bundle, not assumed.

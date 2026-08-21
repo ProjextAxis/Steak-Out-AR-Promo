@@ -139,9 +139,24 @@
   if (instagramLink && config.social?.instagramUrl) instagramLink.href = config.social.instagramUrl;
   if (facebookLink && config.social?.facebookUrl) facebookLink.href = config.social.facebookUrl;
 
+  /* A-Frame and mind-ar both come from CDNs (HANDOFF section 9 flags this as
+   * unmitigated). If either never arrives, <a-scene> stays an unknown element,
+   * its 'loaded' event never fires, and an unguarded await here would hang for
+   * ever -- silently, because there is nothing to reject. Time it out so the
+   * failure reaches the fault panel instead of nothing at all. Generous:
+   * A-Frame is ~378 KB gzipped and a restaurant connection is not a desk. */
+  const AFRAME_BOOT_MS = 20000;
+
   const getArSystem = async () => {
     if (arSystem) return arSystem;
-    if (!scene.hasLoaded) await new Promise((resolve) => scene.addEventListener('loaded', resolve, { once: true }));
+    if (!scene.hasLoaded) {
+      await new Promise((resolve, reject) => {
+        const timer = window.setTimeout(
+          () => reject(new Error('A-Frame did not boot within ' + AFRAME_BOOT_MS + 'ms')),
+          AFRAME_BOOT_MS);
+        scene.addEventListener('loaded', () => { window.clearTimeout(timer); resolve(); }, { once: true });
+      });
+    }
     arSystem = scene.systems['mindar-image-system'];
     return arSystem;
   };
@@ -198,10 +213,43 @@
     cameraWatchdog = undefined;
   };
 
+  /* The LAST video, not the first.
+   *
+   * mind-ar's stop() reads this.video.srcObject.getTracks() before it calls
+   * this.video.remove(), so a session whose getUserMedia rejected throws on
+   * that first line and never removes its element. Each failed retry therefore
+   * leaves another dead <video> in the shell, and querySelector would keep
+   * returning the oldest one -- reporting "not live" forever even once a later
+   * attempt succeeded. */
   const cameraLooksLive = () => {
-    const v = document.querySelector('.marker-shell video, a-scene video');
+    const vs = document.querySelectorAll('.marker-shell video, a-scene video');
+    const v = vs[vs.length - 1];
     return !!(v && v.videoWidth > 0);
   };
+
+  // Clear out the corpses before a fresh attempt, for the same reason.
+  const removeDeadVideos = () => {
+    document.querySelectorAll('.marker-shell video').forEach((v) => {
+      if (!v.srcObject) v.remove();
+    });
+  };
+
+  /* Resolves true once the camera is genuinely producing frames, false if the
+   * fault surfaced first. There is no timeout here on purpose: the watchdog
+   * owns that, and when it fires it sets faultShown, which this sees. */
+  let cameraProbe;
+  const clearCameraProbe = () => {
+    window.clearInterval(cameraProbe);
+    cameraProbe = undefined;
+  };
+  const waitForCamera = () => new Promise((resolve) => {
+    if (cameraLooksLive()) return resolve(true);
+    clearCameraProbe();
+    cameraProbe = window.setInterval(() => {
+      if (cameraLooksLive()) { clearCameraProbe(); resolve(true); }
+      else if (faultShown || !startPromise) { clearCameraProbe(); resolve(false); }
+    }, 200);
+  });
 
   const faultCopy = () => {
     const summary = (window.__steakoutCamera && window.__steakoutCamera.summary) || '';
@@ -223,6 +271,18 @@
         body: 'This device did not offer a camera we can use. Try opening this page in Safari or Chrome directly.'
       };
     }
+    /* The request was made and never answered. In practice this is a permission
+     * prompt the customer has not tapped, or a webview that opens no prompt at
+     * all. Distinguishable because ar-camera-tune.js resets summary to
+     * 'in progress' at the top of every attempt and only replaces it on an
+     * outcome. */
+    if (summary === 'in progress') {
+      return {
+        title: 'WAITING ON THE CAMERA',
+        body: 'Your phone should be asking for camera permission — tap Allow. If you never saw the prompt, reload the page and try again.'
+      };
+    }
+
     // No report at all: the wrapper never ran, so A-Frame or mind-ar never
     // arrived. That is the CDN case HANDOFF section 9 flags as unmitigated.
     return {
@@ -244,6 +304,12 @@
     if (instruction) instruction.hidden = true;
     if (socialDock) socialDock.hidden = true;
     if (orderLink) orderLink.hidden = true;
+    /* The intro is position:fixed inset:0 with an opaque background at
+     * z-index 18. On a non-embedded visit the catch path sets
+     * intro.hidden = isEmbedded (i.e. false) BEFORE raising the fault, so the
+     * error would sit in the DOM completely covered. Hide it here rather than
+     * relying on stacking order alone. */
+    intro.hidden = true;
     fault.hidden = false;
     postToParent('steakout-ar-camera-error');
   };
@@ -263,7 +329,13 @@
     /* Generous on purpose. The permission prompt sits in front of the user for
      * an unknown time, and mind-ar only fetches the .mind target AFTER
      * getUserMedia resolves -- half a megabyte on a restaurant connection.
-     * This fires only if nothing is producing frames well past both. */
+     *
+     * It is disarmed ONLY by waitForCamera() seeing real frames. An earlier
+     * version cleared it as soon as `await system.start()` returned, which is
+     * ~1.25s in and proves nothing -- start() is synchronous and returns
+     * undefined. That cancelled the backstop before any of the cases it exists
+     * for could reach it, and a hung getUserMedia left the customer on a black
+     * screen reading "PUT THE FLYER IN HERE" indefinitely. */
     cameraWatchdog = window.setTimeout(() => {
       if (!cameraLooksLive()) showFault();
     }, 20000);
@@ -282,6 +354,7 @@
         hasLocked = false;
         targetVisible = false;
         hideFault();
+        removeDeadVideos();
         armCameraWatchdog();
         setPlacementGhost();
         intro.hidden = true;
@@ -296,7 +369,6 @@
         const system = await getArSystem();
         if (!system) throw new Error('MindAR image system failed to initialize.');
         await system.start();
-        isRunning = true;
         await minSplashTime;
         /* mind-ar's start() is synchronous and returns undefined, so getting
          * here proves nothing about whether the camera came up. If the arError
@@ -306,6 +378,17 @@
         renderInstruction('scanning');
         if (socialDock) socialDock.hidden = false;
         if (orderLink) orderLink.hidden = false;
+
+        /* Wait for actual frames before declaring success. Everything the
+         * watchdog exists for -- an unanswered permission prompt, a stream
+         * that never reaches loadedmetadata, a stalled .mind fetch -- happens
+         * AFTER this point, so the watchdog has to stay armed until there is
+         * a picture. If it fires instead, faultShown flips and this resolves
+         * false. isRunning likewise gates stop(), whose library call throws on
+         * a session that never got a stream. */
+        const live = await waitForCamera();
+        if (!live || faultShown) return;
+        isRunning = true;
         clearCameraWatchdog();
         await revealCamera();
         postToParent('steakout-ar-camera-live');
@@ -331,15 +414,20 @@
       targetVisible = false;
       // Or it fires 20s later and drops a camera error over a closed session.
       clearCameraWatchdog();
+      clearCameraProbe();
       clearProgressAdvance();
       if (startPromise) await startPromise;
       try {
         const system = await getArSystem();
+        // isRunning is only true once frames were seen, so this cannot be
+        // called on a session with no srcObject -- where the library's own
+        // stop() throws on its first line, before it removes its <video>.
         if (isRunning && system?.stop) await system.stop();
       } catch (error) {
         console.warn('Unable to stop AR cleanly:', error);
       }
       isRunning = false;
+      removeDeadVideos();
       setPlacementGhost();
       if (splash) splash.hidden = true;
       guide.hidden = true;
@@ -423,6 +511,19 @@
       else if (event.data?.type === 'steakout-ar-stop') stop();
     });
     window.addEventListener('keydown', (event) => { if (event.key === 'Escape') postToParent('steakout-ar-close'); });
-    getArSystem().then(() => postToParent('steakout-ar-ready')).catch(() => postToParent('steakout-ar-camera-error'));
+
+    /* Announce readiness as soon as this page is LISTENING, not once A-Frame
+     * has booted.
+     *
+     * The parent gates its 'steakout-ar-start' message on this one
+     * (app.js: `if (browserARFrameReady) postToBrowserAR(...)`), so tying it to
+     * the library meant a CDN failure produced no start message, therefore no
+     * start(), therefore no error -- the customer sat on the opening splash
+     * indefinitely with nothing to read and nothing to retry. start() awaits
+     * the system itself and now times out, so that failure lands on the fault
+     * panel like every other one. */
+    postToParent('steakout-ar-ready');
+    // Warm the system in the background; start() is what reports its failure.
+    getArSystem().catch(() => { /* surfaced by start() */ });
   }
 })();

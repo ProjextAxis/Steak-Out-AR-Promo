@@ -1150,7 +1150,9 @@ a {
 .marker-fault {
   position: fixed;
   inset: 0;
-  z-index: 9;
+  /* Above .marker-intro's 18: that panel is opaque and full-bleed, and on a
+     non-embedded visit it would otherwise cover this one entirely. */
+  z-index: 20;
   display: grid;
   place-items: center;
   padding: 24px;

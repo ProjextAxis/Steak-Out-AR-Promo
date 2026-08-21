@@ -100,7 +100,7 @@
    * z-index sits above .marker-fault (9) on purpose: the fault panel is what a
    * customer should see, but ?xray=1 is opt-in, and a camera failure is
    * precisely when the numbers need to be legible on a recording. */
-  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:10;pointer-events:none';
+  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:21;pointer-events:none';
   document.addEventListener('DOMContentLoaded', () => document.body.appendChild(cv));
   if (document.readyState !== 'loading') document.body.appendChild(cv);
 
