@@ -57,10 +57,24 @@
       video: { ...video, width: { ideal: w }, height: { ideal: h } }
     });
 
-    // Ask high, step down, and only then accept whatever the browser wants.
-    return ask(1920, 1080)
-      .catch(() => ask(1280, 720))
-      .catch(() => native(constraints))
+    // `ideal` is advisory and gets silently ignored, which is indistinguishable
+    // from the device genuinely not offering the mode. Try `exact` first: if the
+    // camera cannot do it, it REJECTS, and that is a definitive answer rather
+    // than a quiet downgrade. Fall back through ideal, then the plain request.
+    const exact = (w, h) => native({
+      ...constraints,
+      video: { ...video, width: { exact: w }, height: { exact: h } }
+    });
+
+    window.__steakoutCameraTrail = [];
+    const note = (t) => { window.__steakoutCameraTrail.push(t); };
+
+    return exact(1920, 1080).then((s) => (note('exact 1920x1080 OK'), s))
+      .catch(() => { note('exact 1920x1080 REJECTED'); return exact(1280, 720); })
+      .then((s) => (note('exact 1280x720 OK'), s))
+      .catch(() => { note('exact 1280x720 REJECTED'); return ask(1920, 1080); })
+      .then((s) => (note('fell back to ideal'), s))
+      .catch(() => { note('ideal failed, using plain request'); return native(constraints); })
       .then(publish);
   };
 })();
