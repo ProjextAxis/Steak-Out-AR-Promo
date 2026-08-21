@@ -34,7 +34,11 @@ window.STEAKOUT_AR_CONFIG = {
     // The practical consequence is that source resolution barely moves
     // tracking, so a better target file is not the lever. What moves it is how
     // much of the camera sensor the flyer physically fills, i.e. print size.
-    targetMindUrl: './assets/steakout-marker.mind',
+    // Lean build: 7 pyramid levels instead of 11, so 41% cheaper matching per
+    // frame and 40% smaller, with 36 points on the 128px keyframe against the
+    // full build's 33 and the sample card's 32. Measured as equal on
+    // acquisition, so this is a cost saving, not a robustness gain.
+    targetMindUrl: './assets/steakout-marker-lean.mind',
     targetPreviewUrl: './assets/steakout-marker.png',
 
     // MindAR normalises the marker to 1 unit wide, so scale is relative to the
