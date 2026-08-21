@@ -131,9 +131,17 @@ window.STEAKOUT_AR_CONFIG = {
   window.setTimeout(() => {
     const frame = document.querySelector('#browser-ar-frame');
     if (frame?.dataset.src && frame.src === 'about:blank') {
-      const v = window.STEAKOUT_AR_VARIANT || 'A';
-      const xray = new URLSearchParams(location.search).get('xray') === '1' ? '&xray=1' : '';
-      frame.src = frame.dataset.src + (frame.dataset.src.indexOf('?') === -1 ? '?' : '&') + 'ar=' + v + xray;
+      /* Forward the test parameters only when the parent actually carries them.
+       * This used to append ar=A unconditionally, which meant the iframe always
+       * looked like a test run -- so the variant badge, gated on the parameter
+       * being present, still rendered its yellow debug tag for every customer.
+       * A customer's AR frame should carry no test parameters at all. */
+      const parentParams = new URLSearchParams(location.search);
+      const extra =
+        (parentParams.get('ar') ? '&ar=' + (window.STEAKOUT_AR_VARIANT || 'A') : '') +
+        (parentParams.get('xray') === '1' ? '&xray=1' : '');
+      const join = frame.dataset.src.indexOf('?') === -1 ? '?' : '&';
+      frame.src = frame.dataset.src + (extra ? join + extra.slice(1) : '');
       frame.dataset.src = '';
     }
   }, 0);
