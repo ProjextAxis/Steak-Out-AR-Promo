@@ -63,30 +63,43 @@ window.STEAKOUT_AR_CONFIG = {
 
 /* Warm the custom marker AR before the user taps VIEW IN AR.
    This does not request camera permission or start MindAR. */
-/* Acquisition A/B. The screen recording measured 20% uptime, and two changes
- * landed immediately before it: the 720p camera cap and the lean target. Rather
- * than argue about which, both are switchable from the URL so the same scene can
- * be recorded against each build.
+/* Acquisition A/B, switchable from the URL so the same scene can be recorded
+ * against each build and the question decided by measurement.
  *
- *   ?ar=A  720p  + lean   (current)
- *   ?ar=B  720p  + full
- *   ?ar=C  1080p + lean
- *   ?ar=D  1080p + full   (as before either change)
+ * These labels previously read "720p" and "1080p" and were INVERTED against
+ * what the code did: ar-camera-tune.js stopped capping down to 720p and
+ * started asking UP, and only these strings were left behind. Anyone recording
+ * ?ar=C believing they were testing 1080p was testing the browser default.
+ * The labels now name the two axes that actually vary.
+ *
+ *   ?ar=A  ask + lean    (current)
+ *   ?ar=B  ask + full
+ *   ?ar=C  default + lean    <- camera request left untouched: the control
+ *   ?ar=D  default + full
+ *
+ * "ask" means ar-camera-tune.js requests 1080p; "default" means it stands
+ * aside and lets the browser choose, which measured 480x640 on device.
  */
 (() => {
   const VARIANTS = {
-    A: { target: './assets/steakout-marker-lean.mind', label: 'A 720p/lean' },
-    B: { target: './assets/steakout-marker.mind',      label: 'B 720p/full' },
-    C: { target: './assets/steakout-marker-lean.mind', label: 'C 1080p/lean' },
-    D: { target: './assets/steakout-marker.mind',      label: 'D 1080p/full' }
+    A: { target: './assets/steakout-marker-lean.mind', label: 'A ask/lean' },
+    B: { target: './assets/steakout-marker.mind',      label: 'B ask/full' },
+    C: { target: './assets/steakout-marker-lean.mind', label: 'C default/lean' },
+    D: { target: './assets/steakout-marker.mind',      label: 'D default/full' }
   };
-  const key = (new URLSearchParams(location.search).get('ar') || 'A').toUpperCase();
+  const params = new URLSearchParams(location.search);
+  const raw = params.get('ar');
+  const key = (raw || 'A').toUpperCase();
   const variant = VARIANTS[key] || VARIANTS.A;
 
   window.STEAKOUT_AR_VARIANT = key in VARIANTS ? key : 'A';
   window.STEAKOUT_AR_CONFIG.marker.targetMindUrl = variant.target;
 
-  // Label it on screen, or the test is not worth running.
+  /* Label it on screen, or the test is not worth running -- but only when a
+   * test is actually being run. This badge was ungated, and since the key
+   * defaults to 'A' it shipped a yellow debug tag in the AR header to every
+   * customer, reading a resolution the build no longer used. */
+  const isTest = !!raw || params.get('xray') === '1';
   const badge = () => {
     const host = document.querySelector('.marker-brand');
     if (!host || host.querySelector('[data-ar-variant-badge]')) return;
@@ -96,6 +109,7 @@ window.STEAKOUT_AR_CONFIG = {
     tag.style.cssText = 'font:600 11px/1 Arial,sans-serif;color:#ffd34d;letter-spacing:.04em';
     host.appendChild(tag);
   };
+  if (!isTest) return;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', badge);
   else badge();
 })();
