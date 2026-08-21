@@ -76,11 +76,27 @@ so the union of the nine windows spans **2 x cropSize per axis**, centred on the
 frame — 1024px across on a 1080-wide feed, not 512. The centred `detect()` is
 reached exactly once, from `dummyRun()`, and never again.
 
-This mattered in practice: `ar-reticle.js` was sized from the centred `detect()`
-geometry, so the on-screen aiming box was **half the linear size of the region
-actually searched**, telling customers to hold back twice as far as they needed
-to. It now draws the swept region (clamped to the viewport, since cover-fit
-crops the feed's sides). `?ret=<n>` overrides the multiple for an A/B.
+**But do NOT size the aiming reticle to the swept region.** That mistake shipped
+briefly in 52f92f6 and was wrong, for a reason that has nothing to do with the
+sweep: a box tells the customer how BIG to make the flyer, and that is capped by
+the compiled target's largest keyframe, not by the search area.
+
+`assets/steakout-marker-lean.mind` decodes to one target, 351x512, seven
+keyframes at short edges **351/317/252/200/159/126/100**. `matchDetection` runs
+the query against every keyframe and keeps the largest inlier set, so the flyer
+has to appear at a scale one of them covers. Above 351px short edge — 512px long
+— there is no keyframe left. A flyer filling a 1024px box sits at roughly twice
+that and cannot match at any scale.
+
+So: the sweep says where the flyer may BE (2 x cropSize). The keyframe ladder
+says how big it may APPEAR (<= 512px long edge, with the lean target). The
+reticle communicates size, so it stays at 1 x cropSize. `?ret=<n>` overrides it.
+
+If the full target ever becomes the default this flips — it is compiled from
+1038x1515, so its largest keyframe is three times bigger and a larger box would
+then be correct. **Tie any reticle change to the target in use.** This also means
+raising `?res=` alone may not help: at crop 1024 the lean target can still only
+use the middle 512, so a resolution test should be paired with `?ar=B`.
 
 **The crop is sized from HALF the smaller dimension** — easy to misread:
 ```js

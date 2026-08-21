@@ -28,11 +28,32 @@
 (() => {
   const ID = 'ar-reticle';
 
-  // How many crop windows wide to draw. 2 is the real swept region; the URL can
-  // override it so a device recording can decide rather than an argument.
+  /* SPAN 1, not 2 — and the difference is not the sweep geometry.
+   *
+   * The swept region really is 2 x cropSize (see the note above), so 2 is the
+   * right answer to "where can the flyer BE". But a box also answers "how BIG
+   * should it be", and that is capped by something else entirely: the compiled
+   * target's largest keyframe.
+   *
+   * assets/steakout-marker-lean.mind decodes to one target, 351x512, with seven
+   * keyframes at short edges 351/317/252/200/159/126/100. The matcher runs the
+   * query against every keyframe and keeps the largest inlier set, so the flyer
+   * must appear at a scale one of those covers. Above 351px short edge — 512px
+   * long — there is no keyframe left, and a flyer filling a 1024px box sits at
+   * roughly twice that. It cannot match at any scale.
+   *
+   * SPAN 2 shipped briefly in 52f92f6 and was wrong for this reason. The 60%
+   * uptime recording ran SPAN 1: its reticle measures 262x266px in a 560px-wide
+   * frame, and SPAN 1 predicts 512 * (560/1080) = 265.5px.
+   *
+   * If the FULL target is ever made the default, this changes — it is compiled
+   * from 1038x1515, so its largest keyframe is three times bigger and a larger
+   * box would then be correct. Tie any change here to the target in use.
+   * ?ret=<n> overrides it so a device recording can settle it, not an argument.
+   */
   const SPAN = (() => {
     const v = parseFloat(new URLSearchParams(location.search).get('ret'));
-    return Number.isFinite(v) && v > 0 && v <= 4 ? v : 2;
+    return Number.isFinite(v) && v > 0 && v <= 4 ? v : 1;
   })();
 
   const sizeIt = (box, video, stage) => {
