@@ -19,7 +19,7 @@
   <script src="./ar-camera-tune.js?v=20260821-shadow-camera"></script>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <script defer src="./config.js?v=20260821-tracking-truth"></script>
+  <script defer src="./config.js?v=20260821-lean"></script>
   <script defer src="./ar-lighting.js?v=20260821-ibl"></script>
   <script defer src="./ar-shadow.js?v=20260820-contact-shadow"></script>
   <script defer src="./marker.js?v=20260821-shadow-camera"></script>
@@ -79,7 +79,7 @@
 
     <a class="marker-order" id="marker-order" href="https://order.toasttab.com/online/steakout-sewell" target="_top" aria-label="Order Steak Out on Toast" hidden>ORDER NOW</a>
 
-    <a-scene id="marker-scene" ar-environment mindar-image="imageTargetSrc: ./assets/steakout-marker.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000; missTolerance: 10; warmupTolerance: 2" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-scene id="marker-scene" ar-environment mindar-image="imageTargetSrc: ./assets/steakout-marker-lean.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000; missTolerance: 10; warmupTolerance: 2" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
       <!-- Both children stay untransformed: ar-shadow.js measures the meal in the
            anchor's own space and drops the shadow straight into it. -->
