@@ -118,7 +118,8 @@ window.STEAKOUT_AR_CONFIG = {
     const frame = document.querySelector('#browser-ar-frame');
     if (frame?.dataset.src && frame.src === 'about:blank') {
       const v = window.STEAKOUT_AR_VARIANT || 'A';
-      frame.src = frame.dataset.src + (frame.dataset.src.indexOf('?') === -1 ? '?' : '&') + 'ar=' + v;
+      const xray = new URLSearchParams(location.search).get('xray') === '1' ? '&xray=1' : '';
+      frame.src = frame.dataset.src + (frame.dataset.src.indexOf('?') === -1 ? '?' : '&') + 'ar=' + v + xray;
       frame.dataset.src = '';
     }
   }, 0);
