@@ -137,9 +137,15 @@ window.STEAKOUT_AR_CONFIG = {
        * being present, still rendered its yellow debug tag for every customer.
        * A customer's AR frame should carry no test parameters at all. */
       const parentParams = new URLSearchParams(location.search);
+      // Test parameters only, and only when the parent actually carries them --
+      // a customer's AR frame must arrive with none of these.
+      const passthrough = ['res', 'ret', 'warm']
+        .map((k) => (parentParams.get(k) ? '&' + k + '=' + encodeURIComponent(parentParams.get(k)) : ''))
+        .join('');
       const extra =
         (parentParams.get('ar') ? '&ar=' + (window.STEAKOUT_AR_VARIANT || 'A') : '') +
-        (parentParams.get('xray') === '1' ? '&xray=1' : '');
+        (parentParams.get('xray') === '1' ? '&xray=1' : '') +
+        passthrough;
       const join = frame.dataset.src.indexOf('?') === -1 ? '?' : '&';
       frame.src = frame.dataset.src + (extra ? join + extra.slice(1) : '');
       frame.dataset.src = '';

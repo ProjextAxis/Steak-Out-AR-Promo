@@ -35,6 +35,23 @@
     scene.setAttribute('mindar-image', 'imageTargetSrc', markerConfig.targetMindUrl);
   }
 
+  /* ?warm=N overrides warmupTolerance for a measured run. Default unchanged.
+   *
+   * From the shipped bundle, this is what it gates -- note trackCount only
+   * survives while isTracking stays true, so it is CONSECUTIVE frames:
+   *
+   *   i.isTracking && (i.trackMiss = 0, i.trackCount += 1,
+   *     i.trackCount > this.warmupTolerance && (i.showing = !0, ...))
+   *
+   * At 2 the meal needs three consecutive tracked frames before it appears.
+   * Today's recording matched on only ~5% of attempts, so demanding a run of
+   * three is plausibly a real part of the 6.85s to first lock -- but lowering
+   * it also lets a bad pose show, so it is switchable, not changed. */
+  const warmOverride = parseInt(new URLSearchParams(window.location.search).get('warm'), 10);
+  if (Number.isFinite(warmOverride) && warmOverride >= 0 && warmOverride <= 10) {
+    scene.setAttribute('mindar-image', 'warmupTolerance', warmOverride);
+  }
+
   let arSystem;
   let startPromise;
   let stopPromise;

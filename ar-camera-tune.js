@@ -39,6 +39,31 @@
   // but it costs extra getUserMedia calls. A customer never runs it.
   const DIAGNOSTIC = params.get('xray') === '1';
 
+  /* What to ask for. The default is unchanged, because 1920x1080 is what the
+   * current 60%-uptime build measured and nothing here should risk that
+   * without a recording to justify it.
+   *
+   * The reason higher is interesting: MindAR sizes its detection window as
+   *     cropSize = 2 ** round(log2(min(w, h) / 2))
+   * so the window only grows when the SHORT edge crosses a power-of-two
+   * boundary. 1080 gives 512. The next step up needs a short edge of ~1448,
+   * which no 16:9 mode below 4K reaches -- but 4:3 modes do, and this phone
+   * reports getCapabilities max 4032x3024. Bigger window AND more pixels on
+   * the flyer, which is the only lever left now that a larger print is out.
+   *
+   * It costs frame rate: tracking runs on the full frame, not the crop. The
+   * x-ray HUD reports windows/second so that cost is measurable rather than
+   * argued. */
+  const RES = {
+    '1080': [1920, 1080],   // default, crop 512
+    '1536': [2048, 1536],   // 4:3,     crop 1024
+    '2160': [3840, 2160],   // 4K 16:9, crop 1024
+    'max':  [4032, 3024]    // 4:3,     crop 2048
+  };
+  const askFor = RES[(params.get('res') || '1080').toLowerCase()] || RES['1080'];
+
+  const predictCrop = (w, h) => Math.pow(2, Math.round(Math.log2(Math.min(w, h) / 2)));
+
   const native = md.getUserMedia.bind(md);
 
   // One object, one source of truth. The overlay reads this and infers nothing.
@@ -47,13 +72,18 @@
     granted: null,   // what mind-ar finally receives
     caps: null,      // what the track claims it is capable of
     applied: null,   // result of the applyConstraints attempt, if one was made
+    wanted: null,    // what ?res= asked for
+    cropIfHonoured: null, // the detection window that request would produce
     crop: null,      // the acquisition window that resolution implies
     constrained: !LEAVE_ALONE,
     summary: 'not started'
   };
   window.__steakoutCamera = report;
 
-  const HD_EDGE = 1200; // long edge above which we have a genuinely HD feed
+  // Long edge at which we consider the request honoured. Derived from what we
+  // asked for rather than fixed, or a 4K request that returned 1080p would look
+  // like a success and the exact ladder would never run.
+  const hdEdge = () => Math.min(1200, Math.round(Math.max(askFor[0], askFor[1]) * 0.85));
 
   const trackOf = (s) => { try { return s.getVideoTracks()[0] || null; } catch (e) { return null; } };
   const sizeOf = (s) => {
@@ -62,7 +92,7 @@
     return g && g.width ? { w: g.width, h: g.height } : null;
   };
   const area = (z) => (z ? z.w * z.h : 0);
-  const isSmall = (s) => { const z = sizeOf(s); return !z || Math.max(z.w, z.h) < HD_EDGE; };
+  const isSmall = (s) => { const z = sizeOf(s); return !z || Math.max(z.w, z.h) < hdEdge(); };
   const release = (s) => { try { if (s) s.getTracks().forEach((t) => t.stop()); } catch (e) { /* best effort */ } };
 
   // Only a constraint refusal is worth retrying differently. A denied
@@ -91,7 +121,8 @@
      * has rather than refusing -- and per spec it can never raise
      * OverconstrainedError. So this rung either honours the hint or quietly
      * ignores it, and the recorded size says which. */
-    let best = await askOnce('ideal1080', { width: { ideal: 1920 }, height: { ideal: 1080 } }, base);
+    const [AW, AH] = askFor;
+    let best = await askOnce('ideal' + AH, { width: { ideal: AW }, height: { ideal: AH } }, base);
 
     /* A device that ignores `ideal` returns its default with no error at all,
      * which is indistinguishable from "this is genuinely the best I have".
@@ -100,7 +131,7 @@
      * happily delivering 1080x1920 -- so a single exact request would read as a
      * hardware refusal when it is nothing of the kind. Try both ways round. */
     if (DIAGNOSTIC && isSmall(best)) {
-      const rungs = [['exact1080land', 1920, 1080], ['exact1080port', 1080, 1920]];
+      const rungs = [['exact' + AH + 'land', AW, AH], ['exact' + AH + 'port', AH, AW]];
       /* try/finally, not just the happy path: rung 1's stream is LIVE while
        * these run, and askOnce rethrows anything that is not a constraint
        * refusal. Asking for a second stream while one is open is exactly where
@@ -156,6 +187,8 @@
     report.granted = z ? z.w + 'x' + z.h : 'unknown';
     const min = z ? Math.min(z.w, z.h) : 0;
     report.crop = min ? Math.pow(2, Math.round(Math.log2(min / 2))) : null;
+    report.wanted = askFor[0] + 'x' + askFor[1];
+    report.cropIfHonoured = predictCrop(askFor[0], askFor[1]);
     report.summary = report.rungs.join(' ') +
       (report.applied ? ' ac=' + report.applied : '') +
       ' caps=' + report.caps;

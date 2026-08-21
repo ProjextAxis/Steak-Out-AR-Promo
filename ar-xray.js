@@ -3,9 +3,11 @@
  * Off unless the URL carries ?xray=1, so customers never see it.
  *
  * Draws, per frame:
- *   - the SEARCH WINDOW, the centred crop acquisition inspects. controller.js
- *     calls cropDetector.detect(), which slices a square from the middle sized
- *     from half the smaller dimension: 256 at 720p, 512 at 1080p.
+ *   - the SEARCH WINDOW in its real position. Acquisition does NOT inspect a
+ *     centred crop: _detectAndMatch calls cropDetector.detectMoving(), which
+ *     cycles a 3x3 grid one position per frame. The centred detect() runs once,
+ *     from dummyRun(). The dashed box is the union of all nine positions --
+ *     2 x cropSize per axis, which is what the reticle is sized to.
  *   - every FEATURE POINT the detector returned. These come back already offset
  *     into full-frame coordinates by _detect(), so they map straight to screen.
  *   - whether the last match SUCCEEDED, and how long since one did.
@@ -24,8 +26,44 @@
   if (new URLSearchParams(location.search).get('xray') !== '1') return;
 
   const state = {
-    crop: null, points: [], lastMatchAt: 0, matches: 0, attempts: 0,
-    matched: false, vw: 0, vh: 0, cropSize: 0
+    crop: null, sweep: null, points: [], lastMatchAt: 0, matches: 0, attempts: 0,
+    matched: false, vw: 0, vh: 0, cropSize: 0,
+    firstLockAt: 0, startedAt: 0, procTimes: []
+  };
+
+  /* Where detectMoving's window actually is this frame.
+   *
+   * Reproduced from the shipped mind-ar 1.2.5 bundle rather than guessed:
+   *
+   *   detectMoving(t){ const e=this.lastRandomIndex%3, s=Math.floor(this.lastRandomIndex/3);
+   *     let o=Math.floor(this.height/2-this.cropSize+s*this.cropSize/2),
+   *         r=Math.floor(this.width/2 -this.cropSize+e*this.cropSize/2);
+   *     r<0&&(r=0), o<0&&(o=0),
+   *     r>=this.width -this.cropSize&&(r=this.width -this.cropSize-1),
+   *     o>=this.height-this.cropSize&&(o=this.height-this.cropSize-1),
+   *     this.lastRandomIndex=(this.lastRandomIndex+1)%9, this._detect(t,r,o) }
+   *
+   * lastRandomIndex is read BEFORE the increment, so the wrapper must sample it
+   * before calling through. */
+  const movingWindow = (cd, idx) => {
+    const c = cd.cropSize, W = cd.width, H = cd.height;
+    let x = Math.floor(W / 2 - c + (idx % 3) * c / 2);
+    let y = Math.floor(H / 2 - c + Math.floor(idx / 3) * c / 2);
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x >= W - c) x = W - c - 1;
+    if (y >= H - c) y = H - c - 1;
+    return { x, y, s: c };
+  };
+
+  // The union of all nine positions: what the sweep covers over 9 frames.
+  const sweptRegion = (cd) => {
+    const c = cd.cropSize;
+    const xs = [0, 1, 2].map((e) => movingWindow(cd, e).x);
+    const ys = [0, 3, 6].map((i) => movingWindow(cd, i).y);
+    return { x: Math.min(...xs), y: Math.min(...ys),
+             w: Math.max(...xs) + c - Math.min(...xs),
+             h: Math.max(...ys) + c - Math.min(...ys) };
   };
 
   const hook = (controller) => {
@@ -37,19 +75,29 @@
     const wrap = (name, centred) => {
       const original = cd[name].bind(cd);
       cd[name] = function (input) {
+        // Sample the index BEFORE calling through; detectMoving increments it.
+        const idx = cd.lastRandomIndex;
+        const t0 = performance.now();
         const result = original(input);
         Promise.resolve(result).then((r) => {
+          state.procTimes.push(t0);
+          if (state.procTimes.length > 120) state.procTimes.shift();
           if (!r) return;
           state.points = r.featurePoints || [];
           const c = cd.cropSize;
           state.crop = centred
             ? { x: Math.floor(cd.width / 2 - c / 2), y: Math.floor(cd.height / 2 - c / 2), s: c }
-            : (state.crop || { x: 0, y: 0, s: c });
+            : movingWindow(cd, idx);
+          state.sweep = sweptRegion(cd);
           state.vw = cd.width; state.vh = cd.height;
+          if (!state.startedAt) state.startedAt = performance.now();
         }).catch(() => {});
         return result;
       };
     };
+    /* detectMoving is the acquisition path -- _detectAndMatch calls only it.
+     * detect() is reached once, from dummyRun(). Wrapping both is harmless, but
+     * the one that matters in a recording is detectMoving. */
     wrap('detect', true);
     if (cd.detectMoving) wrap('detectMoving', false);
 
@@ -61,7 +109,11 @@
         Promise.resolve(p).then((r) => {
           const ok = !!(r && r.modelViewTransform);
           state.matched = ok;
-          if (ok) { state.matches++; state.lastMatchAt = performance.now(); }
+          if (ok) {
+            state.matches++;
+            state.lastMatchAt = performance.now();
+            if (!state.firstLockAt) state.firstLockAt = state.lastMatchAt;
+          }
         }).catch(() => {});
         return p;
       };
@@ -124,6 +176,19 @@
       const since = performance.now() - state.lastMatchAt;
       const live = state.lastMatchAt && since < 400;
 
+      // The whole area the sweep reaches over nine frames: dashed, faint. This
+      // is what the aiming reticle is sized to.
+      if (state.sweep && vw && vh) {
+        g.save();
+        g.setLineDash([10, 8]);
+        g.strokeStyle = 'rgba(255,255,255,.42)';
+        g.lineWidth = 2;
+        g.strokeRect(X(state.sweep.x), Y(state.sweep.y),
+                     state.sweep.w * scale, state.sweep.h * scale);
+        g.restore();
+      }
+
+      // The ONE window being inspected this frame, in its real position.
       if (state.crop && vw && vh) {
         g.strokeStyle = live ? 'rgba(60,220,110,.95)' : 'rgba(255,190,40,.9)';
         g.lineWidth = 3;
@@ -169,12 +234,25 @@
         ['grant ' + cam.granted]
       ) : ['cam   never called'];
 
+      // Detector throughput: how many windows it actually gets through per
+      // second. This is the number that says whether a higher camera
+      // resolution is affordable, and it is invisible without measuring.
+      const win = state.procTimes;
+      const hz = win.length > 4
+        ? (win.length - 1) / ((win[win.length - 1] - win[0]) / 1000)
+        : 0;
+      const ttl = state.firstLockAt && state.startedAt
+        ? ((state.firstLockAt - state.startedAt) / 1000).toFixed(1) + 's'
+        : 'none yet';
+
       const lines = [
         'feed  ' + (vw && vh ? vw + 'x' + vh + '   crop ' + state.cropSize : 'no frames yet'),
+        'sweep ' + (state.sweep ? state.sweep.w + 'x' + state.sweep.h : '?'),
         'patch ' + (window.__steakoutCameraPatch || '?')
       ].concat(camLines, [
-        'feat  ' + state.points.length,
+        'feat  ' + state.points.length + '   ' + (hz ? hz.toFixed(1) + ' win/s' : ''),
         'match ' + state.matches + '/' + state.attempts + (live ? '   LOCKED' : '   searching'),
+        '1st   ' + ttl,
         state.lastMatchAt ? 'last  ' + (since / 1000).toFixed(1) + 's ago' : 'last  no match yet'
       ]);
       // Size the panel to the longest line; fixed widths clipped off-screen.
