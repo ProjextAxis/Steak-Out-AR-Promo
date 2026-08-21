@@ -57,9 +57,30 @@ summed count suggests.
 100px short edge, so a 1038px source gets 11 levels and the 674px card gets 7.
 3999 vs 593 is a pixel-count comparison, not a quality one.
 
-**Acquisition only inspects a CENTRED crop.** `controller.js` calls
-`cropDetector.detect()`, which slices from the middle. `detectMoving()`, which
-walks nine positions, only runs once something is already tracked.
+**Acquisition sweeps a MOVING window — this section previously said the
+opposite, and was wrong.** The only acquisition call in `processVideo` is:
+
+```js
+async _detectAndMatch(t, e) {
+  const { featurePoints: s } = this.cropDetector.detectMoving(t);
+```
+
+`detectMoving()` cycles a 3x3 grid, one position per frame:
+
+```js
+x = width/2  - cropSize + (i % 3) * cropSize/2
+y = height/2 - cropSize + floor(i / 3) * cropSize/2      // i = 0..8, then wraps
+```
+
+so the union of the nine windows spans **2 x cropSize per axis**, centred on the
+frame — 1024px across on a 1080-wide feed, not 512. The centred `detect()` is
+reached exactly once, from `dummyRun()`, and never again.
+
+This mattered in practice: `ar-reticle.js` was sized from the centred `detect()`
+geometry, so the on-screen aiming box was **half the linear size of the region
+actually searched**, telling customers to hold back twice as far as they needed
+to. It now draws the swept region (clamped to the viewport, since cover-fit
+crops the feed's sides). `?ret=<n>` overrides the multiple for an A/B.
 
 **The crop is sized from HALF the smaller dimension** — easy to misread:
 ```js
@@ -95,6 +116,38 @@ during that window measured the browser default, not 1080p.
 
 **All within noise.** Neither the 720p cap nor the lean target caused it — D
 predates both. The meal is on screen 10-14% of the time.
+
+### RESOLVED, 2026-08-21 — it was the camera feed
+
+A device recording on the current build, measured frame by frame:
+
+| | before | after |
+|---|---|---|
+| feed | 480x640 | **1080x1920** |
+| acquisition window | 256 | **512** |
+| uptime | 10-14% | **60%** |
+| longest hold | 3.50s | **13.80s** |
+| time to first lock | — | 6.85s |
+
+`getCapabilities()` reported **max 4032x3024**. The camera was never the ceiling;
+iOS was handing the web 0.3MP until asked. `ask ideal1080=1920x1080` was honoured
+on the first rung, one `getUserMedia` call.
+
+Method: 30.7s recording, 1320x2868 at 60fps, meal detected by a saturated-gold
+pixel fraction over the lower 66% of frame, threshold 0.5%. The measure separated
+cleanly — exactly 0.00% on every no-meal sample against 3.9-11% with. Validated
+against the frames at both transitions before being trusted, and the window was
+started at the true camera-live frame (7.70s) because **the sales page hero
+renders the same cheesesteak model** and contaminates any earlier window.
+
+The 13.8s hold ended because the user panned off the flyer, not because tracking
+dropped. The remaining loss is almost entirely **time to first lock**.
+
+At the moment of lock, most matched feature points sat on the **table's wood
+grain**, not the flyer, and almost none on the QR code. The flyer was small in
+frame and visibly crumpled. Print size and flatness are now the top suspects —
+but a larger print is out of budget, so the levers are framing (see the reticle
+correction in section 4), resolution (`?res=`), and `warmupTolerance` (`?warm=`).
 
 Frame inspection shows it locks only when the phone is close and the flyer is
 centred, which matches the centred-crop finding. Leading hypothesis is therefore
