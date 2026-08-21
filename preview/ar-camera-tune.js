@@ -97,21 +97,43 @@
    * Define it, verify it took, and fall back to the prototype. Record which
    * route worked so the overlay can show it instead of us assuming.
    */
+  /* Patch BOTH the instance and the prototype.
+   *
+   * The previous version returned as soon as the instance assignment verified,
+   * so the prototype was never touched. On the device that reported
+   * "patch instance" and then "cam never called": the override was installed on
+   * the object we captured, and the library reached the camera through one we
+   * had not. Patching MediaDevices.prototype covers any instance.
+   */
   const install = () => {
-    try {
-      Object.defineProperty(md, 'getUserMedia',
-        { value: wrapped, writable: true, configurable: true });
-      if (md.getUserMedia === wrapped) return 'instance';
-    } catch (error) { /* fall through */ }
+    const done = [];
 
     try {
       const proto = Object.getPrototypeOf(md);
-      Object.defineProperty(proto, 'getUserMedia',
-        { value: wrapped, writable: true, configurable: true });
-      if (navigator.mediaDevices.getUserMedia === wrapped) return 'prototype';
-    } catch (error) { /* fall through */ }
+      if (proto && proto.getUserMedia) {
+        Object.defineProperty(proto, 'getUserMedia',
+          { value: wrapped, writable: true, configurable: true });
+        if (proto.getUserMedia === wrapped) done.push('proto');
+      }
+    } catch (error) { /* keep going */ }
 
-    return 'FAILED';
+    try {
+      Object.defineProperty(md, 'getUserMedia',
+        { value: wrapped, writable: true, configurable: true });
+      if (md.getUserMedia === wrapped) done.push('inst');
+    } catch (error) { /* keep going */ }
+
+    // Last resort: some engines expose it only through the legacy alias.
+    try {
+      if (navigator.getUserMedia && navigator.getUserMedia !== wrapped) {
+        navigator.getUserMedia = function (c, ok, err) {
+          wrapped(c).then(ok, err);
+        };
+        done.push('legacy');
+      }
+    } catch (error) { /* keep going */ }
+
+    return done.length ? done.join('+') : 'FAILED';
   };
 
   window.__steakoutCameraPatch = install();
