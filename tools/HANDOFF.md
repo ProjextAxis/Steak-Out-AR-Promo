@@ -38,7 +38,7 @@ Practically: keep `ar` and `ar-modes` off `<model-viewer>`, never call
 | Tracking target | `assets/steakout-marker-lean.mind` (full build also present) |
 | modelScale / position / rotation | `9.0` / `0 0 0` / `90 0 0` |
 | MindAR | filterMinCF `0.001`, filterBeta `1000` (both stock), missTolerance `10`, warmupTolerance `2` |
-| Camera | capped to 720p by `ar-camera-tune.js` |
+| Camera | `ar-camera-tune.js` asks for 1080p and records what it gets — see 5b |
 
 Scale needs no tape measure: MindAR normalises the marker to **1 unit wide**, so
 plate width as a multiple of flyer width is `0.3521 * scale`. 2.84 makes them equal.
@@ -86,6 +86,13 @@ Measured across four builds, ~29s each, same scene:
 | C | 1080p | lean | 14% |
 | D | 1080p | full | 13% |
 
+**Read that table as history, not as a description of the current builds.** It
+was measured when `ar-camera-tune.js` capped resolution DOWN. It now asks UP,
+and the letters were re-pointed to match: **A and B ask for 1080p, C and D leave
+the request untouched as a control.** The labels in `config.js` said 720p/1080p
+for one commit after the behaviour changed, so anyone who recorded `?ar=C`
+during that window measured the browser default, not 1080p.
+
 **All within noise.** Neither the 720p cap nor the lean target caused it — D
 predates both. The meal is on screen 10-14% of the time.
 
@@ -104,12 +111,12 @@ size the flyer has almost no resolvable detail. The detector still returns 120-2
 feature points a frame but they scatter across the room, and the matcher scored
 single digits across 500+ attempts.
 
-**This is NOT a device ceiling.** It is a new iPhone, and Apple's own AR is
-unaffected because ARKit gets native camera access while the web only gets
+**This is NOT known to be a device ceiling.** It is a new iPhone, and Apple's own
+AR is unaffected because ARKit gets native camera access while the web only gets
 getUserMedia, which on iOS defaults low unless explicitly constrained.
 
-Three attempts were made to constrain it, and all three failed for different
-reasons. Each looked verified in Chrome first. Recorded so nobody repeats them:
+Four attempts have been made. All four looked verified in Chrome first. Recorded
+so nobody repeats them:
 
 1. **Capping DOWN to 720p.** Wrong problem entirely. Detection cost was never the
    bottleneck; pixels on the marker are.
@@ -117,22 +124,70 @@ reasons. Each looked verified in Chrome first. Recorded so nobody repeats them:
    is non-writable on some browsers, so the assignment fails **silently** in
    non-strict code. Chrome accepted it, Safari ignored it.
 3. **`Object.defineProperty` on the instance only.** Reported `patch instance`, and
-   the device then reported `cam never called` — the override was installed on the
-   object captured at load, and mind-ar reached the camera through another one.
-   `install()` returned on first success so the prototype was never patched.
+   the device then reported `cam never called` — `install()` returned on first
+   success so the prototype was never patched.
+4. **A promise ladder whose trail lied.** Prototype + instance + legacy alias were
+   all patched, and that part works. But the diagnostic reporting it did not: the
+   `.then` handlers after each `.catch` also ran on the SUCCESS path, so a run
+   that got exact 1920x1080 recorded "exact 1920x1080 OK > exact 1280x720 OK >
+   fell back to ideal". And `.slice(-40)` cut the front off, which made "ideal
+   honoured, 1080x1920" and "ideal ignored, still 480x640" render as identical
+   text. **Had the recording been taken against that build, it would have
+   produced a confident wrong answer.** Caught by replaying the deployed bytes
+   against synthetic cameras, not by reading the source.
 
-Current state patches prototype + instance + legacy alias and traces entry and
-every exit path. **As of this writing the 1080p request has still never been
-exercised on hardware** — every 480x640 measurement so far is the UNCONSTRAINED
-default, not a refusal.
+### What the current build does
 
-The lesson worth carrying: reasoning from the mind-ar source repeatedly produced
-confident wrong answers. What worked was putting a trace in the code and letting
-the phone report. Do that first.
+One `getUserMedia` call on the customer path: `width/height: {ideal: 1920/1080}`,
+which is orientation-tolerant and, per spec, cannot raise `OverconstrainedError`.
+It either honours the hint or ignores it silently, and the recorded size says
+which. Only `OverconstrainedError` is ever retried, so a denied permission costs
+one failure rather than three.
 
-One genuine improvement did land alongside this: the run after the reticle showed
-`match 2/294 LOCKED`, the first successful locks observed, where earlier runs sat
-at zero across 400+ attempts.
+With `?xray=1` it additionally runs an `exact` ladder in **both** orientations —
+a portrait phone can refuse 1920x1080 while happily delivering 1080x1920 — then
+tries `applyConstraints` on the live track as an independent lever.
+
+**As of this writing the 1080p request has still never been exercised on
+hardware.** Every 480x640 measurement so far is the UNCONSTRAINED default, not a
+refusal.
+
+### The recording that settles it
+
+Record ~20s of, held the way a customer would hold it:
+
+```
+https://projextaxis.github.io/Steak-Out-AR-Promo/preview/?ar=A&xray=1
+```
+
+Read these three lines off the overlay. They no longer truncate, and each
+request now prints its own answer on its own line.
+
+| line | meaning |
+|---|---|
+| `CAPS  max 1920x1080` | the camera CAN do HD — anything less is a constraint problem, keep pushing |
+| `CAPS  max 640x480` | genuine ceiling for getUserMedia on this device — stop pushing, change the print instead |
+| `CAPS  unsupported` | this engine has no `getCapabilities`; fall back to reading `grant` |
+| `ask   ideal1080=1920x1080` | the hint was honoured — resolution was the problem, and it is now fixed |
+| `ask   ideal1080=480x640` | the hint was ignored; read the `exact` lines beneath it |
+| `grant …` | what mind-ar actually received |
+| `feed  …  crop …` | what the tracker sees, read independently from the video element |
+
+`CAPS` against `grant` is the whole question. A track that reports 1920 while
+`grant` reads 480x640 proves the pixels are being withheld by software, and that
+is worth another attempt. If `CAPS` reports 640x480, the web camera on this
+device genuinely cannot do better and the remaining lever is physical: print the
+flyer larger so it fills more of whatever frame we get.
+
+If the overlay does not appear at all, the AR iframe is not receiving the
+parameters — `config.js` forwards `ar=` and `xray=1` into `marker.html`, and that
+forwarding was confirmed working on the deployed preview.
+
+### Analysing the recording
+
+Use ffmpeg frame-by-frame. Do not eyeball, and do not trust a summary: an earlier
+measurement reported 79% uptime and was wrong, because the detector counted a
+yellow snack bag in frame as fries. The real figure was 20%.
 
 ## 6. Do not redo these — negative results, already paid for
 
@@ -153,6 +208,23 @@ Full detail in `tools/MARKER-TUNING.md`. Open list in `tools/AR-REFINEMENTS.md`.
 mapping on; exactly one shadow-casting light; lean target resolving at both call
 sites; camera wrapper installed before A-Frame; variant switches; model dimensions
 identical across builds; fonts self-hosted with no external font requests.
+
+Added since, all measured rather than argued:
+- `config.js` really does forward `ar=` and `xray=1` into the `marker.html`
+  iframe — read off the deployed preview, not the source.
+- mind-ar 1.2.5 asks for `{audio:false, video:{facingMode:'environment'}}`, an
+  object carrying no size, freshly on every call — read out of the shipped
+  bundle. So the wrapper's "is it unsized" guard matches, and patching
+  `MediaDevices.prototype` is reached.
+- The camera ladder replayed against synthetic cameras across nine scenarios:
+  ideal honoured, ideal ignored, exact refused in one orientation and not the
+  other, a genuine 640 ceiling, `getCapabilities` absent, permission denied, and
+  the untouched control. Every one is now distinguishable on the overlay.
+- The whole shipped pipeline driven against a synthetic 1920x1080 feed:
+  `crop 512`, 274 feature points, and a successful match. The crop formula in
+  section 4 is confirmed against the runtime — 256 at 480x640, 512 at 1080p.
+- The no-camera journey driven end to end in a browser: one `getUserMedia` call,
+  the fault panel visible and naming the cause, retry working.
 
 **NOT verified — nobody has judged these through a camera:**
 - Contact shadow opacity (0.30) and its 11 degree light tilt against a real print.
@@ -184,6 +256,21 @@ There is no camera or gyro in the dev environment. Any claim about how the AR
 - `model-viewer` does NOT ship the meshopt decoder — Draco only.
 - `track()` in `app.js` pushes to `window.dataLayer`, but **no GTM/GA is loaded**.
   Analytics is currently a no-op. Parked until the domain is settled.
+- **`mindar-image-system.start()` is synchronous and returns `undefined`.**
+  `await system.start()` therefore always resolves, even when the camera never
+  came up. It is not a signal that anything worked. mind-ar catches the
+  `getUserMedia` rejection itself and re-emits it as an **`arError`** event on the
+  scene — listen for that, not for a rejected promise.
+- **A `<canvas>` is a replaced element.** `position:fixed; inset:0` with
+  `width:auto` gives it its *intrinsic* size, which is the backing-store size in
+  CSS pixels — 750px wide on a 375px phone at dpr 2, so everything drew at double
+  scale and ran off-screen. Any full-screen canvas overlay needs an explicit
+  `width:100%; height:100%`.
+- **The compact-layout sheets hide the instruction copy.** `marker-target.css`
+  sets `.marker-instruction__copy { display:none !important }` and
+  `marker-ghost-placement.css` does the same to `.marker-status`. Anything routed
+  through `renderInstruction()` for a message the user must read will render
+  nothing. The camera fault panel has its own class for this reason.
 
 ## 9. Blocked on the owner
 

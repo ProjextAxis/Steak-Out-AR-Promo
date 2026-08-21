@@ -1,5 +1,13 @@
 # AR refinements — open list
 
+> **Superseded in part.** This file leads with a 20% uptime figure and proposes
+> the A/B/C/D experiment as future work. That experiment has since been run:
+> `tools/HANDOFF.md` section 5 reports 10-14% across all four builds, which
+> supersedes both the 20% number and the "proposed next step" below. What is
+> still live here is the suspect list, and suspect 1 in particular — physical
+> print size — which nothing has yet tested.
+
+
 Measured from `ScreenRecording_08-20-2026 23-42-17_1.mov`, 38.6s, 1320x2868, 120fps.
 
 ## The headline measurement
