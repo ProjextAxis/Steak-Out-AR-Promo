@@ -46,11 +46,19 @@
   };
 
   const wrapped = function (constraints) {
+    // Log the call before any branching, so "was the wrapper even reached" is
+    // answerable rather than inferred.
+    window.__steakoutCameraTrail = window.__steakoutCameraTrail || [];
+    window.__steakoutCameraTrail.push('called');
+
     const video = constraints && constraints.video;
     const unsized = video && typeof video === 'object' &&
                     video.width === undefined && video.height === undefined;
 
-    if (LEAVE_ALONE || !unsized) return native(constraints).then(publish);
+    if (LEAVE_ALONE || !unsized) {
+      window.__steakoutCameraTrail.push(LEAVE_ALONE ? 'skipped: variant' : 'skipped: already sized');
+      return native(constraints).then(publish);
+    }
 
     const ask = (w, h) => native({
       ...constraints,
@@ -66,7 +74,6 @@
       video: { ...video, width: { exact: w }, height: { exact: h } }
     });
 
-    window.__steakoutCameraTrail = [];
     const note = (t) => { window.__steakoutCameraTrail.push(t); };
 
     return exact(1920, 1080).then((s) => (note('exact 1920x1080 OK'), s))
