@@ -1099,3 +1099,41 @@ a {
     transition: none;
   }
 }
+
+/* Aiming guide for the centred acquisition crop. See ar-reticle.js. */
+#ar-reticle {
+  position: fixed;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: .9;
+  transition: opacity .3s ease, transform .3s ease;
+}
+
+#ar-reticle.is-locked { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+
+#ar-reticle span {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 3px solid rgba(255, 255, 255, .92);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .7));
+}
+#ar-reticle span:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 6px 0 0 0; }
+#ar-reticle span:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 6px 0 0; }
+#ar-reticle span:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 6px; }
+#ar-reticle span:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 6px 0; }
+
+#ar-reticle b {
+  position: absolute;
+  left: 50%;
+  bottom: -30px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: #fff;
+  font: 400 15px/1 var(--display);
+  letter-spacing: .06em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .85);
+}

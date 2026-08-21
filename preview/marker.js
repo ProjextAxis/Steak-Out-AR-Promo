@@ -100,8 +100,8 @@
   };
 
   const instructionStates = {
-    scanning: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Keep the full graphic in frame. Your $12 lunch will appear here.', status: '', statusState: '' },
-    holding: { step: 3, title: 'KEEP THE FULL GRAPHIC IN FRAME', body: 'Hold steady while Steak Out locks your $12 lunch to this table.', status: '', statusState: '' },
+    scanning: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Put the flyer inside the box and move a little closer.', status: '', statusState: '' },
+    holding: { step: 3, title: 'CENTRE THE GRAPHIC AND MOVE CLOSER', body: 'Hold steady while Steak Out locks your $12 lunch to this table.', status: '', statusState: '' },
     locked: { step: 4, title: 'YOUR $12 LUNCH IS RIGHT HERE', body: 'Move around it to see the portion before you order.', status: '', statusState: 'active' },
     lost: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Bring the full graphic back into frame and reduce glare.', status: '', statusState: '' },
     error: { step: 2, title: 'ALLOW THE CAMERA TO CONTINUE', body: 'Allow camera access, then close and reopen Steak Out AR.', status: 'CAMERA ERROR', statusState: 'error' }
