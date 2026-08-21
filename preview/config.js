@@ -21,8 +21,19 @@ window.STEAKOUT_AR_CONFIG = {
   marker: {
     enabled: true,
     // The printed $12 LUNCH MYSTERY flyer, compiled with tools/compile-mind.js.
-    // Scores 92 tracking / 3999 matching points against the MindAR sample's
-    // 62 / 593, so it locks on well.
+    //
+    // Do not trust a total tracking-point count. mind-ar compiles two tracking
+    // levels, at 256px and 128px on the short edge, and tracker.js reads only
+    // the second:
+    //     const TRACKING_KEYFRAME = 1; // 0: 256px, 1: 128px
+    // On that level this target scores 33 points against the MindAR sample
+    // card's 32 -- parity, not the comfortable margin a summed count implies.
+    // Matching-point counts mislead the same way: they scale with source
+    // resolution, because the pyramid builds more levels from a larger image.
+    //
+    // The practical consequence is that source resolution barely moves
+    // tracking, so a better target file is not the lever. What moves it is how
+    // much of the camera sensor the flyer physically fills, i.e. print size.
     targetMindUrl: './assets/steakout-marker.mind',
     targetPreviewUrl: './assets/steakout-marker.png',
 
