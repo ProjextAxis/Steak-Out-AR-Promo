@@ -404,11 +404,15 @@ Both figures are one power of two too high. `CropDetector` takes
 `2 ** round(log2(shortEdge / 2))`, and instantiating the real class gives 256 for
 720p, 256 for 480p, and 512 for 1080p (table in section 1).
 
-The cap is still worth keeping — tracking runs on the **full** frame, so 720p
-genuinely halves that, and it cuts video decode and texture upload. But the
-acquisition crop is 256x256 at 480p and at 720p alike, so capping at 720p does
-not reduce acquisition cost at all. Only the claimed mechanism is wrong, not the
-decision. Worth a comment fix by whoever owns that file.
+**Superseded — the cap is gone, and this advice to keep it is no longer the
+project's position.** The section above is left as written because its crop
+arithmetic is still correct and still worth knowing.
+
+What changed: the feed was later measured on device at **480x640**, and at that
+size the flyer has too little detail to match. Capping DOWN was solving the wrong
+problem — detection cost was never the bottleneck, pixels on the marker are. So
+`ar-camera-tune.js` now asks for 1080p rather than capping to 720p, and records
+what it is actually granted. See `tools/HANDOFF.md` section 5b.
 
 ### What to check on a real phone, with the real print
 
