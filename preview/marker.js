@@ -5,6 +5,7 @@
   const scene = document.querySelector('#marker-scene');
   const anchor = document.querySelector('#marker-anchor');
   const food = document.querySelector('#marker-food');
+  const shadow = document.querySelector('#marker-shadow');
   const startButton = document.querySelector('#marker-start');
   const intro = document.querySelector('#marker-intro');
   const guide = document.querySelector('#marker-scan-guide');
@@ -45,7 +46,18 @@
     status.dataset.state = state;
   };
 
+  // A model at 34% opacity still writes a fully opaque silhouette into the
+  // shadow map, so the contact shadow has to be faded by hand alongside the
+  // placement ghost or the meal floats above a solid shadow while it is still
+  // translucent. setAttribute rather than a direct call so the value survives
+  // if the component has not initialised yet.
+  const setShadowStrength = (strength) => {
+    if (!shadow || !window.AFRAME || !AFRAME.components['ar-contact-shadow']) return;
+    shadow.setAttribute('ar-contact-shadow', 'strength', strength);
+  };
+
   const setFoodOpacity = (opacity) => {
+    setShadowStrength(opacity);
     const root = food.getObject3D('mesh');
     if (!root) return;
     root.traverse((node) => {
