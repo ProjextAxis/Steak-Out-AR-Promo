@@ -1,90 +1,442 @@
-/* Public-engine diagnostic overlay. It is opt-in with ?xray=1 and never
- * participates in camera or tracking control. */
+/* Opt-in AR diagnostics. Nothing is created unless ?ar-debug=1 (or the legacy
+ * ?xray=1) is present, and no camera pixels or textures are ever retained. */
 (() => {
-  if (new URLSearchParams(location.search).get('xray') !== '1') return;
+  const params = new URLSearchParams(location.search);
+  if (params.get('ar-debug') !== '1' && params.get('xray') !== '1') return;
 
   const scene = document.querySelector('#marker-scene');
-  if (!scene) return;
+  const anchor = document.querySelector('#marker-anchor');
+  if (!scene || !anchor) return;
+
+  const PIPELINE_NAME = 'steakout-anchor-diagnostics';
+  const MAX_LOG_AGE_MS = 60000;
+  const MAX_LOG_ENTRIES = 2400;
+  const FRAME_SAMPLE_MS = 250;
+  const PANEL_UPDATE_MS = 250;
+  const FRAME_HISTORY_LIMIT = 240;
+  const log = [];
+  const listeners = [];
+  let disposed = false;
+  let pipelineInstalled = false;
+  let nextFrameSampleAt = 0;
+  let lastInvariantWarningAt = 0;
+  let lastTargetUpdateAt = 0;
+  let committedAnchor;
+  let previousRealityFrame;
+  let lastFrameAnomalyAt = 0;
+  const frameHistory = [];
+  const anomalyCaptures = [];
+
   const state = {
     camera: 'not requested',
     tracking: 'not started',
     image: 'not found',
+    anchor: 'idle',
+    anchorDetail: {},
     pose: '',
-    readyAt: 0,
-    foundAt: 0
+    lastEvent: 'debug enabled'
   };
 
-  scene.addEventListener('camerastatuschange', ({ detail = {} }) => {
+  const finite = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+  const round = (value, digits = 5) => {
+    const number = finite(value);
+    return number === null ? null : Number(number.toFixed(digits));
+  };
+
+  const safeCopy = (value, depth = 0) => {
+    if (value == null || typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? round(value) : String(value);
+    if (typeof value === 'string') return value.slice(0, 160);
+    if (depth >= 4) return '[depth]';
+    if (Array.isArray(value)) return value.slice(0, 20).map((item) => safeCopy(item, depth + 1));
+    if (typeof value !== 'object') return String(value).slice(0, 80);
+    const result = {};
+    Object.keys(value).slice(0, 30).forEach((key) => {
+      const next = value[key];
+      if (typeof next !== 'function' && !(next instanceof Node)) result[key] = safeCopy(next, depth + 1);
+    });
+    return result;
+  };
+
+  const record = (type, detail = {}) => {
+    if (disposed) return;
+    const now = performance.now();
+    log.push({ t: round(now, 3), type, detail: safeCopy(detail) });
+    while (log.length && (log.length > MAX_LOG_ENTRIES || now - log[0].t > MAX_LOG_AGE_MS)) log.shift();
+    state.lastEvent = type;
+    if (type === 'anchor-committed') committedAnchor = safeCopy(detail.anchor);
+    if (type === 'session-start' && detail.scaleMode) state.scaleMode = detail.scaleMode;
+  };
+
+  const setAnchorState = (nextState, detail = {}) => {
+    state.anchor = nextState;
+    state.anchorDetail = safeCopy(detail);
+  };
+
+  window.STEAKOUT_AR_DIAGNOSTICS = { record, setAnchorState, getLog: () => safeCopy(log) };
+  record('debug-enabled', { href: location.pathname, userAgent: navigator.userAgent, viewport: [innerWidth, innerHeight] });
+
+  const listen = (target, type, handler, options) => {
+    target.addEventListener(type, handler, options);
+    listeners.push(() => target.removeEventListener(type, handler, options));
+  };
+
+  const targetPose = (detail = {}) => {
+    const scale = finite(detail.scale);
+    const scaledWidth = finite(detail.scaledWidth);
+    const scaledHeight = finite(detail.scaledHeight);
+    return {
+      name: detail.name || '',
+      position: detail.position ? {
+        x: round(detail.position.x), y: round(detail.position.y), z: round(detail.position.z)
+      } : null,
+      rotation: detail.rotation ? {
+        x: round(detail.rotation.x), y: round(detail.rotation.y),
+        z: round(detail.rotation.z), w: round(detail.rotation.w)
+      } : null,
+      scale,
+      scaledWidth,
+      scaledHeight,
+      width: scale !== null && scaledWidth !== null ? round(scale * scaledWidth) : null,
+      height: scale !== null && scaledHeight !== null ? round(scale * scaledHeight) : null
+    };
+  };
+
+  const poseSummary = (pose) => {
+    if (!pose.position) return 'pose unavailable';
+    const p = pose.position;
+    const width = pose.width === null ? '?' : pose.width.toFixed(3);
+    return `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)} · flyer ${width}`;
+  };
+
+  listen(scene, 'camerastatuschange', ({ detail = {} }) => {
     state.camera = detail.status || 'unknown';
+    record('scene-camera-status', { status: state.camera });
   });
-  scene.addEventListener('realityready', () => {
-    state.readyAt = performance.now();
-  });
-  scene.addEventListener('xrtrackingstatus', ({ detail = {} }) => {
-    state.tracking = detail.status || detail.state || 'active';
-  });
-  scene.addEventListener('xrimagescanning', () => {
-    state.image = 'scanning';
-  });
-  scene.addEventListener('xrimagefound', ({ detail = {} }) => {
-    state.image = 'found ' + (detail.name || 'target');
-    state.foundAt = performance.now();
-    state.pose = poseSummary(detail);
-  });
-  scene.addEventListener('xrimageupdated', ({ detail = {} }) => {
-    state.image = 'tracking ' + (detail.name || 'target');
-    state.pose = poseSummary(detail);
-  });
-  scene.addEventListener('xrimagelost', ({ detail = {} }) => {
-    state.image = 'lost ' + (detail.name || 'target');
-  });
-  scene.addEventListener('realityerror', ({ detail = {} }) => {
+  listen(scene, 'realityready', () => record('scene-reality-ready'));
+  listen(scene, 'realityerror', ({ detail = {} }) => {
     const error = detail.error || detail;
-    state.camera = 'error ' + (error?.name || 'unknown');
+    state.camera = `error ${error?.name || 'unknown'}`;
+    record('scene-reality-error', { name: error?.name, message: error?.message });
+  });
+  listen(scene, 'xrtrackingstatus', ({ detail = {} }) => {
+    state.tracking = String(detail.status || detail.state || detail.trackingStatus || 'unknown').toUpperCase();
+    record('scene-tracking-status', { status: state.tracking, reason: detail.reason || detail.trackingReason });
+  });
+  listen(scene, 'xrimagescanning', () => {
+    state.image = 'scanning';
+    record('scene-image-scanning');
+  });
+  listen(scene, 'xrimagefound', ({ detail = {} }) => {
+    const pose = targetPose(detail);
+    state.image = `found ${pose.name || 'target'}`;
+    state.pose = poseSummary(pose);
+    record('scene-image-found', pose);
+  });
+  listen(scene, 'xrimageupdated', ({ detail = {} }) => {
+    const pose = targetPose(detail);
+    state.image = `tracking ${pose.name || 'target'}`;
+    state.pose = poseSummary(pose);
+    const now = performance.now();
+    if (now - lastTargetUpdateAt >= FRAME_SAMPLE_MS) {
+      lastTargetUpdateAt = now;
+      record('scene-image-updated', pose);
+    }
+  });
+  listen(scene, 'xrimagelost', ({ detail = {} }) => {
+    state.image = `lost ${detail.name || 'target'}`;
+    record('scene-image-lost', { name: detail.name || '' });
   });
 
-  const poseSummary = (detail) => {
-    const p = detail.position;
-    const width = Number(detail.scale) * Number(detail.scaledWidth);
-    if (!p) return '';
-    const widthText = Number.isFinite(width) ? width.toFixed(3) + 'm flyer' : 'width ?';
-    return `pose ${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}  ${widthText}`;
+  ['visibilitychange', 'pageshow', 'pagehide', 'orientationchange', 'focus', 'blur'].forEach((type) => {
+    const target = type === 'visibilitychange' ? document : window;
+    listen(target, type, () => record(`dom-${type}`, {
+      visibility: document.visibilityState,
+      focused: document.hasFocus(),
+      orientation: screen.orientation?.type || window.orientation,
+      viewport: [innerWidth, innerHeight]
+    }));
+  });
+  listen(window, 'message', (event) => {
+    if (event.origin !== location.origin || !/^steakout-ar-/.test(event.data?.type || '')) return;
+    record('parent-message', { type: event.data.type });
+  });
+
+  const matrix = (value) => {
+    const elements = value?.elements || value;
+    return elements && typeof elements.length === 'number'
+      ? Array.from(elements).slice(0, 16).map((entry) => round(entry))
+      : null;
+  };
+  const vector = (value) => value ? [round(value.x), round(value.y), round(value.z)] : null;
+  const quaternion = (value) => value ? [round(value.x), round(value.y), round(value.z), round(value.w)] : null;
+
+  const cameraSnapshot = () => {
+    const camera = scene.camera;
+    if (!camera) return null;
+    return {
+      position: vector(camera.position),
+      quaternion: quaternion(camera.quaternion),
+      matrixWorld: matrix(camera.matrixWorld),
+      projection: matrix(camera.projectionMatrix)
+    };
   };
 
-  const canvas = document.createElement('canvas');
-  canvas.id = 'ar-xray';
-  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:21;pointer-events:none';
-  document.body.appendChild(canvas);
+  const anchorSnapshot = () => {
+    const object = anchor.object3D;
+    if (!object) return null;
+    return {
+      visible: object.visible,
+      position: vector(object.position),
+      quaternion: quaternion(object.quaternion),
+      scale: vector(object.scale),
+      matrixWorld: matrix(object.matrixWorld)
+    };
+  };
 
-  const elapsed = (time) => time ? ((performance.now() - time) / 1000).toFixed(1) + 's' : 'never';
-  const draw = () => {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+  const quaternionDifference = (first, second) => {
+    if (!first?.every(Number.isFinite) || !second?.every(Number.isFinite)) return 0;
+    const dot = Math.abs(first.reduce((sum, entry, index) => sum + entry * second[index], 0));
+    return 2 * Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI;
+  };
+
+  const vectorDifference = (first, second) => first?.every(Number.isFinite) && second?.every(Number.isFinite)
+    ? Math.hypot(...first.map((entry, index) => entry - second[index]))
+    : 0;
+
+  const matrixDifference = (first, second) => first?.every(Number.isFinite) && second?.every(Number.isFinite)
+    ? first.reduce((maximum, entry, index) => Math.max(maximum, Math.abs(entry - second[index])), 0)
+    : 0;
+
+  const realityFrame = (result, now) => {
+    const frame = result.frameStartResult || {};
+    const reality = result.processCpuResult?.reality || result.reality || {};
+    return {
+      t: round(now, 3),
+      videoTime: finite(frame.videoTime),
+      repeatFrame: Boolean(frame.repeatFrame),
+      orientation: frame.orientation ?? null,
+      position: vector(reality.position),
+      rotation: quaternion(reality.rotation),
+      intrinsics: matrix(reality.intrinsics),
+      trackingStatus: reality.trackingStatus || null,
+      trackingReason: reality.trackingReason || null
+    };
+  };
+
+  const detectRealityAnomaly = (current, previous) => {
+    if (!committedAnchor || !previous) return null;
+    const anchorWidth = Number(committedAnchor.scale?.[0]) || 1;
+    const translationLimit = Math.max(state.scaleMode === 'absolute' ? 0.10 : 0, anchorWidth * 0.50);
+    const translation = vectorDifference(current.position, previous.position);
+    const rotation = quaternionDifference(current.rotation, previous.rotation);
+    const projection = matrixDifference(current.intrinsics, previous.intrinsics);
+    const trackingChanged = previous.trackingStatus && current.trackingStatus &&
+      previous.trackingStatus !== current.trackingStatus;
+    const reasons = [];
+    if (translation > translationLimit) reasons.push('camera-translation');
+    if (rotation > 35) reasons.push('camera-rotation');
+    if (projection > 0.08) reasons.push('projection');
+    if (trackingChanged && String(current.trackingStatus).toUpperCase() !== 'NORMAL') reasons.push('tracking');
+    return reasons.length ? { reasons, translation, translationLimit, rotation, projection } : null;
+  };
+
+  const checkAnchorInvariant = (snapshot, now) => {
+    if (!committedAnchor || !snapshot || now - lastInvariantWarningAt < 1000) return;
+    const expectedPosition = committedAnchor.position;
+    const expectedQuaternion = committedAnchor.quaternion;
+    const expectedScale = committedAnchor.scale;
+    if (!expectedPosition || !expectedQuaternion || !expectedScale) return;
+    const positionDelta = Math.hypot(...snapshot.position.map((entry, index) => entry - expectedPosition[index]));
+    const rotationDelta = quaternionDifference(snapshot.quaternion, expectedQuaternion);
+    const scaleDelta = Math.abs(snapshot.scale[0] / expectedScale[0] - 1);
+    const positionLimit = Math.max(0.002, expectedScale[0] * 0.01);
+    if (positionDelta > positionLimit || rotationDelta > 0.5 || scaleDelta > 0.005) {
+      lastInvariantWarningAt = now;
+      setAnchorState('fault', { reason: 'anchor-invariant' });
+      record('anchor-invariant-warning', { positionDelta, rotationDelta, scaleDelta, positionLimit, snapshot });
     }
-    const context = canvas.getContext('2d');
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, width, height);
-    context.font = '600 13px ui-monospace, Menlo, monospace';
-    const lines = [
-      'ENGINE 8th Wall SLAM',
-      'camera ' + state.camera,
-      'tracking ' + state.tracking,
-      'image ' + state.image,
-      state.pose || 'pose waiting',
-      'ready ' + elapsed(state.readyAt),
-      'found ' + elapsed(state.foundAt)
-    ];
-    const boxWidth = Math.min(width - 20, Math.max(...lines.map((line) => context.measureText(line).width)) + 20);
-    const lineHeight = 19;
-    context.fillStyle = 'rgba(0,0,0,.64)';
-    context.fillRect(10, 106, boxWidth, lines.length * lineHeight + 12);
-    context.fillStyle = '#7fffb1';
-    lines.forEach((line, index) => context.fillText(line, 20, 106 + lineHeight + index * lineHeight));
-    requestAnimationFrame(draw);
   };
-  draw();
+
+  const dimensions = (detail = {}) => ({
+    canvas: [finite(detail.canvasWidth || detail.canvas?.width), finite(detail.canvasHeight || detail.canvas?.height)],
+    video: [finite(detail.videoWidth), finite(detail.videoHeight)],
+    orientation: detail.orientation ?? detail.videoOrientation ?? null
+  });
+
+  const pipelineModule = {
+    name: PIPELINE_NAME,
+    onAttach: (detail) => record('pipeline-attach', dimensions(detail)),
+    onStart: (detail) => record('pipeline-start', dimensions(detail)),
+    onDetach: () => record('pipeline-detach'),
+    onRemove: () => { pipelineInstalled = false; record('pipeline-remove'); },
+    onCameraStatusChange: (detail = {}) => record('pipeline-camera-status', { status: detail.status }),
+    onPaused: () => record('pipeline-paused'),
+    onResume: () => record('pipeline-resumed'),
+    onDeviceOrientationChange: (detail) => record('pipeline-orientation', dimensions(detail)),
+    onCanvasSizeChange: (detail) => record('pipeline-canvas-size', dimensions(detail)),
+    onVideoSizeChange: (detail) => record('pipeline-video-size', dimensions(detail)),
+    onException: (error = {}) => record('pipeline-exception', { name: error.name, message: error.message }),
+    onUpdate: (result = {}) => {
+      const now = performance.now();
+      const frame = result.frameStartResult || {};
+      const currentRealityFrame = realityFrame(result, now);
+      frameHistory.push(currentRealityFrame);
+      if (frameHistory.length > FRAME_HISTORY_LIMIT) frameHistory.shift();
+      anomalyCaptures.forEach((capture) => {
+        if (capture.remaining > 0) {
+          capture.frames.push(currentRealityFrame);
+          capture.remaining -= 1;
+        }
+      });
+      const anomaly = detectRealityAnomaly(currentRealityFrame, previousRealityFrame);
+      previousRealityFrame = currentRealityFrame;
+      if (anomaly && now - lastFrameAnomalyAt >= 250) {
+        lastFrameAnomalyAt = now;
+        anomalyCaptures.push({ detectedAt: round(now, 3), anomaly, frames: [...frameHistory], remaining: 60 });
+        if (anomalyCaptures.length > 4) anomalyCaptures.shift();
+        setAnchorState('fault', { reason: anomaly.reasons.join(',') });
+        record('frame-anomaly', anomaly);
+      }
+      if (now < nextFrameSampleAt && !anomaly) return;
+      nextFrameSampleAt = now + FRAME_SAMPLE_MS;
+      const anchorState = anchorSnapshot();
+      checkAnchorInvariant(anchorState, now);
+      record('frame', {
+        videoTime: finite(frame.videoTime),
+        repeatFrame: Boolean(frame.repeatFrame),
+        orientation: frame.orientation ?? null,
+        texture: [finite(frame.textureWidth), finite(frame.textureHeight)],
+        reality: {
+          position: currentRealityFrame.position,
+          rotation: currentRealityFrame.rotation,
+          trackingStatus: currentRealityFrame.trackingStatus,
+          trackingReason: currentRealityFrame.trackingReason,
+          intrinsics: currentRealityFrame.intrinsics
+        },
+        camera: cameraSnapshot(),
+        anchor: anchorState,
+        viewport: [innerWidth, innerHeight]
+      });
+    }
+  };
+
+  const installPipeline = () => {
+    if (disposed || pipelineInstalled || !window.XR8?.addCameraPipelineModule) return;
+    window.XR8.addCameraPipelineModule(pipelineModule);
+    pipelineInstalled = true;
+    record('pipeline-installed', { name: PIPELINE_NAME });
+  };
+  installPipeline();
+  listen(window, 'xrloaded', installPipeline, { once: true });
+
+  const style = document.createElement('style');
+  style.id = 'steakout-ar-debug-style';
+  style.textContent = `
+    #steakout-ar-debug-toggle{position:fixed;left:max(7px,env(safe-area-inset-left));bottom:max(7px,env(safe-area-inset-bottom));z-index:1001;width:40px;height:40px;border:0;background:transparent;padding:0;display:grid;place-items:center;touch-action:manipulation}
+    #steakout-ar-debug-toggle span{width:9px;height:9px;border-radius:50%;background:#88929b;box-shadow:0 0 0 2px rgba(0,0,0,.7),0 0 8px rgba(255,255,255,.35)}
+    #steakout-ar-debug-toggle[data-state="camera"] span,#steakout-ar-debug-toggle[data-state="scanning"] span{background:#4ca7ff}
+    #steakout-ar-debug-toggle[data-state="candidate"] span,#steakout-ar-debug-toggle[data-state="stabilizing"] span,#steakout-ar-debug-toggle[data-state="candidate-warning"] span,#steakout-ar-debug-toggle[data-state="limited"] span{background:#ffb020}
+    #steakout-ar-debug-toggle[data-state="committed"] span{background:#43db82}
+    #steakout-ar-debug-toggle[data-state="fault"] span{background:#ff4b55}
+    #steakout-ar-debug-panel{position:fixed;left:max(8px,env(safe-area-inset-left));bottom:calc(max(8px,env(safe-area-inset-bottom)) + 45px);z-index:1001;width:min(430px,calc(100vw - 16px));max-height:55vh;overflow:auto;box-sizing:border-box;padding:12px;border:1px solid rgba(127,255,177,.4);border-radius:10px;background:rgba(0,0,0,.86);color:#dfffea;font:600 11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+    #steakout-ar-debug-panel[hidden]{display:none}
+    #steakout-ar-debug-actions{display:flex;gap:8px;margin-top:10px}
+    #steakout-ar-debug-actions button{border:1px solid rgba(255,255,255,.4);border-radius:6px;background:#151a18;color:#fff;padding:8px 10px;font:700 10px ui-monospace,Menlo,monospace}
+  `;
+  document.head.appendChild(style);
+
+  const toggle = document.createElement('button');
+  toggle.id = 'steakout-ar-debug-toggle';
+  toggle.type = 'button';
+  toggle.setAttribute('aria-label', 'Toggle AR diagnostics');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.dataset.state = 'idle';
+  toggle.appendChild(document.createElement('span'));
+
+  const panel = document.createElement('section');
+  panel.id = 'steakout-ar-debug-panel';
+  panel.hidden = true;
+  panel.setAttribute('aria-label', 'AR diagnostics');
+  const output = document.createElement('div');
+  const actions = document.createElement('div');
+  actions.id = 'steakout-ar-debug-actions';
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.textContent = 'COPY 60S LOG';
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.textContent = 'CLOSE';
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.textContent = 'REMOVE';
+  actions.append(copyButton, closeButton, removeButton);
+  panel.append(output, actions);
+  document.body.append(toggle, panel);
+
+  const render = () => {
+    toggle.dataset.state = state.anchor;
+    if (panel.hidden) return;
+    const detail = state.anchorDetail || {};
+    output.textContent = [
+      `STEAK OUT AR · ${state.scaleMode || params.get('xrscale') || 'responsive'}`,
+      `camera    ${state.camera}`,
+      `tracking  ${state.tracking}`,
+      `image     ${state.image}`,
+      `anchor    ${state.anchor}`,
+      `samples   ${detail.sampleCount ?? '-'}`,
+      `reason    ${detail.reason || '-'}`,
+      `pose      ${state.pose || 'waiting'}`,
+      `event     ${state.lastEvent}`,
+      `log       ${log.length} entries / last 60s`
+    ].join('\n');
+  };
+  const renderTimer = window.setInterval(render, PANEL_UPDATE_MS);
+
+  const setPanelOpen = (open) => {
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    render();
+  };
+  toggle.addEventListener('click', () => setPanelOpen(panel.hidden));
+  closeButton.addEventListener('click', () => setPanelOpen(false));
+  copyButton.addEventListener('click', async () => {
+    const payload = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      page: location.href,
+      entries: log,
+      anomalyCaptures
+    }, null, 2);
+    try {
+      await navigator.clipboard.writeText(payload);
+      copyButton.textContent = 'COPIED';
+    } catch (error) {
+      const textarea = document.createElement('textarea');
+      textarea.value = payload;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+      copyButton.textContent = 'COPIED';
+    }
+    window.setTimeout(() => { copyButton.textContent = 'COPY 60S LOG'; }, 1400);
+  });
+
+  const remove = () => {
+    if (disposed) return;
+    record('debug-removed');
+    disposed = true;
+    window.clearInterval(renderTimer);
+    listeners.splice(0).forEach((unlisten) => unlisten());
+    if (pipelineInstalled) {
+      try { window.XR8?.removeCameraPipelineModule?.(PIPELINE_NAME); } catch (error) { /* diagnostic cleanup only */ }
+    }
+    toggle.remove();
+    panel.remove();
+    style.remove();
+    delete window.STEAKOUT_AR_DIAGNOSTICS;
+  };
+  removeButton.addEventListener('click', remove);
+  window.STEAKOUT_AR_DIAGNOSTICS.remove = remove;
+  render();
 })();

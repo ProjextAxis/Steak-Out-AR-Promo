@@ -20,6 +20,9 @@ window.STEAKOUT_AR_CONFIG = {
 
   marker: {
     enabled: true,
+    // Target-relative scale avoids the metric calibration correction that can
+    // resize a frozen world anchor. Use ?xrscale=absolute only for A/B tests.
+    scaleMode: 'responsive',
     // Generated from the printed $12 LUNCH MYSTERY flyer with the local
     // 8th Wall image-target compiler. The target name is the event key used
     // by marker.js; keep it paired with the JSON file.
@@ -68,12 +71,13 @@ window.STEAKOUT_AR_CONFIG = {
       const parentParams = new URLSearchParams(location.search);
       // Test parameters only, and only when the parent actually carries them --
       // a customer's AR frame must arrive with none of these.
-      const passthrough = ['res', 'ret', 'warm', 'zoom']
+      const passthrough = ['res', 'ret', 'warm', 'zoom', 'xrscale']
         .map((k) => (parentParams.get(k) ? '&' + k + '=' + encodeURIComponent(parentParams.get(k)) : ''))
         .join('');
       const extra =
         (parentParams.get('ar') ? '&ar=' + (window.STEAKOUT_AR_VARIANT || 'A') : '') +
         (parentParams.get('xray') === '1' ? '&xray=1' : '') +
+        (parentParams.get('ar-debug') === '1' ? '&ar-debug=1' : '') +
         passthrough;
       const join = frame.dataset.src.indexOf('?') === -1 ? '?' : '&';
       frame.src = frame.dataset.src + (extra ? join + extra.slice(1) : '');

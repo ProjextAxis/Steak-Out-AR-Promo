@@ -1,7 +1,12 @@
 (() => {
   const config = window.STEAKOUT_AR_CONFIG || {};
   const markerConfig = config.marker || {};
-  const isEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1';
+  const queryParams = new URLSearchParams(window.location.search);
+  const isEmbedded = queryParams.get('embedded') === '1';
+  const requestedScaleMode = queryParams.get('xrscale');
+  const configuredScaleMode = requestedScaleMode || markerConfig.scaleMode || 'responsive';
+  const scaleMode = configuredScaleMode === 'absolute' ? 'absolute' : 'responsive';
+  const stability = window.SteakoutAnchorStability;
   const scene = document.querySelector('#marker-scene');
   const anchor = document.querySelector('#marker-anchor');
   const food = document.querySelector('#marker-food');
@@ -27,11 +32,37 @@
   const faultBack = document.querySelector('#marker-fault-back');
 
   if (!scene || !anchor || !food || !startButton) return;
+  if (!stability) {
+    const showDependencyFault = () => {
+      console.error('AR pose-stability helper did not load.');
+      if (faultTitle) faultTitle.textContent = 'AR COULDN\'T LOAD';
+      if (faultBody) faultBody.textContent = 'Refresh the page and try again.';
+      if (intro) intro.hidden = true;
+      if (guide) guide.hidden = true;
+      if (fault) fault.hidden = false;
+      if (isEmbedded && window.parent !== window) {
+        window.parent.postMessage({ type: 'steakout-ar-camera-error' }, window.location.origin);
+      }
+    };
+    startButton.addEventListener('click', showDependencyFault);
+    if (isEmbedded) showDependencyFault();
+    return;
+  }
 
   const BOOT_TIMEOUT_MS = 20000;
-  const TARGET_LOCK_MS = 900;
+  const TARGET_DWELL_MS = 900;
+  const TRACKING_NORMAL_MS = 500;
+  const LIFECYCLE_QUIET_MS = 750;
+  const REJECT_QUIET_MS = 400;
   const TARGET_LOST_GRACE_MS = 1600;
   const LOCKED_COPY_HIDE_MS = 2200;
+  const stabilityOptions = Object.freeze({
+    ...stability.DEFAULTS,
+    // Responsive coordinates are target-relative, not metres. In that mode,
+    // all translation gates scale only with the observed flyer width.
+    hardTranslationMetres: scaleMode === 'absolute' ? stability.DEFAULTS.hardTranslationMetres : 0,
+    stableTranslationMetres: scaleMode === 'absolute' ? stability.DEFAULTS.stableTranslationMetres : 0
+  });
 
   let startPromise;
   let stopPromise;
@@ -49,7 +80,22 @@
   let lastEngineError;
   let sessionToken = 0;
   let hasStartedEngine = false;
+  let trackingStatus = 'UNKNOWN';
+  let trackingNormalSince = 0;
+  let lastLifecycleChangeAt = performance.now();
+  let candidate;
+  let candidateEpoch = 0;
+  let lockedSnapshot;
+  let lastCommittedTargetLogAt = 0;
   const cameraWaiters = new Set();
+
+  const recordDiagnostic = (type, detail = {}) => {
+    window.STEAKOUT_AR_DIAGNOSTICS?.record(type, detail);
+  };
+
+  const setDiagnosticState = (state, detail = {}) => {
+    window.STEAKOUT_AR_DIAGNOSTICS?.setAnchorState(state, detail);
+  };
 
   const setStatus = (label, state = '') => {
     if (!status) return;
@@ -308,18 +354,14 @@
   };
 
   /* 8th Wall reports the target's local image width separately from its world
-     scale. Multiplying them converts this anchor back to one local flyer unit,
-     so the existing food scale remains a 3.2x-flyer plate rather than growing
-     by the target's 3:4 geometry ratio. */
-  const applyTargetPose = (detail) => {
-    const scale = Number(detail.scale);
-    const width = Number(detail.scaledWidth);
-    const anchorScale = scale * width;
-    if (!detail.position || !detail.rotation || !Number.isFinite(anchorScale) || anchorScale <= 0) return false;
+     scale. The validated sample has already combined those values into width,
+     keeping the existing food scale relative to one flyer width. */
+  const applyPoseSample = (sample) => {
+    if (!sample) return false;
     const object = anchor.object3D;
-    object.position.set(detail.position.x, detail.position.y, detail.position.z);
-    object.quaternion.set(detail.rotation.x, detail.rotation.y, detail.rotation.z, detail.rotation.w);
-    object.scale.setScalar(anchorScale);
+    object.position.set(sample.position.x, sample.position.y, sample.position.z);
+    object.quaternion.set(sample.rotation.x, sample.rotation.y, sample.rotation.z, sample.rotation.w);
+    object.scale.setScalar(sample.width);
     object.visible = true;
     object.updateMatrix();
     object.updateMatrixWorld(true);
@@ -328,48 +370,269 @@
 
   const isOurTarget = (event) => !markerConfig.targetName || event.detail?.name === markerConfig.targetName;
 
-  const beginTargetLock = () => {
-    targetVisible = true;
+  const poseForLog = (sample) => sample ? {
+    time: sample.time,
+    position: sample.position,
+    rotation: sample.rotation,
+    scale: sample.scale,
+    scaledWidth: sample.scaledWidth,
+    scaledHeight: sample.scaledHeight,
+    width: sample.width,
+    height: sample.height
+  } : null;
+
+  const transformSnapshot = () => {
+    const object = anchor.object3D;
+    object.updateMatrixWorld(true);
+    return {
+      position: object.position.toArray(),
+      quaternion: object.quaternion.toArray(),
+      scale: object.scale.toArray(),
+      matrix: object.matrix.toArray(),
+      matrixWorld: object.matrixWorld.toArray()
+    };
+  };
+
+  const resetCandidate = (reason, options = {}) => {
+    const { hideAnchor = true, emitLost = true, instructionState } = options;
+    clearProgressAdvance();
+    const previousCandidate = candidate;
+    if (previousCandidate) {
+      recordDiagnostic('candidate-reset', {
+        reason,
+        epoch: previousCandidate.epoch,
+        sampleCount: previousCandidate.samples.length
+      });
+    }
+    candidate = undefined;
+    if (!hasLocked && hideAnchor) anchor.object3D.visible = false;
+    if (!hasLocked && previousCandidate && emitLost) anchor.emit('targetLost');
+    if (!hasLocked && previousCandidate && instructionState && sessionActive) {
+      setPlacementGhost();
+      renderInstruction(instructionState);
+    }
+    setDiagnosticState(trackingStatus === 'NORMAL' ? 'scanning' : 'limited', { reason });
+  };
+
+  const beginCandidate = (now, source) => {
     clearProgressAdvance();
     clearLostGrace();
-    if (hasLocked) return;
+    candidate = {
+      epoch: ++candidateEpoch,
+      startedAt: now,
+      lastRejectedAt: -Infinity,
+      samples: [],
+      lastRawSample: undefined,
+      pendingOutlier: undefined
+    };
 
     anchor.emit('targetFound');
     setPlacementGhost();
     renderInstruction('holding');
-    progressAdvanceTimer = window.setTimeout(() => {
-      if (!sessionActive || !targetVisible || hasLocked) return;
-      setPlacementSolid();
-      renderInstruction('locked');
-      hasLocked = true;
+    setDiagnosticState('candidate', { epoch: candidate.epoch, source });
+    recordDiagnostic('candidate-start', { epoch: candidate.epoch, source, scaleMode });
+  };
 
-      // The world-space anchor is now intentionally frozen. XR8 SLAM keeps
-      // that pose on the table after the printed trigger leaves the camera.
-      clearLockedHide();
-      lockedHideTimer = window.setTimeout(() => {
-        if (sessionActive && hasLocked && instruction) instruction.hidden = true;
-      }, LOCKED_COPY_HIDE_MS);
-    }, TARGET_LOCK_MS);
+  const commitCandidate = (sample, evaluation, now) => {
+    if (!candidate || hasLocked || !sample) return;
+    const committedEpoch = candidate.epoch;
+    clearProgressAdvance();
+
+    // Set the guard first so no subsequent image event can write the anchor.
+    hasLocked = true;
+    applyPoseSample(sample);
+    lockedSnapshot = transformSnapshot();
+    candidate = undefined;
+    setPlacementSolid();
+    renderInstruction('locked');
+    setDiagnosticState('committed', { epoch: committedEpoch });
+    recordDiagnostic('anchor-committed', {
+      epoch: committedEpoch,
+      at: now,
+      scaleMode,
+      trackingStatus,
+      sample: poseForLog(sample),
+      evaluation: {
+        sampleCount: evaluation.sampleCount,
+        spanMs: evaluation.spanMs,
+        maxima: evaluation.maxima,
+        limits: evaluation.limits
+      },
+      anchor: lockedSnapshot
+    });
+
+    // XR8 SLAM now moves only the camera around this immutable world anchor.
+    clearLockedHide();
+    lockedHideTimer = window.setTimeout(() => {
+      if (sessionActive && hasLocked && instruction) instruction.hidden = true;
+    }, LOCKED_COPY_HIDE_MS);
+  };
+
+  const scheduleCandidateEvaluation = (now) => {
+    clearProgressAdvance();
+    if (!candidate || hasLocked || !targetVisible || trackingStatus !== 'NORMAL') return;
+    const nextEvaluationAt = Math.max(
+      candidate.startedAt + TARGET_DWELL_MS,
+      trackingNormalSince + TRACKING_NORMAL_MS,
+      lastLifecycleChangeAt + LIFECYCLE_QUIET_MS,
+      candidate.lastRejectedAt + REJECT_QUIET_MS
+    );
+    const delay = Math.max(0, Math.ceil(nextEvaluationAt - now));
+    progressAdvanceTimer = window.setTimeout(() => {
+      progressAdvanceTimer = undefined;
+      if (!candidate || hasLocked || !targetVisible) return;
+      const evaluation = stability.evaluateCluster(candidate.samples, stabilityOptions);
+      maybeCommitCandidate(performance.now(), evaluation);
+    }, delay);
+  };
+
+  function maybeCommitCandidate(now, evaluation) {
+    if (!candidate || hasLocked || !targetVisible || !evaluation.stable) return;
+    const gates = {
+      dwell: now - candidate.startedAt >= TARGET_DWELL_MS,
+      tracking: trackingStatus === 'NORMAL' && now - trackingNormalSince >= TRACKING_NORMAL_MS,
+      lifecycle: now - lastLifecycleChangeAt >= LIFECYCLE_QUIET_MS,
+      rejection: now - candidate.lastRejectedAt >= REJECT_QUIET_MS
+    };
+    recordDiagnostic('candidate-evaluated', {
+      epoch: candidate.epoch,
+      sampleCount: evaluation.sampleCount,
+      spanMs: evaluation.spanMs,
+      stable: evaluation.stable,
+      gates,
+      maxima: evaluation.maxima
+    });
+    if (Object.values(gates).every(Boolean)) commitCandidate(evaluation.medoid, evaluation, now);
+    else scheduleCandidateEvaluation(now);
+  }
+
+  const acceptTargetSample = (detail, source) => {
+    const now = performance.now();
+    const sample = stability.createPoseSample(detail, now);
+    targetVisible = true;
+
+    if (hasLocked) {
+      if (source === 'found' || now - lastCommittedTargetLogAt >= 250) {
+        lastCommittedTargetLogAt = now;
+        recordDiagnostic('target-after-commit', { source, sample: poseForLog(sample) });
+      }
+      return;
+    }
+    if (!sample) {
+      recordDiagnostic('candidate-rejected', { source, reason: 'invalid-pose' });
+      return;
+    }
+
+    if (!candidate) beginCandidate(now, source);
+    let previous = candidate.samples[candidate.samples.length - 1];
+
+    // Never mix a new pose burst with evidence older than the candidate window.
+    if (previous && now - previous.time > stabilityOptions.maxWindowMs) {
+      recordDiagnostic('candidate-restarted', { reason: 'sample-gap', previousEpoch: candidate.epoch });
+      resetCandidate('sample-gap', { hideAnchor: false, emitLost: false });
+      beginCandidate(now, 'sample-gap');
+      previous = undefined;
+    }
+
+    const previousRaw = candidate.lastRawSample;
+    candidate.lastRawSample = sample;
+
+    if (candidate.pendingOutlier && previous) {
+      const activeComparison = stability.comparePoses(sample, previous, stabilityOptions);
+      if (!activeComparison.hard) {
+        // A lone bad frame returned to the existing cluster; quarantine ends.
+        recordDiagnostic('candidate-outlier-cleared', { epoch: candidate.epoch, reason: 'returned-to-cluster' });
+        candidate.pendingOutlier = undefined;
+      } else {
+        const pending = candidate.pendingOutlier;
+        const pendingPrevious = pending.samples[pending.samples.length - 1];
+        const pendingComparison = stability.comparePoses(sample, pendingPrevious, stabilityOptions);
+        if (pendingComparison.hard) {
+          pending.startedAt = now;
+          pending.samples = [sample];
+        } else if (stability.shouldRetainSample(sample, pendingPrevious, stabilityOptions)) {
+          pending.samples.push(sample);
+        }
+
+        if (pending.samples.length >= 3) {
+          const confirmationOptions = {
+            ...stabilityOptions,
+            minSamples: 3,
+            minWindowMs: 100,
+            maxSamples: 3
+          };
+          const confirmation = stability.evaluateCluster(pending.samples.slice(-3), confirmationOptions);
+          if (confirmation.stable) {
+            candidate.startedAt = pending.startedAt;
+            candidate.samples = pending.samples.slice(-3);
+            candidate.pendingOutlier = undefined;
+            candidate.lastRejectedAt = now;
+            recordDiagnostic('candidate-restarted', {
+              reason: 'confirmed-new-cluster',
+              epoch: candidate.epoch,
+              sample: poseForLog(confirmation.medoid)
+            });
+          }
+        }
+        return;
+      }
+    }
+
+    if (previousRaw) {
+      const comparison = stability.comparePoses(sample, previousRaw, stabilityOptions);
+      if (comparison.hard) {
+        candidate.lastRejectedAt = now;
+        candidate.pendingOutlier = { startedAt: now, samples: [sample] };
+        clearProgressAdvance();
+        recordDiagnostic('candidate-rejected', {
+          epoch: candidate.epoch,
+          source,
+          reason: comparison.reasons.join(','),
+          comparison,
+          sample: poseForLog(sample)
+        });
+        setDiagnosticState('candidate-warning', { reason: comparison.reasons.join(',') });
+        return;
+      }
+    }
+
+    // Decimate high-rate target events to 20 Hz. This lets the 12-sample ring
+    // span more than 250 ms even when the engine reports at 60/120 Hz, while
+    // the hard-jump check above still examines every raw event.
+    if (!stability.shouldRetainSample(sample, previous, stabilityOptions)) return;
+
+    candidate.samples.push(sample);
+    candidate.samples = candidate.samples
+      .filter((entry) => now - entry.time <= stabilityOptions.maxWindowMs)
+      .slice(-stabilityOptions.maxSamples);
+    const evaluation = stability.evaluateCluster(candidate.samples, stabilityOptions);
+    const displayPose = evaluation.medoid || sample;
+    applyPoseSample(displayPose);
+    setDiagnosticState(evaluation.stable ? 'stabilizing' : 'candidate', {
+      epoch: candidate.epoch,
+      sampleCount: candidate.samples.length,
+      reason: evaluation.reason
+    });
+    maybeCommitCandidate(now, evaluation);
   };
 
   const onImageFound = (event) => {
     if (!sessionActive || !isOurTarget(event)) return;
-    if (hasLocked) return;
-    if (!applyTargetPose(event.detail)) return;
-    beginTargetLock();
+    acceptTargetSample(event.detail, 'found');
   };
 
   const onImageUpdated = (event) => {
-    if (!sessionActive || hasLocked || !isOurTarget(event)) return;
-    applyTargetPose(event.detail);
+    if (!sessionActive || !isOurTarget(event)) return;
+    acceptTargetSample(event.detail, 'updated');
   };
 
   const onImageLost = (event) => {
-    if (!sessionActive || hasLocked || !isOurTarget(event)) return;
+    if (!sessionActive || !isOurTarget(event)) return;
     targetVisible = false;
-    anchor.object3D.visible = false;
+    recordDiagnostic('target-lost', { committed: hasLocked, epoch: candidate?.epoch });
+    if (hasLocked) return;
     anchor.emit('targetLost');
-    clearProgressAdvance();
+    resetCandidate('target-lost', { emitLost: false });
     clearLostGrace();
     lostGraceTimer = window.setTimeout(() => {
       if (!sessionActive || targetVisible || hasLocked) return;
@@ -378,23 +641,73 @@
     }, TARGET_LOST_GRACE_MS);
   };
 
+  const normalizeTrackingStatus = (detail = {}) => String(
+    detail.status || detail.state || detail.trackingStatus || 'UNKNOWN'
+  ).toUpperCase();
+
+  const onTrackingStatus = (event) => {
+    const now = performance.now();
+    const nextStatus = normalizeTrackingStatus(event.detail);
+    const changed = nextStatus !== trackingStatus;
+    trackingStatus = nextStatus;
+    if (trackingStatus === 'NORMAL') {
+      if (changed || !trackingNormalSince) trackingNormalSince = now;
+      setDiagnosticState(hasLocked ? 'committed' : candidate ? 'candidate' : 'scanning');
+      if (candidate) {
+        const evaluation = stability.evaluateCluster(candidate.samples, stabilityOptions);
+        maybeCommitCandidate(now, evaluation);
+      }
+    } else {
+      trackingNormalSince = 0;
+      if (!hasLocked) {
+        resetCandidate(`tracking-${trackingStatus.toLowerCase()}`, { instructionState: 'scanning' });
+      }
+      setDiagnosticState('limited', { status: trackingStatus });
+    }
+    recordDiagnostic('tracking-status', { status: trackingStatus, changed });
+  };
+
+  const invalidatePreLockEvidence = (reason) => {
+    lastLifecycleChangeAt = performance.now();
+    if (!hasLocked) resetCandidate(reason, { instructionState: 'scanning' });
+    recordDiagnostic('lifecycle-epoch', { reason, committed: hasLocked });
+  };
+
   scene.addEventListener('xrimagefound', onImageFound);
   scene.addEventListener('xrimageupdated', onImageUpdated);
   scene.addEventListener('xrimagelost', onImageLost);
+  scene.addEventListener('xrtrackingstatus', onTrackingStatus);
   scene.addEventListener('realityerror', (event) => {
     lastEngineError = event.detail?.error || event.detail || new Error('AR engine failed');
+    recordDiagnostic('reality-error', {
+      name: lastEngineError?.name,
+      message: lastEngineError?.message
+    });
+    setDiagnosticState('fault');
     if (startPromise || isRunning) showFault();
   });
   scene.addEventListener('camerastatuschange', (event) => {
     const detail = event.detail || {};
-    if (detail.status === 'hasVideo' && startPromise && !faultShown) {
-      cameraLive = true;
-      resolveCameraWaiters(true);
+    recordDiagnostic('camera-status', { status: detail.status || 'unknown' });
+    if (detail.status === 'hasVideo') {
+      invalidatePreLockEvidence('camera-has-video');
+      if (startPromise && !faultShown) {
+        cameraLive = true;
+        resolveCameraWaiters(true);
+      }
     } else if (detail.status === 'failed' && (startPromise || isRunning)) {
       lastEngineError = detail.error || new Error('Camera failed to start');
+      setDiagnosticState('fault');
       showFault();
     }
   });
+
+  document.addEventListener('visibilitychange', () => {
+    invalidatePreLockEvidence(`visibility-${document.visibilityState}`);
+  });
+  window.addEventListener('blur', () => invalidatePreLockEvidence('window-blur'));
+  window.addEventListener('pageshow', () => invalidatePreLockEvidence('page-show'));
+  window.addEventListener('orientationchange', () => invalidatePreLockEvidence('orientation-change'));
 
   const armCameraWatchdog = () => {
     clearCameraWatchdog();
@@ -428,6 +741,12 @@
         clearLockedHide();
         hasLocked = false;
         targetVisible = false;
+        candidate = undefined;
+        lockedSnapshot = undefined;
+        if (!hasStartedEngine) trackingStatus = 'UNKNOWN';
+        trackingNormalSince = trackingStatus === 'NORMAL' ? performance.now() : 0;
+        lastLifecycleChangeAt = performance.now();
+        lastCommittedTargetLogAt = 0;
         sessionActive = false;
         cameraLive = false;
         lastEngineError = undefined;
@@ -451,13 +770,14 @@
         // invalidate its calibrated SLAM projection.
         armCameraWatchdog();
         const cameraReady = waitForCamera();
-        if (hasStartedEngine && engine.isPaused?.()) {
+        const wasResume = hasStartedEngine && engine.isPaused?.();
+        if (wasResume) {
           sessionActive = true;
           await engine.resume();
         } else {
           engine.XrController.configure({
             imageTargetData: [target],
-            scale: 'absolute',
+            scale: scaleMode,
             disableWorldTracking: false,
             enableLighting: true
           });
@@ -465,6 +785,8 @@
           sessionActive = true;
           scene.emit('runreality');
         }
+        recordDiagnostic('session-start', { scaleMode, resumed: Boolean(wasResume) });
+        setDiagnosticState('camera');
         await minSplashTime;
         const live = await cameraReady;
         if (runToken !== sessionToken || !live || faultShown) return;
@@ -503,6 +825,7 @@
       isRunning = false;
       sessionActive = false;
       cameraLive = false;
+      candidate = undefined;
       resolveCameraWaiters(false);
       clearCameraWatchdog();
       clearProgressAdvance();
@@ -517,6 +840,8 @@
       setPlacementGhost();
       resetVisibleUi();
       intro.hidden = isEmbedded;
+      setDiagnosticState('idle');
+      recordDiagnostic('session-stop');
     })().finally(() => { stopPromise = null; });
     return stopPromise;
   };
