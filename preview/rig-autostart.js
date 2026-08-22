@@ -61,4 +61,32 @@
 
   if (document.readyState === 'complete') begin();
   else window.addEventListener('load', begin, { once: true });
+
+  /* ------------------------------------------------------------------
+   * Remote refresh, without touching the phone.
+   *
+   * The phone is mirrored to the Mac for viewing only -- that link carries no
+   * input, so a deployed change could not be picked up without a human tapping
+   * reload. Instead the page watches its own build marker and reloads when it
+   * changes, which makes "deploy" and "refresh the phone" the same action.
+   *
+   * The first poll establishes the baseline rather than trusting a stamp
+   * compiled into the HTML, so this cannot reload-loop on a stale cache.
+   * ------------------------------------------------------------------ */
+  const POLL_MS = 8000;
+  let build = null;
+
+  const poll = async () => {
+    try {
+      const r = await fetch('./rig-version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const next = (await r.json()).build;
+      if (!next) return;
+      if (build === null) { build = next; return; }   // baseline
+      if (next !== build) location.reload();
+    } catch (e) { /* offline or mid-deploy: just try again next tick */ }
+  };
+
+  poll();
+  window.setInterval(poll, POLL_MS);
 })();
