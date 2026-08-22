@@ -24,11 +24,13 @@ assert.ok(configIndex >= 0 && configIndex < stabilityIndex && stabilityIndex < d
 assert.match(markerHtml, /scale: responsive/, 'responsive scale is the default test mode');
 assert.doesNotMatch(markerHtml, /<a-camera\s+position="0\s+0\s+0"/, 'responsive mode never starts at camera Y zero');
 assert.match(markerHtml, /<a-camera\s+position="0\s+1\.6\s+0"/, 'camera uses the calibrated nonzero start height');
-assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=20260822-huddecay/, 'parent iframe carries the new immutable cache token');
+assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=20260822-hudalways/, 'parent iframe carries the new immutable cache token');
 assert.match(indexHtml, /allow="[^"]*clipboard-write/, 'AR iframe grants clipboard-write so the diagnostics log can be saved/copied');
 assert.match(configSource, /'ar-debug'/, 'parent forwards the opt-in diagnostics flag');
 assert.match(configSource, /'xrscale'/, 'parent forwards the scale A\/B flag');
-assert.match(diagnosticsSource, /params\.get\('ar-debug'\) !== '1'/,
-  'diagnostics exit before creating runtime work for normal customers');
+assert.match(diagnosticsSource, /const ALWAYS_ON = true;/,
+  'RIG MODE: HUD is always on (flip ALWAYS_ON to false before customer ship)');
+assert.match(diagnosticsSource, /!ALWAYS_ON && params\.get\('ar-debug'\) !== '1'/,
+  'with ALWAYS_ON false, diagnostics still exit early for normal customers');
 
 console.log('static AR entry tests passed');

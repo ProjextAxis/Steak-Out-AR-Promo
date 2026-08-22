@@ -1,8 +1,13 @@
-/* Opt-in AR diagnostics. Nothing is created unless ?ar-debug=1 (or the legacy
- * ?xray=1) is present, and no camera pixels or textures are ever retained. */
+/* AR diagnostics. No camera pixels or textures are ever retained.
+ *
+ * RIG MODE: with ALWAYS_ON the HUD is on screen permanently and cannot be
+ * tapped shut, because the test phone is bolted to the gimbal and cannot be
+ * tapped at all. Set ALWAYS_ON = false to restore the opt-in ?ar-debug=1
+ * behaviour -- do that before this is live in front of customers. */
 (() => {
+  const ALWAYS_ON = true;
   const params = new URLSearchParams(location.search);
-  if (params.get('ar-debug') !== '1' && params.get('xray') !== '1') return;
+  if (!ALWAYS_ON && params.get('ar-debug') !== '1' && params.get('xray') !== '1') return;
 
   const scene = document.querySelector('#marker-scene');
   const anchor = document.querySelector('#marker-anchor');
@@ -373,17 +378,16 @@
   `;
   document.head.appendChild(style);
 
-  const toggle = document.createElement('button');
+  const toggle = document.createElement('div');
   toggle.id = 'steakout-ar-debug-toggle';
-  toggle.type = 'button';
-  toggle.setAttribute('aria-label', 'Toggle AR diagnostics');
-  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('role', 'status');
+  toggle.setAttribute('aria-label', 'AR anchor state');
   toggle.dataset.state = 'idle';
   toggle.appendChild(document.createElement('span'));
 
   const panel = document.createElement('section');
   panel.id = 'steakout-ar-debug-panel';
-  panel.hidden = true;
+  panel.hidden = false;
   panel.setAttribute('aria-label', 'AR diagnostics');
   const output = document.createElement('div');
   const actions = document.createElement('div');
@@ -391,13 +395,10 @@
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.textContent = 'SAVE 60S LOG';
-  const closeButton = document.createElement('button');
-  closeButton.type = 'button';
-  closeButton.textContent = 'CLOSE';
   const removeButton = document.createElement('button');
   removeButton.type = 'button';
   removeButton.textContent = 'REMOVE';
-  actions.append(copyButton, closeButton, removeButton);
+  actions.append(copyButton, removeButton);
   panel.append(output, actions);
   document.body.append(toggle, panel);
 
@@ -422,13 +423,6 @@
   };
   const renderTimer = window.setInterval(render, PANEL_UPDATE_MS);
 
-  const setPanelOpen = (open) => {
-    panel.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
-    render();
-  };
-  toggle.addEventListener('click', () => setPanelOpen(panel.hidden));
-  closeButton.addEventListener('click', () => setPanelOpen(false));
   const flashButton = (text) => {
     copyButton.textContent = text;
     window.setTimeout(() => { copyButton.textContent = 'SAVE 60S LOG'; }, 2200);
