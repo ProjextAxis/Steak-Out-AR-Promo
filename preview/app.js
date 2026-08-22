@@ -285,7 +285,28 @@
     } else if (arStatus === 'not-presenting') setStatus('3D READY', 'ready');
   });
 
+  /* iOS requires this permission request to originate in the top-level tap,
+     not in the iframe reached through postMessage. It is a no-op everywhere
+     else and intentionally runs before the AR frame is asked to start. */
+  const requestMotionPermissions = () => {
+    const requests = [];
+    try {
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        requests.push(DeviceMotionEvent.requestPermission());
+      }
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        requests.push(DeviceOrientationEvent.requestPermission());
+      }
+    } catch (error) {
+      console.warn('Could not request motion permission:', error);
+    }
+    if (requests.length) Promise.allSettled(requests).catch(() => {});
+  };
+
   const launchAR = async () => {
+    requestMotionPermissions();
     track('ar_launch_tapped', { mode: activeMode, item: config.itemName || 'test-food' });
 
     // Steak Out AR is always the branded in-page camera. Apple's AR Quick Look

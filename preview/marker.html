@@ -10,29 +10,29 @@
         href="./assets/fonts/bebas-neue-latin.woff2" />
   <link rel="preload" as="font" type="font/woff" crossorigin
         href="./assets/fonts/rustler.woff" />
-  <!-- mind-ar only fetches the tracking target inside _startAR, i.e. AFTER
-       getUserMedia resolves, so on a slow connection the customer gets a live
-       camera that cannot possibly track until half a megabyte arrives, with
-       uiLoading:no suppressing any indicator. Starting the fetch here overlaps
-       it with the permission prompt. Keep in sync with config.js targetMindUrl;
-       ?ar=B and ?ar=D load the larger full target instead and are not covered. -->
-  <link rel="preload" as="fetch" crossorigin
-        href="./assets/steakout-marker-lean.mind" />
+  <!-- Preload the local target metadata and luminance image while the customer
+       is reading the existing start sheet. This never opens the camera. -->
+  <link rel="preload" as="fetch" crossorigin="anonymous"
+        href="./assets/steakout-flyer.json" />
+  <link rel="preload" as="fetch" crossorigin="anonymous"
+        href="./assets/image-targets/steakout-flyer_luminance.png" />
   <link rel="stylesheet" href="./fonts.css?v=20260820-self-hosted" />
   <link rel="stylesheet" href="./marker.css?v=20260821-camlive" />
   <link rel="stylesheet" href="./marker-target.css?v=20260819-approved-target" />
   <link rel="stylesheet" href="./marker-panel-tight.css?v=20260819-tight-panel" />
   <link rel="stylesheet" href="./marker-panel-compact.css?v=20260819-force-compact-1" />
   <link rel="stylesheet" href="./marker-ghost-placement.css?v=20260819-ghost-placement" />
-  <script src="./ar-camera-tune.js?v=20260821-honest"></script>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <script defer src="./config.js?v=20260821-sweep"></script>
-  <script defer src="./ar-reticle.js?v=20260821-span1"></script>
-  <script defer src="./ar-xray.js?v=20260821-honest"></script>
+  <!-- This product includes the XR Engine software developed by Niantic
+       Spatial, Inc. Copyright © 2026 Niantic Spatial, Inc. All rights reserved.
+       License: ./vendor/8thwall/LICENSE -->
+  <script src="./vendor/8frame/aframe-v1.5.0.min.js"></script>
+  <script src="./vendor/8thwall/xr.js" data-preload-chunks="slam"></script>
+  <script defer src="./config.js?v=20260821-8w"></script>
+  <script defer src="./ar-reticle.js?v=20260821-8w"></script>
+  <script defer src="./ar-xray.js?v=20260821-8w"></script>
   <script defer src="./ar-lighting.js?v=20260821-ibl"></script>
   <script defer src="./ar-shadow.js?v=20260820-contact-shadow-0f6e623"></script>
-  <script defer src="./marker.js?v=20260821-sweep"></script>
+  <script defer src="./marker.js?v=20260821-8w"></script>
   <script defer src="./marker-splash-fix.js?v=20260819-transparent-svg"></script>
 </head>
 <body>
@@ -73,13 +73,8 @@
 
     <div class="marker-scan-guide" id="marker-scan-guide" hidden aria-hidden="true"><span class="scan-corners"></span></div>
 
-    <!-- The camera can fail in ways nothing else in this page surfaces: a
-         denied permission, an in-app webview that blocks getUserMedia, or a
-         CDN that never delivers A-Frame. mind-ar swallows all of them into an
-         `arError` event nobody used to listen for, leaving the customer on a
-         black screen being told to aim at a flyer. This is that missing
-         surface. Its own class, so the compact-layout sheets that hide
-         .marker-instruction__copy and .marker-status cannot hide it too. -->
+    <!-- Keep camera and engine failures above the AR HUD, rather than leaving
+         a customer with a black screen and no recovery action. -->
     <div class="marker-fault" id="marker-fault" hidden role="alert" aria-live="assertive">
       <div class="marker-fault__panel">
         <strong id="marker-fault-title">THE CAMERA DIDN&rsquo;T START</strong>
@@ -107,11 +102,11 @@
 
     <a class="marker-order" id="marker-order" href="https://order.toasttab.com/online/steakout-sewell" target="_top" aria-label="Order Steak Out on Toast" hidden>ORDER NOW</a>
 
-    <a-scene id="marker-scene" ar-environment mindar-image="imageTargetSrc: ./assets/steakout-marker-lean.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000; missTolerance: 10; warmupTolerance: 2" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-scene id="marker-scene" ar-environment xrweb="delayRun: true; cameraDirection: back; allowedDevices: mobile; disableDefaultEnvironment: true; disableDesktopCameraControls: true; disableDesktopTouchEmulation: true; disableXrTablet: true; disableXrTouchEmulation: true; scale: absolute; disableWorldTracking: false; enableLighting: true" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
       <!-- Both children stay untransformed: ar-shadow.js measures the meal in the
            anchor's own space and drops the shadow straight into it. -->
-      <a-entity id="marker-anchor" mindar-image-target="targetIndex: 0"><a-entity id="marker-shadow" ar-contact-shadow="caster: #marker-food"></a-entity><a-gltf-model id="marker-food" shadow="cast: true; receive: false"></a-gltf-model></a-entity>
+      <a-entity id="marker-anchor" visible="false"><a-entity id="marker-shadow" ar-contact-shadow="caster: #marker-food"></a-entity><a-gltf-model id="marker-food" shadow="cast: true; receive: false"></a-gltf-model></a-entity>
     </a-scene>
   </div>
 </body>

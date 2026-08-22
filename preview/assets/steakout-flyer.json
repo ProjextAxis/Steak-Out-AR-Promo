@@ -1,0 +1,23 @@
+{
+  "imagePath": "image-targets/steakout-flyer_luminance.png",
+  "metadata": null,
+  "name": "steakout-flyer",
+  "type": "PLANAR",
+  "properties": {
+    "left": 0,
+    "top": 66,
+    "width": 1038,
+    "height": 1384,
+    "isRotated": false,
+    "originalWidth": 1038,
+    "originalHeight": 1515
+  },
+  "resources": {
+    "originalImage": "steakout-flyer_original.png",
+    "croppedImage": "steakout-flyer_cropped.png",
+    "thumbnailImage": "steakout-flyer_thumbnail.png",
+    "luminanceImage": "steakout-flyer_luminance.png"
+  },
+  "created": 1787365826539,
+  "updated": 1787365826539
+}

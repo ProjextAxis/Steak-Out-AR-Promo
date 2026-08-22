@@ -28,39 +28,28 @@
 
   if (!scene || !anchor || !food || !startButton) return;
 
-  // marker.html hard-codes a sample target in its mindar-image attribute, so
-  // config.marker.targetMindUrl was doing nothing. Swapping the printed marker
-  // should be one config change, not an edit in two files.
-  if (markerConfig.targetMindUrl) {
-    scene.setAttribute('mindar-image', 'imageTargetSrc', markerConfig.targetMindUrl);
-  }
+  const BOOT_TIMEOUT_MS = 20000;
+  const TARGET_LOCK_MS = 900;
+  const TARGET_LOST_GRACE_MS = 1600;
+  const LOCKED_COPY_HIDE_MS = 2200;
 
-  /* ?warm=N overrides warmupTolerance for a measured run. Default unchanged.
-   *
-   * From the shipped bundle, this is what it gates -- note trackCount only
-   * survives while isTracking stays true, so it is CONSECUTIVE frames:
-   *
-   *   i.isTracking && (i.trackMiss = 0, i.trackCount += 1,
-   *     i.trackCount > this.warmupTolerance && (i.showing = !0, ...))
-   *
-   * At 2 the meal needs three consecutive tracked frames before it appears.
-   * Today's recording matched on only ~5% of attempts, so demanding a run of
-   * three is plausibly a real part of the 6.85s to first lock -- but lowering
-   * it also lets a bad pose show, so it is switchable, not changed. */
-  const warmOverride = parseInt(new URLSearchParams(window.location.search).get('warm'), 10);
-  if (Number.isFinite(warmOverride) && warmOverride >= 0 && warmOverride <= 10) {
-    scene.setAttribute('mindar-image', 'warmupTolerance', warmOverride);
-  }
-
-  let arSystem;
   let startPromise;
   let stopPromise;
+  let targetDataPromise;
   let isRunning = false;
+  let sessionActive = false;
+  let cameraLive = false;
   let targetVisible = false;
-  let progressAdvanceTimer;
   let hasLocked = false;
+  let progressAdvanceTimer;
   let lostGraceTimer;
   let lockedHideTimer;
+  let cameraWatchdog;
+  let faultShown = false;
+  let lastEngineError;
+  let sessionToken = 0;
+  let hasStartedEngine = false;
+  const cameraWaiters = new Set();
 
   const setStatus = (label, state = '') => {
     if (!status) return;
@@ -68,11 +57,6 @@
     status.dataset.state = state;
   };
 
-  // A model at 34% opacity still writes a fully opaque silhouette into the
-  // shadow map, so the contact shadow has to be faded by hand alongside the
-  // placement ghost or the meal floats above a solid shadow while it is still
-  // translucent. setAttribute rather than a direct call so the value survives
-  // if the component has not initialised yet.
   const setShadowStrength = (strength) => {
     if (!shadow || !window.AFRAME || !AFRAME.components['ar-contact-shadow']) return;
     shadow.setAttribute('ar-contact-shadow', 'strength', strength);
@@ -111,6 +95,23 @@
     window.parent.postMessage({ type }, window.location.origin);
   };
 
+  const requestTopLevelMotionPermissions = () => {
+    const requests = [];
+    try {
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        requests.push(DeviceMotionEvent.requestPermission());
+      }
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        requests.push(DeviceOrientationEvent.requestPermission());
+      }
+    } catch (error) {
+      console.warn('Could not request motion permission:', error);
+    }
+    if (requests.length) Promise.allSettled(requests).catch(() => {});
+  };
+
   const setProgressStep = (currentStep) => {
     if (instruction) instruction.dataset.currentStep = String(currentStep);
     progressSteps.forEach((progressStep) => {
@@ -140,43 +141,46 @@
     setStatus(next.status, next.statusState);
   };
 
-  /* These fallbacks must match what config.js actually ships, or a dropped key
-   * renders the plate at a wildly wrong size. '0 0 0.12' and 0.32 were
-   * README-era values: 0.32 puts the meal at about 11% of the flyer's width
-   * instead of 3.2x it, a 28-fold error that would look like a broken model
-   * rather than a missing config value. */
   food.setAttribute('src', config.modelUrl || '');
   food.setAttribute('position', markerConfig.modelPosition || '0 0 0');
   food.setAttribute('rotation', markerConfig.modelRotation || '90 0 0');
-  const modelScale = Number(markerConfig.modelScale || 9.0);
+  const modelScale = Number(markerConfig.modelScale || 9);
   food.setAttribute('scale', `${modelScale} ${modelScale} ${modelScale}`);
-  food.addEventListener('model-loaded', () => setPlacementGhost());
+  food.addEventListener('model-loaded', () => hasLocked ? setPlacementSolid() : setPlacementGhost());
 
   if (orderLink && config.orderUrl) orderLink.href = config.orderUrl;
   if (instagramLink && config.social?.instagramUrl) instagramLink.href = config.social.instagramUrl;
   if (facebookLink && config.social?.facebookUrl) facebookLink.href = config.social.facebookUrl;
 
-  /* A-Frame and mind-ar both come from CDNs (HANDOFF section 9 flags this as
-   * unmitigated). If either never arrives, <a-scene> stays an unknown element,
-   * its 'loaded' event never fires, and an unguarded await here would hang for
-   * ever -- silently, because there is nothing to reject. Time it out so the
-   * failure reaches the fault panel instead of nothing at all. Generous:
-   * A-Frame is ~378 KB gzipped and a restaurant connection is not a desk. */
-  const AFRAME_BOOT_MS = 20000;
-
-  const getArSystem = async () => {
-    if (arSystem) return arSystem;
-    if (!scene.hasLoaded) {
-      await new Promise((resolve, reject) => {
-        const timer = window.setTimeout(
-          () => reject(new Error('A-Frame did not boot within ' + AFRAME_BOOT_MS + 'ms')),
-          AFRAME_BOOT_MS);
-        scene.addEventListener('loaded', () => { window.clearTimeout(timer); resolve(); }, { once: true });
-      });
-    }
-    arSystem = scene.systems['mindar-image-system'];
-    return arSystem;
+  const clearProgressAdvance = () => {
+    window.clearTimeout(progressAdvanceTimer);
+    progressAdvanceTimer = undefined;
   };
+
+  const clearLostGrace = () => {
+    window.clearTimeout(lostGraceTimer);
+    lostGraceTimer = undefined;
+  };
+
+  const clearLockedHide = () => {
+    window.clearTimeout(lockedHideTimer);
+    lockedHideTimer = undefined;
+  };
+
+  const clearCameraWatchdog = () => {
+    window.clearTimeout(cameraWatchdog);
+    cameraWatchdog = undefined;
+  };
+
+  const resolveCameraWaiters = (value) => {
+    cameraWaiters.forEach((resolve) => resolve(value));
+    cameraWaiters.clear();
+  };
+
+  const waitForCamera = () => new Promise((resolve) => {
+    if (cameraLive) return resolve(true);
+    cameraWaiters.add(resolve);
+  });
 
   const showSplash = () => {
     if (!splash) return;
@@ -194,116 +198,33 @@
     splash.classList.remove('is-live', 'is-revealing');
   };
 
-  const clearProgressAdvance = () => {
-    window.clearTimeout(progressAdvanceTimer);
-    progressAdvanceTimer = undefined;
+  const errorSummary = () => {
+    const error = lastEngineError || {};
+    return [error.name, error.message, error.type].filter(Boolean).join(' ');
   };
-
-  const clearLostGrace = () => {
-    window.clearTimeout(lostGraceTimer);
-    lostGraceTimer = undefined;
-  };
-
-  const clearLockedHide = () => {
-    window.clearTimeout(lockedHideTimer);
-    lockedHideTimer = undefined;
-  };
-
-  /* Camera failure used to be completely silent, for three stacked reasons:
-   *   - mind-ar's system.start() is synchronous and returns undefined, so the
-   *     `await system.start()` below always resolves even when the camera died;
-   *   - _startVideo catches the getUserMedia rejection itself and re-emits it
-   *     as an `arError` event, which nothing in this repo listened for;
-   *   - the 'error' instruction state renders into .marker-instruction__copy
-   *     and .marker-status, both of which the compact-layout sheets hide with
-   *     display:none !important.
-   * The customer was left on a black screen reading "POINT BACK AT THE TABLE
-   * GRAPHIC". This is the missing detection and the missing surface.
-   *
-   * ar-camera-tune.js already recorded WHY the request failed, so name the
-   * cause rather than offering one generic apology for four different faults. */
-  let faultShown = false;
-  let cameraWatchdog;
-
-  const clearCameraWatchdog = () => {
-    window.clearTimeout(cameraWatchdog);
-    cameraWatchdog = undefined;
-  };
-
-  /* The LAST video, not the first.
-   *
-   * mind-ar's stop() reads this.video.srcObject.getTracks() before it calls
-   * this.video.remove(), so a session whose getUserMedia rejected throws on
-   * that first line and never removes its element. Each failed retry therefore
-   * leaves another dead <video> in the shell, and querySelector would keep
-   * returning the oldest one -- reporting "not live" forever even once a later
-   * attempt succeeded. */
-  const cameraLooksLive = () => {
-    const vs = document.querySelectorAll('.marker-shell video, a-scene video');
-    const v = vs[vs.length - 1];
-    return !!(v && v.videoWidth > 0);
-  };
-
-  // Clear out the corpses before a fresh attempt, for the same reason.
-  const removeDeadVideos = () => {
-    document.querySelectorAll('.marker-shell video').forEach((v) => {
-      if (!v.srcObject) v.remove();
-    });
-  };
-
-  /* Resolves true once the camera is genuinely producing frames, false if the
-   * fault surfaced first. There is no timeout here on purpose: the watchdog
-   * owns that, and when it fires it sets faultShown, which this sees. */
-  let cameraProbe;
-  const clearCameraProbe = () => {
-    window.clearInterval(cameraProbe);
-    cameraProbe = undefined;
-  };
-  const waitForCamera = () => new Promise((resolve) => {
-    if (cameraLooksLive()) return resolve(true);
-    clearCameraProbe();
-    cameraProbe = window.setInterval(() => {
-      if (cameraLooksLive()) { clearCameraProbe(); resolve(true); }
-      else if (faultShown || !startPromise) { clearCameraProbe(); resolve(false); }
-    }, 200);
-  });
 
   const faultCopy = () => {
-    const summary = (window.__steakoutCamera && window.__steakoutCamera.summary) || '';
+    const summary = errorSummary();
     if (/NotAllowedError|SecurityError|PermissionDenied/i.test(summary)) {
       return {
         title: 'CAMERA ACCESS IS OFF',
         body: 'Tap Allow when your phone asks. If you already said no, turn the camera on for this site in your browser settings.'
       };
     }
-    if (/NotReadableError|AbortError|TrackStartError/i.test(summary)) {
+    if (/NotReadableError|AbortError|TrackStartError|busy/i.test(summary)) {
       return {
         title: 'THE CAMERA IS BUSY',
         body: 'Another app may be using it. Close your other camera apps, then try again.'
       };
     }
-    if (/NotFoundError|OverconstrainedError|DevicesNotFound/i.test(summary)) {
+    if (/NotFoundError|OverconstrainedError|DevicesNotFound|unsupported/i.test(summary)) {
       return {
         title: 'NO CAMERA AVAILABLE',
         body: 'This device did not offer a camera we can use. Try opening this page in Safari or Chrome directly.'
       };
     }
-    /* The request was made and never answered. In practice this is a permission
-     * prompt the customer has not tapped, or a webview that opens no prompt at
-     * all. Distinguishable because ar-camera-tune.js resets summary to
-     * 'in progress' at the top of every attempt and only replaces it on an
-     * outcome. */
-    if (summary === 'in progress') {
-      return {
-        title: 'WAITING ON THE CAMERA',
-        body: 'Your phone should be asking for camera permission — tap Allow. If you never saw the prompt, reload the page and try again.'
-      };
-    }
-
-    // No report at all: the wrapper never ran, so A-Frame or mind-ar never
-    // arrived. That is the CDN case HANDOFF section 9 flags as unmitigated.
     return {
-      title: 'AR COULDN\u2019T LOAD',
+      title: 'AR COULDN\'T LOAD',
       body: 'Check your connection and try again. If you opened this from another app, try opening it in your browser instead.'
     };
   };
@@ -311,6 +232,8 @@
   const showFault = () => {
     if (!fault || faultShown) return;
     faultShown = true;
+    sessionActive = false;
+    resolveCameraWaiters(false);
     clearCameraWatchdog();
     clearProgressAdvance();
     const copy = faultCopy();
@@ -321,11 +244,6 @@
     if (instruction) instruction.hidden = true;
     if (socialDock) socialDock.hidden = true;
     if (orderLink) orderLink.hidden = true;
-    /* The intro is position:fixed inset:0 with an opaque background at
-     * z-index 18. On a non-embedded visit the catch path sets
-     * intro.hidden = isEmbedded (i.e. false) BEFORE raising the fault, so the
-     * error would sit in the DOM completely covered. Hide it here rather than
-     * relying on stacking order alone. */
     intro.hidden = true;
     fault.hidden = false;
     postToParent('steakout-ar-camera-error');
@@ -336,26 +254,165 @@
     if (fault) fault.hidden = true;
   };
 
-  // mind-ar emits this for a failed getUserMedia and for an unsupported
-  // browser. It is the fast, definite signal; the watchdog below is the
-  // backstop for the cases that hang instead of erroring.
-  scene.addEventListener('arError', showFault);
+  const waitFor = (test, message) => new Promise((resolve, reject) => {
+    if (test()) return resolve();
+    const started = Date.now();
+    const probe = window.setInterval(() => {
+      if (test()) {
+        window.clearInterval(probe);
+        resolve();
+      } else if (Date.now() - started >= BOOT_TIMEOUT_MS) {
+        window.clearInterval(probe);
+        reject(new Error(message));
+      }
+    }, 40);
+  });
+
+  const waitForEvent = (target, name, timeoutMessage) => new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      target.removeEventListener(name, done);
+      reject(new Error(timeoutMessage));
+    }, BOOT_TIMEOUT_MS);
+    const done = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    target.addEventListener(name, done, { once: true });
+  });
+
+  const getEngine = async () => {
+    if (!scene.hasLoaded) await waitForEvent(scene, 'loaded', 'A-Frame did not boot within 20000ms');
+    if (!window.XR8?.XrController) {
+      await waitForEvent(window, 'xrloaded', 'The AR engine did not boot within 20000ms');
+    }
+    await waitFor(() => !!(scene.components.xrweb && scene.components.xrconfig), 'The AR scene did not initialize within 20000ms');
+    return window.XR8;
+  };
+
+  const getTargetData = () => {
+    if (targetDataPromise) return targetDataPromise;
+    targetDataPromise = (async () => {
+      const source = markerConfig.targetDataUrl;
+      if (!source) throw new Error('Missing image target data URL.');
+      const url = new URL(source, window.location.href).href;
+      const response = await fetch(url, { cache: 'force-cache' });
+      if (!response.ok) throw new Error(`Image target ${response.status}`);
+      const target = await response.json();
+      target.imagePath = new URL(target.imagePath, url).href;
+      return target;
+    })().catch((error) => {
+      targetDataPromise = undefined;
+      throw error;
+    });
+    return targetDataPromise;
+  };
+
+  /* 8th Wall reports the target's local image width separately from its world
+     scale. Multiplying them converts this anchor back to one local flyer unit,
+     so the existing food scale remains a 3.2x-flyer plate rather than growing
+     by the target's 3:4 geometry ratio. */
+  const applyTargetPose = (detail) => {
+    const scale = Number(detail.scale);
+    const width = Number(detail.scaledWidth);
+    const anchorScale = scale * width;
+    if (!detail.position || !detail.rotation || !Number.isFinite(anchorScale) || anchorScale <= 0) return false;
+    const object = anchor.object3D;
+    object.position.set(detail.position.x, detail.position.y, detail.position.z);
+    object.quaternion.set(detail.rotation.x, detail.rotation.y, detail.rotation.z, detail.rotation.w);
+    object.scale.setScalar(anchorScale);
+    object.visible = true;
+    object.updateMatrix();
+    object.updateMatrixWorld(true);
+    return true;
+  };
+
+  const isOurTarget = (event) => !markerConfig.targetName || event.detail?.name === markerConfig.targetName;
+
+  const beginTargetLock = () => {
+    targetVisible = true;
+    clearProgressAdvance();
+    clearLostGrace();
+    if (hasLocked) return;
+
+    anchor.emit('targetFound');
+    setPlacementGhost();
+    renderInstruction('holding');
+    progressAdvanceTimer = window.setTimeout(() => {
+      if (!sessionActive || !targetVisible || hasLocked) return;
+      setPlacementSolid();
+      renderInstruction('locked');
+      hasLocked = true;
+
+      // The world-space anchor is now intentionally frozen. XR8 SLAM keeps
+      // that pose on the table after the printed trigger leaves the camera.
+      clearLockedHide();
+      lockedHideTimer = window.setTimeout(() => {
+        if (sessionActive && hasLocked && instruction) instruction.hidden = true;
+      }, LOCKED_COPY_HIDE_MS);
+    }, TARGET_LOCK_MS);
+  };
+
+  const onImageFound = (event) => {
+    if (!sessionActive || !isOurTarget(event)) return;
+    if (hasLocked) return;
+    if (!applyTargetPose(event.detail)) return;
+    beginTargetLock();
+  };
+
+  const onImageUpdated = (event) => {
+    if (!sessionActive || hasLocked || !isOurTarget(event)) return;
+    applyTargetPose(event.detail);
+  };
+
+  const onImageLost = (event) => {
+    if (!sessionActive || hasLocked || !isOurTarget(event)) return;
+    targetVisible = false;
+    anchor.object3D.visible = false;
+    anchor.emit('targetLost');
+    clearProgressAdvance();
+    clearLostGrace();
+    lostGraceTimer = window.setTimeout(() => {
+      if (!sessionActive || targetVisible || hasLocked) return;
+      setPlacementGhost();
+      renderInstruction('lost');
+    }, TARGET_LOST_GRACE_MS);
+  };
+
+  scene.addEventListener('xrimagefound', onImageFound);
+  scene.addEventListener('xrimageupdated', onImageUpdated);
+  scene.addEventListener('xrimagelost', onImageLost);
+  scene.addEventListener('realityerror', (event) => {
+    lastEngineError = event.detail?.error || event.detail || new Error('AR engine failed');
+    if (startPromise || isRunning) showFault();
+  });
+  scene.addEventListener('camerastatuschange', (event) => {
+    const detail = event.detail || {};
+    if (detail.status === 'hasVideo' && startPromise && !faultShown) {
+      cameraLive = true;
+      resolveCameraWaiters(true);
+    } else if (detail.status === 'failed' && (startPromise || isRunning)) {
+      lastEngineError = detail.error || new Error('Camera failed to start');
+      showFault();
+    }
+  });
 
   const armCameraWatchdog = () => {
     clearCameraWatchdog();
-    /* Generous on purpose. The permission prompt sits in front of the user for
-     * an unknown time, and mind-ar only fetches the .mind target AFTER
-     * getUserMedia resolves -- half a megabyte on a restaurant connection.
-     *
-     * It is disarmed ONLY by waitForCamera() seeing real frames. An earlier
-     * version cleared it as soon as `await system.start()` returned, which is
-     * ~1.25s in and proves nothing -- start() is synchronous and returns
-     * undefined. That cancelled the backstop before any of the cases it exists
-     * for could reach it, and a hung getUserMedia left the customer on a black
-     * screen reading "PUT THE FLYER IN HERE" indefinitely. */
     cameraWatchdog = window.setTimeout(() => {
-      if (!cameraLooksLive()) showFault();
-    }, 20000);
+      if (!cameraLive) {
+        lastEngineError = new Error('Camera did not provide video in time');
+        showFault();
+      }
+    }, BOOT_TIMEOUT_MS);
+  };
+
+  const resetVisibleUi = () => {
+    if (splash) splash.hidden = true;
+    guide.hidden = true;
+    if (instruction) instruction.hidden = true;
+    if (socialDock) socialDock.hidden = true;
+    if (orderLink) orderLink.hidden = true;
+    setStatus('');
   };
 
   const start = () => {
@@ -363,16 +420,19 @@
     if (isRunning) return Promise.resolve();
     if (startPromise) return startPromise;
 
-    startPromise = (async () => {
+    const runToken = ++sessionToken;
+    const operation = (async () => {
       try {
         clearProgressAdvance();
         clearLostGrace();
         clearLockedHide();
         hasLocked = false;
         targetVisible = false;
+        sessionActive = false;
+        cameraLive = false;
+        lastEngineError = undefined;
         hideFault();
-        removeDeadVideos();
-        armCameraWatchdog();
+        anchor.object3D.visible = false;
         setPlacementGhost();
         intro.hidden = true;
         guide.hidden = true;
@@ -383,133 +443,91 @@
         window.dispatchEvent(new Event('resize'));
 
         const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1250));
-        const system = await getArSystem();
-        if (!system) throw new Error('MindAR image system failed to initialize.');
-        await system.start();
-        await minSplashTime;
-        /* mind-ar's start() is synchronous and returns undefined, so getting
-         * here proves nothing about whether the camera came up. If the arError
-         * listener has already raised the fault, stop -- otherwise the scanning
-         * HUD is painted underneath the error the customer is reading. */
-        if (faultShown) return;
-        renderInstruction('scanning');
-        if (socialDock) socialDock.hidden = false;
-        if (orderLink) orderLink.hidden = false;
+        const [engine, target] = await Promise.all([getEngine(), getTargetData()]);
+        if (runToken !== sessionToken) return;
 
-        /* Wait for actual frames before declaring success. Everything the
-         * watchdog exists for -- an unanswered permission prompt, a stream
-         * that never reaches loadedmetadata, a stalled .mind fetch -- happens
-         * AFTER this point, so the watchdog has to stay armed until there is
-         * a picture. If it fires instead, faultShown flips and this resolves
-         * false. isRunning likewise gates stop(), whose library call throws on
-         * a session that never got a stream. */
-        const live = await waitForCamera();
-        if (!live || faultShown) return;
+        // Configure before run. World tracking remains enabled and the engine
+        // owns the camera constraints, avoiding a post-open zoom that would
+        // invalidate its calibrated SLAM projection.
+        armCameraWatchdog();
+        const cameraReady = waitForCamera();
+        if (hasStartedEngine && engine.isPaused?.()) {
+          sessionActive = true;
+          await engine.resume();
+        } else {
+          engine.XrController.configure({
+            imageTargetData: [target],
+            scale: 'absolute',
+            disableWorldTracking: false,
+            enableLighting: true
+          });
+          hasStartedEngine = true;
+          sessionActive = true;
+          scene.emit('runreality');
+        }
+        await minSplashTime;
+        const live = await cameraReady;
+        if (runToken !== sessionToken || !live || faultShown) return;
+
         isRunning = true;
         clearCameraWatchdog();
+        if (!targetVisible && !hasLocked) renderInstruction('scanning');
+        if (socialDock) socialDock.hidden = false;
+        if (orderLink) orderLink.hidden = false;
+        guide.hidden = false;
         await revealCamera();
-        postToParent('steakout-ar-camera-live');
+        if (runToken === sessionToken && isRunning) postToParent('steakout-ar-camera-live');
       } catch (error) {
+        if (runToken !== sessionToken) return;
         console.error(error);
         isRunning = false;
+        sessionActive = false;
         targetVisible = false;
+        lastEngineError = error;
         intro.hidden = isEmbedded;
-        // showFault() clears the progress timer, hides the splash and the rest
-        // of the HUD, and posts steakout-ar-camera-error itself.
         showFault();
       } finally {
-        startPromise = null;
+        if (startPromise === operation) startPromise = null;
       }
     })();
-
-    return startPromise;
+    startPromise = operation;
+    return operation;
   };
 
   const stop = () => {
     if (stopPromise) return stopPromise;
+    ++sessionToken;
+    startPromise = null;
     stopPromise = (async () => {
       targetVisible = false;
-      // Or it fires 20s later and drops a camera error over a closed session.
+      isRunning = false;
+      sessionActive = false;
+      cameraLive = false;
+      resolveCameraWaiters(false);
       clearCameraWatchdog();
-      clearCameraProbe();
       clearProgressAdvance();
-      if (startPromise) await startPromise;
+      clearLostGrace();
+      clearLockedHide();
       try {
-        const system = await getArSystem();
-        // isRunning is only true once frames were seen, so this cannot be
-        // called on a session with no srcObject -- where the library's own
-        // stop() throws on its first line, before it removes its <video>.
-        if (isRunning && system?.stop) await system.stop();
+        if (hasStartedEngine && window.XR8?.pause) await window.XR8.pause();
       } catch (error) {
         console.warn('Unable to stop AR cleanly:', error);
       }
-      isRunning = false;
-      removeDeadVideos();
+      anchor.object3D.visible = false;
       setPlacementGhost();
-      if (splash) splash.hidden = true;
-      guide.hidden = true;
-      if (instruction) instruction.hidden = true;
-      if (socialDock) socialDock.hidden = true;
-      if (orderLink) orderLink.hidden = true;
+      resetVisibleUi();
       intro.hidden = isEmbedded;
-      setStatus('');
     })().finally(() => { stopPromise = null; });
     return stopPromise;
   };
 
-  anchor.addEventListener('targetFound', () => {
-    if (!isRunning) return;
-    targetVisible = true;
-    clearProgressAdvance();
-    clearLostGrace();
-
-    // Already locked once: re-acquiring after a wobble should be silent rather
-    // than replaying the whole walkthrough.
-    if (hasLocked) {
-      setPlacementSolid();
-      if (instruction) instruction.hidden = true;
-      return;
-    }
-
-    setPlacementGhost();
-    renderInstruction('holding');
-    progressAdvanceTimer = window.setTimeout(() => {
-      if (!isRunning || !targetVisible) return;
-      setPlacementSolid();
-      renderInstruction('locked');
-      hasLocked = true;
-
-      // The steps have done their job the moment the meal is on the table.
-      clearLockedHide();
-      lockedHideTimer = window.setTimeout(() => {
-        if (!isRunning || !targetVisible) return;
-        if (instruction) instruction.hidden = true;
-      }, 2200);
-    }, 900);
+  startButton.addEventListener('click', () => {
+    if (!isEmbedded) requestTopLevelMotionPermissions();
+    start();
   });
-
-  anchor.addEventListener('targetLost', () => {
-    if (!isRunning) return;
-    targetVisible = false;
-    clearProgressAdvance();
-
-    // A momentary wobble should not tear the guidance back over the screen.
-    // Only admit we lost it if it stays lost.
-    clearLostGrace();
-    lostGraceTimer = window.setTimeout(() => {
-      if (!isRunning || targetVisible) return;
-      hasLocked = false;
-      setPlacementGhost();
-      renderInstruction('lost');
-    }, 1600);
-  });
-
-  startButton.addEventListener('click', start);
 
   faultRetry?.addEventListener('click', () => {
     hideFault();
-    // A fresh attempt needs a fresh permission request, so drop any half-built
-    // session first rather than resolving straight out of the isRunning guard.
     stop().then(start);
   });
   faultBack?.addEventListener('click', () => {
@@ -529,18 +547,16 @@
     });
     window.addEventListener('keydown', (event) => { if (event.key === 'Escape') postToParent('steakout-ar-close'); });
 
-    /* Announce readiness as soon as this page is LISTENING, not once A-Frame
-     * has booted.
-     *
-     * The parent gates its 'steakout-ar-start' message on this one
-     * (app.js: `if (browserARFrameReady) postToBrowserAR(...)`), so tying it to
-     * the library meant a CDN failure produced no start message, therefore no
-     * start(), therefore no error -- the customer sat on the opening splash
-     * indefinitely with nothing to read and nothing to retry. start() awaits
-     * the system itself and now times out, so that failure lands on the fault
-     * panel like every other one. */
+    // Parent app.js gates start on this message. It must precede the engine
+    // warm-up so a slow engine still receives the user's start request.
     postToParent('steakout-ar-ready');
-    // Warm the system in the background; start() is what reports its failure.
-    getArSystem().catch(() => { /* surfaced by start() */ });
+    getEngine().catch(() => { /* start() surfaces this through the fault panel */ });
   }
+
+  // A normal close keeps the warm iframe resumable. Once the browser is
+  // actually discarding this document, release the engine and camera fully.
+  window.addEventListener('pagehide', () => {
+    try { window.XR8?.stop?.(); } catch (error) { /* best effort final cleanup */ }
+    hasStartedEngine = false;
+  });
 })();

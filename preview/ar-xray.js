@@ -1,296 +1,90 @@
-/*
- * Diagnostic overlay: shows what the tracker is actually looking at and finding.
- * Off unless the URL carries ?xray=1, so customers never see it.
- *
- * Draws, per frame:
- *   - the SEARCH WINDOW in its real position. Acquisition does NOT inspect a
- *     centred crop: _detectAndMatch calls cropDetector.detectMoving(), which
- *     cycles a 3x3 grid one position per frame. The centred detect() runs once,
- *     from dummyRun(). The dashed box is the union of all nine positions --
- *     2 x cropSize per axis, which is what the reticle is sized to.
- *   - every FEATURE POINT the detector returned. These come back already offset
- *     into full-frame coordinates by _detect(), so they map straight to screen.
- *   - whether the last match SUCCEEDED, and how long since one did.
- *   - the camera report from ar-camera-tune.js: what was asked for, what came
- *     back, and what the track says it is CAPABLE of. That last one is the
- *     measurement the resolution question turns on.
- *
- * The panel draws as soon as the page loads, not only once the tracker
- * produces a frame, so a camera that never starts is still legible on a
- * recording.
- *
- * Nothing here changes tracking. It only wraps two methods to read what they
- * already return, then hands the original value straight back.
- */
+/* Public-engine diagnostic overlay. It is opt-in with ?xray=1 and never
+ * participates in camera or tracking control. */
 (() => {
   if (new URLSearchParams(location.search).get('xray') !== '1') return;
 
+  const scene = document.querySelector('#marker-scene');
+  if (!scene) return;
   const state = {
-    crop: null, sweep: null, points: [], lastMatchAt: 0, matches: 0, attempts: 0,
-    matched: false, vw: 0, vh: 0, cropSize: 0,
-    firstMatchAt: 0, firstShowAt: 0, startedAt: 0, procTimes: [], lastProcAt: 0
+    camera: 'not requested',
+    tracking: 'not started',
+    image: 'not found',
+    pose: '',
+    readyAt: 0,
+    foundAt: 0
   };
 
-  /* Where detectMoving's window actually is this frame.
-   *
-   * Reproduced from the shipped mind-ar 1.2.5 bundle rather than guessed:
-   *
-   *   detectMoving(t){ const e=this.lastRandomIndex%3, s=Math.floor(this.lastRandomIndex/3);
-   *     let o=Math.floor(this.height/2-this.cropSize+s*this.cropSize/2),
-   *         r=Math.floor(this.width/2 -this.cropSize+e*this.cropSize/2);
-   *     r<0&&(r=0), o<0&&(o=0),
-   *     r>=this.width -this.cropSize&&(r=this.width -this.cropSize-1),
-   *     o>=this.height-this.cropSize&&(o=this.height-this.cropSize-1),
-   *     this.lastRandomIndex=(this.lastRandomIndex+1)%9, this._detect(t,r,o) }
-   *
-   * lastRandomIndex is read BEFORE the increment, so the wrapper must sample it
-   * before calling through. */
-  const movingWindow = (cd, idx) => {
-    const c = cd.cropSize, W = cd.width, H = cd.height;
-    let x = Math.floor(W / 2 - c + (idx % 3) * c / 2);
-    let y = Math.floor(H / 2 - c + Math.floor(idx / 3) * c / 2);
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x >= W - c) x = W - c - 1;
-    if (y >= H - c) y = H - c - 1;
-    return { x, y, s: c };
+  scene.addEventListener('camerastatuschange', ({ detail = {} }) => {
+    state.camera = detail.status || 'unknown';
+  });
+  scene.addEventListener('realityready', () => {
+    state.readyAt = performance.now();
+  });
+  scene.addEventListener('xrtrackingstatus', ({ detail = {} }) => {
+    state.tracking = detail.status || detail.state || 'active';
+  });
+  scene.addEventListener('xrimagescanning', () => {
+    state.image = 'scanning';
+  });
+  scene.addEventListener('xrimagefound', ({ detail = {} }) => {
+    state.image = 'found ' + (detail.name || 'target');
+    state.foundAt = performance.now();
+    state.pose = poseSummary(detail);
+  });
+  scene.addEventListener('xrimageupdated', ({ detail = {} }) => {
+    state.image = 'tracking ' + (detail.name || 'target');
+    state.pose = poseSummary(detail);
+  });
+  scene.addEventListener('xrimagelost', ({ detail = {} }) => {
+    state.image = 'lost ' + (detail.name || 'target');
+  });
+  scene.addEventListener('realityerror', ({ detail = {} }) => {
+    const error = detail.error || detail;
+    state.camera = 'error ' + (error?.name || 'unknown');
+  });
+
+  const poseSummary = (detail) => {
+    const p = detail.position;
+    const width = Number(detail.scale) * Number(detail.scaledWidth);
+    if (!p) return '';
+    const widthText = Number.isFinite(width) ? width.toFixed(3) + 'm flyer' : 'width ?';
+    return `pose ${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}  ${widthText}`;
   };
 
-  // The union of all nine positions: what the sweep covers over 9 frames.
-  const sweptRegion = (cd) => {
-    const c = cd.cropSize;
-    const xs = [0, 1, 2].map((e) => movingWindow(cd, e).x);
-    const ys = [0, 3, 6].map((i) => movingWindow(cd, i).y);
-    return { x: Math.min(...xs), y: Math.min(...ys),
-             w: Math.max(...xs) + c - Math.min(...xs),
-             h: Math.max(...ys) + c - Math.min(...ys) };
-  };
+  const canvas = document.createElement('canvas');
+  canvas.id = 'ar-xray';
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:21;pointer-events:none';
+  document.body.appendChild(canvas);
 
-  let ctrl = null;
-
-  const hook = (controller) => {
-    ctrl = controller;
-    const cd = controller.cropDetector;
-    if (!cd || cd.__xray) return false;
-    cd.__xray = true;
-    state.cropSize = cd.cropSize;
-
-    const wrap = (name, centred) => {
-      const original = cd[name].bind(cd);
-      cd[name] = function (input) {
-        // Sample the index BEFORE calling through; detectMoving increments it.
-        const idx = cd.lastRandomIndex;
-        const t0 = performance.now();
-        const result = original(input);
-        Promise.resolve(result).then((r) => {
-          state.procTimes.push(t0);
-          state.lastProcAt = performance.now();
-          if (state.procTimes.length > 120) state.procTimes.shift();
-          if (!r) return;
-          state.points = r.featurePoints || [];
-          const c = cd.cropSize;
-          state.crop = centred
-            ? { x: Math.floor(cd.width / 2 - c / 2), y: Math.floor(cd.height / 2 - c / 2), s: c }
-            : movingWindow(cd, idx);
-          state.sweep = sweptRegion(cd);
-          state.vw = cd.width; state.vh = cd.height;
-          if (!state.startedAt) state.startedAt = performance.now();
-        }).catch(() => {});
-        return result;
-      };
-    };
-    /* detectMoving is the acquisition path -- _detectAndMatch calls only it.
-     * detect() is reached once, from dummyRun(). Wrapping both is harmless, but
-     * the one that matters in a recording is detectMoving. */
-    wrap('detect', true);
-    if (cd.detectMoving) wrap('detectMoving', false);
-
-    const match = controller._workerMatch?.bind(controller);
-    if (match) {
-      controller._workerMatch = function (...args) {
-        state.attempts++;
-        const p = match(...args);
-        Promise.resolve(p).then((r) => {
-          const ok = !!(r && r.modelViewTransform);
-          state.matched = ok;
-          if (ok) {
-            state.matches++;
-            state.lastMatchAt = performance.now();
-            if (!state.firstMatchAt) state.firstMatchAt = state.lastMatchAt;
-          }
-        }).catch(() => {});
-        return p;
-      };
-    }
-    return true;
-  };
-
-  /* Drawing and hooking are deliberately separate.
-   *
-   * mind-ar only builds its controller inside _startAR, which runs after
-   * getUserMedia resolves -- so a camera that never starts means no controller,
-   * ever. Waiting for one before drawing meant the overlay stayed blank in
-   * exactly the case worth diagnosing. Draw from load; attach when there is
-   * something to attach to. */
-  const hookWhenReady = () => {
-    const scene = document.querySelector('#marker-scene');
-    const sys = scene && scene.systems && scene.systems['mindar-image-system'];
-    if (!sys || !sys.controller || !hook(sys.controller)) setTimeout(hookWhenReady, 300);
-  };
-
-  const start = () => {
-    hookWhenReady();
-    draw();
-  };
-
-  const cv = document.createElement('canvas');
-  cv.id = 'ar-xray';
-  /* width/height are NOT redundant with inset:0.
-   *
-   * A canvas is a replaced element, so with width:auto it takes its INTRINSIC
-   * size -- the backing-store size we set below, in CSS pixels. On a 375px
-   * phone at dpr 2 that laid the overlay out 750px wide and drew every glyph
-   * at double size, which is why the panel ran off the right edge. Pinning the
-   * CSS box to the viewport is what makes the dpr transform mean what it says.
-   *
-   * z-index sits above .marker-fault (9) on purpose: the fault panel is what a
-   * customer should see, but ?xray=1 is opt-in, and a camera failure is
-   * precisely when the numbers need to be legible on a recording. */
-  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:21;pointer-events:none';
-  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(cv));
-  if (document.readyState !== 'loading') document.body.appendChild(cv);
-
+  const elapsed = (time) => time ? ((performance.now() - time) / 1000).toFixed(1) + 's' : 'never';
   const draw = () => {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const W = window.innerWidth, H = window.innerHeight;
-    if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
-    const g = cv.getContext('2d');
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, W, H);
-
-    // Bare block: the panel below always draws, while everything keyed to the
-    // video frame is guarded individually on vw/vh.
-    const vw = state.vw, vh = state.vh;
-    {
-      // MindAR covers the viewport with the feed; match that mapping.
-      const scale = (vw && vh) ? Math.max(W / vw, H / vh) : 1;
-      const ox = (W - vw * scale) / 2, oy = (H - vh * scale) / 2;
-      const X = (x) => ox + x * scale, Y = (y) => oy + y * scale;
-
-      const since = performance.now() - state.lastMatchAt;
-
-      /* "LOCKED" now means the model is actually SHOWING, read from the
-       * library's own state, not "we matched within the last 400ms".
-       *
-       * Those are different, and the difference is not cosmetic: once a target
-       * is tracked the controller STOPS matching entirely (processVideo only
-       * calls _detectAndMatch while nTracking < maxTrack), so the old rule went
-       * dark during exactly the periods it was meant to report. A recording
-       * read on that indicator would show ~9% "locked" while the meal was on
-       * screen for 60% of the time. */
-      const ts = ctrl && ctrl.trackingStates && ctrl.trackingStates[0];
-      const showing = !!(ts && ts.showing);
-      const tracking = !!(ts && ts.isTracking);
-      if (showing && !state.firstShowAt) state.firstShowAt = performance.now();
-      const live = showing || tracking;
-
-      // The whole area the sweep reaches over nine frames: dashed, faint. This
-      // is what the aiming reticle is sized to.
-      if (state.sweep && vw && vh) {
-        g.save();
-        g.setLineDash([10, 8]);
-        g.strokeStyle = 'rgba(255,255,255,.42)';
-        g.lineWidth = 2;
-        g.strokeRect(X(state.sweep.x), Y(state.sweep.y),
-                     state.sweep.w * scale, state.sweep.h * scale);
-        g.restore();
-      }
-
-      // The ONE window being inspected this frame, in its real position.
-      if (state.crop && vw && vh) {
-        g.strokeStyle = live ? 'rgba(60,220,110,.95)' : 'rgba(255,190,40,.9)';
-        g.lineWidth = 3;
-        g.strokeRect(X(state.crop.x), Y(state.crop.y), state.crop.s * scale, state.crop.s * scale);
-        g.fillStyle = live ? 'rgba(60,220,110,.10)' : 'rgba(255,190,40,.07)';
-        g.fillRect(X(state.crop.x), Y(state.crop.y), state.crop.s * scale, state.crop.s * scale);
-      }
-
-      // Every feature the detector returned this frame.
-      g.fillStyle = live ? 'rgba(60,255,140,.95)' : 'rgba(90,200,255,.9)';
-      for (const p of (vw && vh ? state.points : [])) {
-        g.beginPath(); g.arc(X(p.x), Y(p.y), 2.4, 0, 6.2832); g.fill();
-      }
-
-      const pad = 10;
-      /* Fit the panel to the screen instead of assuming it fits. The rung
-       * lines vary in length with what the camera answered, and a narrow
-       * phone must still show them whole -- a truncated diagnostic is how the
-       * previous camera trail managed to report a fallback that never
-       * happened. Shrink to fit; never clip. */
-      const FIT = W - pad * 2 - 20;
-      let fontPx = 13;
-      const setFont = () => { g.font = '600 ' + fontPx + 'px ui-monospace,Menlo,monospace'; };
-      setFont();
-      /* The camera report, one fact per line.
-       *
-       * An earlier version joined it all into one string and kept the last 40
-       * characters, which cut off the front -- the decisive part. Worse, the
-       * chain it summarised ran its .then handlers on the success path too, so
-       * it reported a fallback that had not happened. Give each request its own
-       * line and let the reader see all of them.
-       *
-       * CAPS is the line that settles the open question: a track reporting
-       * 1920 while the feed sits at 480x640 is a constraint problem, not a
-       * hardware limit. */
-      const cam = window.__steakoutCamera;
-      const camLines = cam ? [
-        'CAPS  ' + cam.caps,
-        'zoom  ' + (cam.zoom || '?') + '   torch ' + (cam.torch || '?')
-      ].concat(
-        cam.rungs.length ? cam.rungs.map((r, i) => (i ? '      ' : 'ask   ') + r)
-                         : ['ask   (none recorded)'],
-        cam.applied ? ['apply ' + cam.applied] : [],
-        ['grant ' + cam.granted]
-      ) : ['cam   never called'];
-
-      // Detector throughput: how many windows it actually gets through per
-      // second. This is the number that says whether a higher camera
-      // resolution is affordable, and it is invisible without measuring.
-      const win = state.procTimes;
-      // Stale guard: without it a stalled detector leaves the last rate frozen
-      // on screen, which reads as healthy on a recording.
-      const fresh = state.lastProcAt && (performance.now() - state.lastProcAt) < 1000;
-      const hz = (fresh && win.length > 4)
-        ? (win.length - 1) / ((win[win.length - 1] - win[0]) / 1000)
-        : 0;
-      const secs = (t) => (t && state.startedAt)
-        ? ((t - state.startedAt) / 1000).toFixed(1) + 's' : 'none yet';
-
-      const lines = [
-        'feed  ' + (vw && vh ? vw + 'x' + vh + '   crop ' + state.cropSize : 'no frames yet'),
-        'sweep ' + (state.sweep ? state.sweep.w + 'x' + state.sweep.h : '?'),
-        'patch ' + (window.__steakoutCameraPatch || '?')
-      ].concat(camLines, [
-        'feat  ' + state.points.length + '   ' + (fresh ? hz.toFixed(1) + ' win/s' : '-- win/s'),
-        'match ' + state.matches + '/' + state.attempts +
-          (showing ? '   SHOWING' : tracking ? '   tracking' : '   searching'),
-        '1stMch ' + secs(state.firstMatchAt),
-        '1stShow ' + secs(state.firstShowAt),
-        state.lastMatchAt ? 'matched ' + (since / 1000).toFixed(1) + 's ago' : 'matched never'
-      ]);
-      // Size the panel to the longest line; fixed widths clipped off-screen.
-      const widest = () => lines.reduce((m, t) => Math.max(m, g.measureText(t).width), 0);
-      while (fontPx > 8 && widest() > FIT) { fontPx -= 1; setFont(); }
-      const lineH = Math.round(fontPx * 1.38);
-      let wBox = widest() + 20;
-      const hBox = lines.length * lineH + 12;
-      g.fillStyle = 'rgba(0,0,0,.62)';
-      g.fillRect(pad, pad + 96, wBox, hBox);
-      g.fillStyle = live ? '#5cff8c' : '#ffd34d';
-      lines.forEach((t, i) => g.fillText(t, pad + 10, pad + 96 + lineH + i * lineH));
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
     }
+    const context = canvas.getContext('2d');
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.clearRect(0, 0, width, height);
+    context.font = '600 13px ui-monospace, Menlo, monospace';
+    const lines = [
+      'ENGINE 8th Wall SLAM',
+      'camera ' + state.camera,
+      'tracking ' + state.tracking,
+      'image ' + state.image,
+      state.pose || 'pose waiting',
+      'ready ' + elapsed(state.readyAt),
+      'found ' + elapsed(state.foundAt)
+    ];
+    const boxWidth = Math.min(width - 20, Math.max(...lines.map((line) => context.measureText(line).width)) + 20);
+    const lineHeight = 19;
+    context.fillStyle = 'rgba(0,0,0,.64)';
+    context.fillRect(10, 106, boxWidth, lines.length * lineHeight + 12);
+    context.fillStyle = '#7fffb1';
+    lines.forEach((line, index) => context.fillText(line, 20, 106 + lineHeight + index * lineHeight));
     requestAnimationFrame(draw);
   };
-
-  start();
+  draw();
 })();

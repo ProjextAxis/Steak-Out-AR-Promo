@@ -20,33 +20,15 @@ window.STEAKOUT_AR_CONFIG = {
 
   marker: {
     enabled: true,
-    // The printed $12 LUNCH MYSTERY flyer, compiled with tools/compile-mind.js.
-    //
-    // Do not trust a total tracking-point count. mind-ar compiles two tracking
-    // levels, at 256px and 128px on the short edge, and tracker.js reads only
-    // the second:
-    //     const TRACKING_KEYFRAME = 1; // 0: 256px, 1: 128px
-    // On that level this target scores 33 points against the MindAR sample
-    // card's 32 -- parity, not the comfortable margin a summed count implies.
-    // Matching-point counts mislead the same way: they scale with source
-    // resolution, because the pyramid builds more levels from a larger image.
-    //
-    // The practical consequence is that source resolution barely moves
-    // tracking, so a better target file is not the lever. What moves it is how
-    // much of the camera sensor the flyer physically fills, i.e. print size.
-    // Lean build: 7 pyramid levels instead of 11, so 41% cheaper matching per
-    // frame and 40% smaller, with 36 points on the 128px keyframe against the
-    // full build's 33 and the sample card's 32. Measured as equal on
-    // acquisition, so this is a cost saving, not a robustness gain.
-    // Overridden below by ?ar=A|B|C|D for the acquisition A/B.
-    targetMindUrl: './assets/steakout-marker-lean.mind',
+    // Generated from the printed $12 LUNCH MYSTERY flyer with the local
+    // 8th Wall image-target compiler. The target name is the event key used
+    // by marker.js; keep it paired with the JSON file.
+    targetDataUrl: './assets/steakout-flyer.json',
+    targetName: 'steakout-flyer',
     targetPreviewUrl: './assets/steakout-marker.png',
 
-    // MindAR normalises the marker to 1 unit wide, so scale is relative to the
-    // printed width and needs no physical measurement. The model is 0.3521
-    // wide, so 1 / 0.3521 = 2.84 makes the plate exactly as wide as the flyer.
-    // 3.0 gives it a slight overhang so it covers the artwork.
-    // Plate width as a multiple of the flyer's width is 0.3521 * scale:
+    // marker.js maps the 8th Wall image width back to one local flyer unit
+    // before applying this scale. Plate width as a multiple of flyer width:
     //    2.84 -> 1.0x, sits exactly within the flyer
     //    6.00 -> 2.1x
     //    9.00 -> 3.2x, current
@@ -60,59 +42,6 @@ window.STEAKOUT_AR_CONFIG = {
     scaleStep: 0.04
   }
 };
-
-/* Warm the custom marker AR before the user taps VIEW IN AR.
-   This does not request camera permission or start MindAR. */
-/* Acquisition A/B, switchable from the URL so the same scene can be recorded
- * against each build and the question decided by measurement.
- *
- * These labels previously read "720p" and "1080p" and were INVERTED against
- * what the code did: ar-camera-tune.js stopped capping down to 720p and
- * started asking UP, and only these strings were left behind. Anyone recording
- * ?ar=C believing they were testing 1080p was testing the browser default.
- * The labels now name the two axes that actually vary.
- *
- *   ?ar=A  ask + lean    (current)
- *   ?ar=B  ask + full
- *   ?ar=C  default + lean    <- camera request left untouched: the control
- *   ?ar=D  default + full
- *
- * "ask" means ar-camera-tune.js requests 1080p; "default" means it stands
- * aside and lets the browser choose, which measured 480x640 on device.
- */
-(() => {
-  const VARIANTS = {
-    A: { target: './assets/steakout-marker-lean.mind', label: 'A ask/lean' },
-    B: { target: './assets/steakout-marker.mind',      label: 'B ask/full' },
-    C: { target: './assets/steakout-marker-lean.mind', label: 'C default/lean' },
-    D: { target: './assets/steakout-marker.mind',      label: 'D default/full' }
-  };
-  const params = new URLSearchParams(location.search);
-  const raw = params.get('ar');
-  const key = (raw || 'A').toUpperCase();
-  const variant = VARIANTS[key] || VARIANTS.A;
-
-  window.STEAKOUT_AR_VARIANT = key in VARIANTS ? key : 'A';
-  window.STEAKOUT_AR_CONFIG.marker.targetMindUrl = variant.target;
-
-  /* Label it on screen, or the test is not worth running -- but only when a
-   * test is actually being run. This badge was ungated, and since the key
-   * defaults to 'A' it shipped a yellow debug tag in the AR header to every
-   * customer, reading a resolution the build no longer used. */
-  const isTest = !!raw || params.get('xray') === '1';
-  const badge = () => {
-    const host = document.querySelector('.marker-brand');
-    if (!host || host.querySelector('[data-ar-variant-badge]')) return;
-    const tag = document.createElement('span');
-    tag.setAttribute('data-ar-variant-badge', '');
-    tag.textContent = ' \u00b7 ' + variant.label;
-    tag.style.cssText = 'font:600 11px/1 Arial,sans-serif;color:#ffd34d;letter-spacing:.04em';
-    host.appendChild(tag);
-  };
-  if (!isTest) return;
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', badge);
-  else badge();
-})();
 
 (() => {
   const modelUrl = window.STEAKOUT_AR_CONFIG.modelUrl;
@@ -139,7 +68,7 @@ window.STEAKOUT_AR_CONFIG = {
       const parentParams = new URLSearchParams(location.search);
       // Test parameters only, and only when the parent actually carries them --
       // a customer's AR frame must arrive with none of these.
-      const passthrough = ['res', 'ret', 'warm']
+      const passthrough = ['res', 'ret', 'warm', 'zoom']
         .map((k) => (parentParams.get(k) ? '&' + k + '=' + encodeURIComponent(parentParams.get(k)) : ''))
         .join('');
       const extra =
