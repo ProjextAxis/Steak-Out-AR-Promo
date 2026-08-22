@@ -363,7 +363,7 @@
   actions.id = 'steakout-ar-debug-actions';
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
-  copyButton.textContent = 'COPY 60S LOG';
+  copyButton.textContent = 'SAVE 60S LOG';
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
   closeButton.textContent = 'CLOSE';
@@ -400,6 +400,35 @@
   };
   toggle.addEventListener('click', () => setPanelOpen(panel.hidden));
   closeButton.addEventListener('click', () => setPanelOpen(false));
+  const flashButton = (text) => {
+    copyButton.textContent = text;
+    window.setTimeout(() => { copyButton.textContent = 'SAVE 60S LOG'; }, 2200);
+  };
+
+  /* Last-resort retrieval: a full-screen selectable textarea. Even if a file
+     download and the clipboard are both blocked (iframe permission policy, old
+     iOS), the log can always be long-pressed -> Select All -> Share. Tap closes. */
+  const revealSelectableLog = (payload) => {
+    let box = document.getElementById('steakout-ar-debug-raw');
+    if (!box) {
+      box = document.createElement('textarea');
+      box.id = 'steakout-ar-debug-raw';
+      box.readOnly = true;
+      box.style.cssText = 'position:fixed;inset:8px;z-index:1002;box-sizing:border-box;' +
+        'padding:10px;font:600 10px/1.4 ui-monospace,Menlo,monospace;background:#000;' +
+        'color:#dfffea;border:1px solid rgba(127,255,177,.5);border-radius:8px';
+      box.addEventListener('click', () => box.remove());
+      document.body.appendChild(box);
+    }
+    box.value = 'Long-press -> Select All -> Share. Tap this box to close.\n\n' + payload;
+    box.focus();
+  };
+
+  /* The old handler only tried the clipboard, and this HUD runs INSIDE the AR
+     iframe whose allow-list did not include clipboard-write, so on iOS the write
+     was blocked -- and the button then said COPIED anyway. Now it actually SAVES
+     a file (the reliable way to get a log off a phone), copies as a bonus, and
+     only reports what genuinely happened. */
   copyButton.addEventListener('click', async () => {
     const payload = JSON.stringify({
       exportedAt: new Date().toISOString(),
@@ -407,19 +436,35 @@
       entries: log,
       anomalyCaptures
     }, null, 2);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `steakout-ar-log-${stamp}.json`;
+
+    let saved = false;
     try {
-      await navigator.clipboard.writeText(payload);
-      copyButton.textContent = 'COPIED';
-    } catch (error) {
-      const textarea = document.createElement('textarea');
-      textarea.value = payload;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      textarea.remove();
-      copyButton.textContent = 'COPIED';
-    }
-    window.setTimeout(() => { copyButton.textContent = 'COPY 60S LOG'; }, 1400);
+      const blob = new Blob([payload], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      // Revoke late; a too-early revoke cancels the download on some engines.
+      window.setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 5000);
+      saved = true;
+    } catch (error) { /* fall through to clipboard / selectable */ }
+
+    let copied = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+        copied = true;
+      }
+    } catch (error) { /* clipboard blocked; the file save is the real path */ }
+
+    if (saved) flashButton(copied ? 'SAVED + COPIED' : 'SAVED');
+    else if (copied) flashButton('COPIED');
+    else { revealSelectableLog(payload); flashButton('SELECT & SHARE'); }
   });
 
   const remove = () => {
