@@ -24,6 +24,10 @@
   let committedAnchor;
   let previousRealityFrame;
   let lastFrameAnomalyAt = 0;
+  let faultCount = 0;
+  let lastPoseAt = 0;
+  let baseAnchorState = 'idle';
+  const FAULT_DECAY_MS = 1500;
   const frameHistory = [];
   const anomalyCaptures = [];
 
@@ -33,6 +37,7 @@
     image: 'not found',
     anchor: 'idle',
     anchorDetail: {},
+    lastFaultInfo: '',
     pose: '',
     lastEvent: 'debug enabled'
   };
@@ -69,6 +74,9 @@
   };
 
   const setAnchorState = (nextState, detail = {}) => {
+    // Remember the app's real (non-fault) state so a transient camera-translation
+    // fault can decay back to it instead of latching on the dot forever.
+    if (nextState !== 'fault') baseAnchorState = nextState;
     state.anchor = nextState;
     state.anchorDetail = safeCopy(detail);
   };
@@ -131,6 +139,7 @@
     const pose = targetPose(detail);
     state.image = `found ${pose.name || 'target'}`;
     state.pose = poseSummary(pose);
+    lastPoseAt = performance.now();
     record('scene-image-found', pose);
   });
   listen(scene, 'xrimageupdated', ({ detail = {} }) => {
@@ -138,6 +147,7 @@
     state.image = `tracking ${pose.name || 'target'}`;
     state.pose = poseSummary(pose);
     const now = performance.now();
+    lastPoseAt = now;
     if (now - lastTargetUpdateAt >= FRAME_SAMPLE_MS) {
       lastTargetUpdateAt = now;
       record('scene-image-updated', pose);
@@ -295,8 +305,25 @@
         lastFrameAnomalyAt = now;
         anomalyCaptures.push({ detectedAt: round(now, 3), anomaly, frames: [...frameHistory], remaining: 60 });
         if (anomalyCaptures.length > 4) anomalyCaptures.shift();
-        setAnchorState('fault', { reason: anomaly.reasons.join(',') });
+        faultCount += 1;
+        // Surface how far past the limit the jump was, so the on-screen HUD alone
+        // carries the calibration number (no need to open the saved log for it).
+        state.lastFaultInfo = `${anomaly.reasons.join(',')} ${round(anomaly.translation, 3)}>${round(anomaly.translationLimit, 3)}`;
+        setAnchorState('fault', {
+          reason: anomaly.reasons.join(','),
+          translation: round(anomaly.translation, 3),
+          limit: round(anomaly.translationLimit, 3)
+        });
         record('frame-anomaly', anomaly);
+      }
+      // A camera-translation fault is a momentary event, not a persistent state.
+      // Let the dot fall back to the app's real anchor state after a quiet period
+      // so it stops overstating on ordinary fast panning. The faults counter keeps
+      // the running total; a genuine anchor-invariant fault does NOT decay.
+      if (state.anchor === 'fault' && state.anchorDetail?.reason !== 'anchor-invariant' &&
+          now - lastFrameAnomalyAt >= FAULT_DECAY_MS) {
+        state.anchor = baseAnchorState;
+        state.anchorDetail = {};
       }
       if (now < nextFrameSampleAt && !anomaly) return;
       nextFrameSampleAt = now + FRAME_SAMPLE_MS;
@@ -378,6 +405,7 @@
     toggle.dataset.state = state.anchor;
     if (panel.hidden) return;
     const detail = state.anchorDetail || {};
+    const poseAge = lastPoseAt ? ` · ${Math.round(performance.now() - lastPoseAt)}ms` : '';
     output.textContent = [
       `STEAK OUT AR · ${state.scaleMode || params.get('xrscale') || 'responsive'}`,
       `camera    ${state.camera}`,
@@ -386,7 +414,8 @@
       `anchor    ${state.anchor}`,
       `samples   ${detail.sampleCount ?? '-'}`,
       `reason    ${detail.reason || '-'}`,
-      `pose      ${state.pose || 'waiting'}`,
+      `faults    ${faultCount}${state.lastFaultInfo ? '  last ' + state.lastFaultInfo : ''}`,
+      `pose      ${state.pose || 'waiting'}${poseAge}`,
       `event     ${state.lastEvent}`,
       `log       ${log.length} entries / last 60s`
     ].join('\n');
