@@ -78,6 +78,7 @@ window.STEAKOUT_AR_CONFIG = {
         (parentParams.get('ar') ? '&ar=' + (window.STEAKOUT_AR_VARIANT || 'A') : '') +
         (parentParams.get('xray') === '1' ? '&xray=1' : '') +
         (parentParams.get('ar-debug') === '1' ? '&ar-debug=1' : '') +
+        (parentParams.get('dev') === '1' ? '&dev=1' : '') +
         passthrough;
       const join = frame.dataset.src.indexOf('?') === -1 ? '?' : '&';
       frame.src = frame.dataset.src + (extra ? join + extra.slice(1) : '');

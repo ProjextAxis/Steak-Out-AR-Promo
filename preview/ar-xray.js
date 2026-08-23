@@ -7,6 +7,13 @@
 (() => {
   const ALWAYS_ON = true;    // TESTING. Set false before customers see this.
   const params = new URLSearchParams(location.search);
+
+  /* DEV MODE (?dev=1): strip the branded chrome and put the diagnostics at the
+   * TOP. During a rig run the header, the ORDER NOW pill, the social buttons
+   * and the step ribbon are pure obstruction -- they cover the camera view we
+   * are trying to read and sit on top of the panel. Customers never see this;
+   * it is opt-in and leaves the normal styling untouched. */
+  const DEV = params.get('dev') === '1';
   if (!ALWAYS_ON && params.get('ar-debug') !== '1' && params.get('xray') !== '1') return;
 
   const scene = document.querySelector('#marker-scene');
@@ -377,6 +384,28 @@
     #steakout-ar-debug-actions button{border:1px solid rgba(255,255,255,.4);border-radius:6px;background:#151a18;color:#fff;padding:8px 10px;font:700 10px ui-monospace,Menlo,monospace}
   `;
   document.head.appendChild(style);
+
+  if (DEV) {
+    const dev = document.createElement('style');
+    dev.id = 'steakout-dev-mode-style';
+    dev.textContent = `
+      #marker-hud, #marker-order, #marker-social, #marker-progress,
+      #marker-instruction, #marker-intro { display: none !important; }
+      /* Diagnostics move to the top, out of the way of the camera view. */
+      #steakout-ar-debug-panel{
+        top: max(8px, env(safe-area-inset-top)) !important;
+        bottom: auto !important;
+        max-height: 46vh !important;
+      }
+      #steakout-ar-debug-toggle{
+        top: calc(max(8px, env(safe-area-inset-top)) + 4px) !important;
+        bottom: auto !important;
+        left: auto !important;
+        right: max(10px, env(safe-area-inset-right)) !important;
+      }
+    `;
+    document.head.appendChild(dev);
+  }
 
   const toggle = document.createElement('div');
   toggle.id = 'steakout-ar-debug-toggle';
