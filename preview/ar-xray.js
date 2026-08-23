@@ -5,7 +5,7 @@
  * tapped at all. Set ALWAYS_ON = false to restore the opt-in ?ar-debug=1
  * behaviour -- do that before this is live in front of customers. */
 (() => {
-  const ALWAYS_ON = true;
+  const ALWAYS_ON = false;   // customer-safe: HUD is opt-in via ?ar-debug=1
   const params = new URLSearchParams(location.search);
   if (!ALWAYS_ON && params.get('ar-debug') !== '1' && params.get('xray') !== '1') return;
 

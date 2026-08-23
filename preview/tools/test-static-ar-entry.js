@@ -28,8 +28,8 @@ assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=20260822-hudalways/, 'pa
 assert.match(indexHtml, /allow="[^"]*clipboard-write/, 'AR iframe grants clipboard-write so the diagnostics log can be saved/copied');
 assert.match(configSource, /'ar-debug'/, 'parent forwards the opt-in diagnostics flag');
 assert.match(configSource, /'xrscale'/, 'parent forwards the scale A\/B flag');
-assert.match(diagnosticsSource, /const ALWAYS_ON = true;/,
-  'RIG MODE: HUD is always on (flip ALWAYS_ON to false before customer ship)');
+assert.match(diagnosticsSource, /const ALWAYS_ON = false;/,
+  'customer-safe: the diagnostics HUD is opt-in, not always on');
 assert.match(diagnosticsSource, /!ALWAYS_ON && params\.get\('ar-debug'\) !== '1'/,
   'with ALWAYS_ON false, diagnostics still exit early for normal customers');
 
