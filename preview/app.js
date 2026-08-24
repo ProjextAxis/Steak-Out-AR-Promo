@@ -138,6 +138,15 @@
     window.dataLayer.push({ event: eventName, ...detail });
   };
 
+  /* Safari caches a motion refusal for the origin and will not ask again --
+     not on reload, not on a new tab. Only clearing the site's data or quitting
+     Safari resets it. So a refusal is not a transient error to retry, it is a
+     state the customer has to be walked out of, and the AR frame is told about
+     it explicitly rather than being left to fail and guess. */
+  let motionBlocked = false;
+  const startMessage = () =>
+    (motionBlocked ? 'steakout-ar-motion-blocked' : 'steakout-ar-start');
+
   const postToBrowserAR = (type) => {
     if (!browserARFrameReady || !browserARFrame?.contentWindow) return;
     browserARFrame.contentWindow.postMessage({ type }, window.location.origin);
@@ -184,7 +193,7 @@
     showBrowserARSplash();
     loadBrowserAR();
 
-    if (browserARFrameReady) postToBrowserAR('steakout-ar-start');
+    if (browserARFrameReady) postToBrowserAR(startMessage());
     setStatus('OPENING AR', 'active');
     track('browser_ar_opened', { item: config.itemName || 'test-food' });
   };
@@ -210,7 +219,7 @@
     if (event.data?.type === 'steakout-ar-ready') {
       browserARFrameReady = true;
       if (browserARShouldStart) {
-        postToBrowserAR('steakout-ar-start');
+        postToBrowserAR(startMessage());
       }
     } else if (event.data?.type === 'steakout-ar-camera-live') {
       if (!browserARShouldStart) {
@@ -321,7 +330,7 @@
        call throws, which xr.js treats as "retry" and answers by drawing its
        unbranded .prompt-box-8w over our camera. Awaiting means the grant is
        already recorded for this origin by the time the engine asks. */
-    await motionGrant;
+    motionBlocked = !(await motionGrant);
 
     // Steak Out AR is always the branded in-page camera. Apple's AR Quick Look
     // and Scene Viewer are never used, whatever mode the dev toggle is on.

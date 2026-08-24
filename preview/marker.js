@@ -321,6 +321,8 @@
     const copy = faultCopy();
     if (faultTitle) faultTitle.textContent = copy.title;
     if (faultBody) faultBody.textContent = copy.body;
+    // showMotionBlockedFault rewrites this label; put it back for normal faults.
+    if (faultRetry) faultRetry.textContent = 'TRY AGAIN';
     if (splash) splash.hidden = true;
     guide.hidden = true;
     if (instruction) instruction.hidden = true;
@@ -329,6 +331,32 @@
     intro.hidden = true;
     fault.hidden = false;
     postToParent('steakout-ar-camera-error');
+  };
+
+  /* Distinct from every other fault here: there is nothing to retry. Safari has
+     already recorded the refusal for this origin and will not prompt again, so
+     the honest thing is to name the one action that does work. */
+  const showMotionBlockedFault = () => {
+    if (!fault) return;
+    faultShown = true;
+    sessionActive = false;
+    resolveCameraWaiters(false);
+    clearCameraWatchdog();
+    clearProgressAdvance();
+    if (faultTitle) faultTitle.textContent = 'MOTION ACCESS IS OFF';
+    if (faultBody) {
+      faultBody.textContent = 'Safari saved your \u2018Don\u2019t Allow\u2019 for this ' +
+        'site and will not ask again. Fully quit Safari from the app switcher, ' +
+        'then reopen this page.';
+    }
+    if (faultRetry) faultRetry.textContent = 'I\u2019VE REOPENED SAFARI';
+    if (splash) splash.hidden = true;
+    if (guide) guide.hidden = true;
+    if (instruction) instruction.hidden = true;
+    if (socialDock) socialDock.hidden = true;
+    if (orderLink) orderLink.hidden = true;
+    if (intro) intro.hidden = true;
+    fault.hidden = false;
   };
 
   const hideFault = () => {
@@ -902,6 +930,7 @@
       if (event.source !== window.parent || event.origin !== window.location.origin) return;
       if (event.data?.type === 'steakout-ar-start') start();
       else if (event.data?.type === 'steakout-ar-stop') stop();
+      else if (event.data?.type === 'steakout-ar-motion-blocked') showMotionBlockedFault();
     });
     window.addEventListener('keydown', (event) => { if (event.key === 'Escape') postToParent('steakout-ar-close'); });
 
