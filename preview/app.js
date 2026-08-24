@@ -302,12 +302,26 @@
     } catch (error) {
       console.warn('Could not request motion permission:', error);
     }
-    if (requests.length) Promise.allSettled(requests).catch(() => {});
+    // Not iOS (no requestPermission at all): nothing to grant, carry on.
+    if (!requests.length) return Promise.resolve(true);
+    return Promise.allSettled(requests).then(
+      (results) => results.every((r) => r.status === 'fulfilled' && r.value === 'granted'));
   };
 
   const launchAR = async () => {
-    requestMotionPermissions();
+    // The requestPermission() calls must be issued SYNCHRONOUSLY here, while
+    // the tap's user gesture is still live -- iOS ignores them otherwise.
+    const motionGrant = requestMotionPermissions();
     track('ar_launch_tapped', { mode: activeMode, item: config.itemName || 'test-food' });
+
+    /* ...but the RESULT has to settle before the AR frame is allowed to start.
+       Firing this off without awaiting is what produced the engine's own purple
+       "AR requires access to device motion sensors" box: 8th Wall calls
+       requestPermission() itself, and while our grant is still in flight that
+       call throws, which xr.js treats as "retry" and answers by drawing its
+       unbranded .prompt-box-8w over our camera. Awaiting means the grant is
+       already recorded for this origin by the time the engine asks. */
+    await motionGrant;
 
     // Steak Out AR is always the branded in-page camera. Apple's AR Quick Look
     // and Scene Viewer are never used, whatever mode the dev toggle is on.

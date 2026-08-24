@@ -5,7 +5,7 @@
  * tapped at all. Set ALWAYS_ON = false to restore the opt-in ?ar-debug=1
  * behaviour -- do that before this is live in front of customers. */
 (() => {
-  const ALWAYS_ON = true;    // TESTING. Set false before customers see this.
+  const ALWAYS_ON = false;   // Customer default. ?ar-debug=1 or ?xray=1 opts in.
   const params = new URLSearchParams(location.search);
 
   /* DEV MODE (?dev=1): strip the branded chrome and put the diagnostics at the

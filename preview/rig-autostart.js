@@ -14,8 +14,13 @@
  * customer path at the repo root does not.
  */
 (() => {
-  const RIG_AUTO_AR = true;
-  if (!RIG_AUTO_AR) return;
+  const RIG_AUTO_AR = false;
+
+  /* The remote-refresh watcher below is independent of the auto-entry above and
+     stays available for debugging, but only when explicitly asked for with
+     ?rig=1 -- a customer must never have a page that polls a build marker. */
+  const RIG_REMOTE_REFRESH =
+    new URLSearchParams(location.search).get('rig') === '1';
 
   const START_DELAY_MS = 900;    // let config.js/app.js bind their handlers
   const RETRY_EVERY_MS = 2500;   // camera prompts and slow warms need patience
@@ -59,8 +64,10 @@
     }, START_DELAY_MS);
   };
 
-  if (document.readyState === 'complete') begin();
-  else window.addEventListener('load', begin, { once: true });
+  if (RIG_AUTO_AR) {
+    if (document.readyState === 'complete') begin();
+    else window.addEventListener('load', begin, { once: true });
+  }
 
   /* ------------------------------------------------------------------
    * Remote refresh, without touching the phone.
@@ -87,6 +94,8 @@
     } catch (e) { /* offline or mid-deploy: just try again next tick */ }
   };
 
-  poll();
-  window.setInterval(poll, POLL_MS);
+  if (RIG_REMOTE_REFRESH) {
+    poll();
+    window.setInterval(poll, POLL_MS);
+  }
 })();
