@@ -1,0 +1,131 @@
+/* Landing refresh — matches the approved hero mockup.
+   Loaded last so it settles the cascade against the older hero sheets rather
+   than competing with them. Structure still comes from hero-split.css: this
+   sheet only changes the treatment. */
+
+/* --- LUNCH SPECIALS gains its flanking rules ------------------------------ */
+.ar-hero .offer-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 3vw, 18px);
+}
+
+.ar-hero .offer-name::before,
+.ar-hero .offer-name::after {
+  content: '';
+  flex: 0 0 auto;
+  width: clamp(26px, 7vw, 44px);
+  height: 5px;
+  border-radius: 3px;
+  background: var(--red);
+}
+
+/* --- hero copy ------------------------------------------------------------ */
+.ar-hero .ar-nudge {
+  max-width: 34ch;
+  margin: 16px auto 0;
+  color: var(--white);
+  font: 400 clamp(17px, 4.4vw, 21px)/1.32 Arial, Helvetica, sans-serif;
+}
+
+.ar-hero .ar-subnudge {
+  margin: 9px auto 0;
+  color: rgba(255, 255, 255, .58);
+  font: 400 clamp(12px, 3.3vw, 14px)/1.2 var(--display), Arial, sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+/* --- the CTA: solid red, lit from underneath ------------------------------ */
+/* hero-split.css sets the outlined treatment with !important, so each property
+   it claims has to be reclaimed here explicitly. */
+.ar-hero .primary-ar-button {
+  position: relative !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 22px auto 0 !important;
+  min-height: 68px !important;
+  background: var(--red) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: var(--white);
+  font: 400 clamp(26px, 7vw, 33px)/1 var(--display);
+  letter-spacing: .022em;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .06) inset,
+    0 10px 30px -8px rgba(186, 31, 44, .95),
+    0 0 46px -6px rgba(242, 24, 31, .55);
+}
+
+.ar-hero .primary-ar-button:active { transform: translateY(1px); }
+
+.ar-launch-icon {
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  display: block;
+}
+.ar-launch-icon svg { display: block; width: 100%; height: 100%; }
+
+/* --- logo divider + ORDER NOW --------------------------------------------- */
+.order-divider {
+  width: min(100%, 620px);
+  margin: 34px auto 20px;
+  padding: 0 4px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+.order-divider::before,
+.order-divider::after {
+  content: '';
+  height: 1px;
+  background: rgba(255, 255, 255, .16);
+}
+.order-divider img { width: 34px; height: 34px; object-fit: contain; display: block; }
+
+/* The order CTA leaves the fixed bar and joins the page flow, as drawn. */
+.bottom-order-bar {
+  position: static;
+  padding: 0 28px calc(30px + env(safe-area-inset-bottom));
+  background: transparent;
+  border-top: 0;
+}
+.bottom-order-bar a {
+  width: min(100%, 620px);
+  margin-inline: auto;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: transparent;
+  border: 2px solid var(--red);
+  border-radius: 999px;
+  color: var(--red);
+  font: 400 clamp(22px, 5.6vw, 27px)/1 var(--display);
+  letter-spacing: .05em;
+}
+.bottom-order-bar a::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-top: -1px;
+}
+
+/* main reserved room for the old fixed bar; nothing is overlapping now. */
+main { padding-bottom: 0; }
+
+@media (max-width: 620px) {
+  .bottom-order-bar { padding-inline: 20px; }
+}
+@media (max-width: 410px) {
+  .bottom-order-bar { padding-inline: 16px; }
+}
