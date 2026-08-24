@@ -1174,6 +1174,13 @@ a {
   text-align: center;
 }
 
+.marker-fault__logo {
+  width: 92px;
+  height: auto;
+  margin: 0 auto 2px;
+  display: block;
+}
+
 .marker-fault__panel > strong {
   color: #ffd34d;
   font: 900 clamp(23px, 6.4vw, 30px)/1.02 var(--display);

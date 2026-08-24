@@ -17,7 +17,7 @@
   <link rel="preload" as="fetch" crossorigin="anonymous"
         href="./assets/image-targets/steakout-flyer_luminance.png" />
   <link rel="stylesheet" href="./fonts.css?v=20260820-self-hosted" />
-  <link rel="stylesheet" href="./marker.css?v=20260821-camlive" />
+  <link rel="stylesheet" href="./marker.css?v=20260823-fault-brand" />
   <link rel="stylesheet" href="./marker-target.css?v=20260819-approved-target" />
   <link rel="stylesheet" href="./marker-panel-tight.css?v=20260819-tight-panel" />
   <link rel="stylesheet" href="./marker-panel-compact.css?v=20260819-force-compact-1" />
@@ -33,7 +33,7 @@
   <script defer src="./ar-xray.js?v=20260823-hud-optin"></script>
   <script defer src="./ar-lighting.js?v=20260821-ibl"></script>
   <script defer src="./ar-shadow.js?v=20260820-contact-shadow-0f6e623"></script>
-  <script defer src="./marker.js?v=20260822-lock-1"></script>
+  <script defer src="./marker.js?v=20260823-fault-reload"></script>
   <script defer src="./marker-splash-fix.js?v=20260819-transparent-svg"></script>
 </head>
 <body>
@@ -78,6 +78,7 @@
          a customer with a black screen and no recovery action. -->
     <div class="marker-fault" id="marker-fault" hidden role="alert" aria-live="assertive">
       <div class="marker-fault__panel">
+        <img class="marker-fault__logo" src="./assets/steakout-logo.webp" alt="Steak Out" />
         <strong id="marker-fault-title">THE CAMERA DIDN&rsquo;T START</strong>
         <span id="marker-fault-body">Check your connection and try again.</span>
         <div class="marker-fault__actions">

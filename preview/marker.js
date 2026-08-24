@@ -31,6 +31,32 @@
   const faultRetry = document.querySelector('#marker-fault-retry');
   const faultBack = document.querySelector('#marker-fault-back');
 
+  /* Recovering from a fault means reloading the WHOLE experience, not
+     restarting the engine in place.
+
+     iOS holds a motion/camera denial for the life of the page, so a retry
+     inside the same document is answered with the same refusal instantly --
+     which is what made this panel reappear the moment it was dismissed and
+     left people locked out of AR with no way back in. A reload clears that
+     state and lets the phone ask again.
+
+     Embedded, the AR page is an iframe: reloading only the frame would leave
+     the denied top-level document in place, and the permission has to be
+     requested from a top-level tap. So reload the top document, which returns
+     the customer to the landing page and the branded start popup. */
+  const reloadExperience = () => {
+    try {
+      if (isEmbedded && window.top && window.top !== window) {
+        window.top.location.reload();
+        return;
+      }
+    } catch (error) {
+      // A cross-origin top would throw; fall through and reload ourselves.
+      console.warn('Could not reload the top document:', error);
+    }
+    window.location.reload();
+  };
+
   if (!scene || !anchor || !food || !startButton) return;
   if (!stability) {
     const showDependencyFault = () => {
@@ -45,6 +71,16 @@
       }
     };
     startButton.addEventListener('click', showDependencyFault);
+    // This branch returns before the main handlers below are bound, which left
+    // both buttons inert -- the panel was a dead end.
+    faultRetry?.addEventListener('click', reloadExperience);
+    faultBack?.addEventListener('click', () => {
+      if (isEmbedded && window.parent !== window) {
+        window.parent.postMessage({ type: 'steakout-ar-close' }, window.location.origin);
+      } else {
+        reloadExperience();
+      }
+    });
     if (isEmbedded) showDependencyFault();
     return;
   }
@@ -271,7 +307,7 @@
     }
     return {
       title: 'AR COULDN\'T LOAD',
-      body: 'Check your connection and try again. If you opened this from another app, try opening it in your browser instead.'
+      body: 'Tap Try Again to start over, and choose Allow when your phone asks for camera and motion access.'
     };
   };
 
@@ -851,10 +887,7 @@
     start();
   });
 
-  faultRetry?.addEventListener('click', () => {
-    hideFault();
-    stop().then(start);
-  });
+  faultRetry?.addEventListener('click', reloadExperience);
   faultBack?.addEventListener('click', () => {
     hideFault();
     if (isEmbedded) postToParent('steakout-ar-close');
