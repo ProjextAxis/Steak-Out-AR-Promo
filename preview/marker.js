@@ -117,6 +117,52 @@
   let sessionToken = 0;
   let hasStartedEngine = false;
   let trackingStatus = 'UNKNOWN';
+
+  /* ------------------------------------------------------------------
+   * GROUNDING: keep the meal on the flyer after commit.
+   *
+   * The anchor is committed once into SLAM WORLD space, not to the flyer. When
+   * the world origin drifts -- dim light, a glossy table, thermal throttling,
+   * fast motion -- the world moves and the meal goes with it while the flyer
+   * stays put. Nothing corrected that, because the one signal which could was
+   * observed after commit, written to the diagnostics log, and discarded.
+   *
+   * It is now used, but only under evidence. Continuously driving the anchor
+   * from the tracker is what commit-once was avoiding: it jitters every frame
+   * and the meal vanishes the moment a hand or a plate covers the flyer. And a
+   * correction the diner can SEE is worse than the drift it fixes -- a meal
+   * that pops or swims reads as broken, a meal 2cm off does not.
+   *
+   * So: prove the drift with the same clustering used for the original commit,
+   * then remove it slower than the eye tracks.
+   * ------------------------------------------------------------------ */
+
+  // Deadband. Below this the drift is not worth touching, and correcting it
+  // would mean moving the meal more often than the world actually drifts.
+  // Sits just above stabilityOptions.stableTranslationMetres (0.015), which is
+  // the spread a GOOD lock already shows -- correcting inside that would be
+  // chasing measurement noise.
+  const GROUND_DEADBAND_M = 0.022;
+  const GROUND_DEADBAND_FLYER = 0.09;      // or 9% of flyer width, whichever is larger
+  // Slower than the eye follows on a static object. 3cm of drift takes ~3s to
+  // remove, spread over ~180 frames, so no single frame moves it perceptibly.
+  const GROUND_MAX_M_PER_S = 0.010;
+  const GROUND_MAX_DEG_PER_S = 2.0;
+  // Stop before the deadband so it cannot oscillate around the threshold.
+  const GROUND_SETTLE_M = 0.004;
+  // Upper gate. Genuine SLAM drift over a sitting is centimetres. A discrepancy
+  // this large is far more likely a mis-detection, a reflection, or a second
+  // copy of the flyer than the world having moved 15cm -- and because the
+  // correction is rate-capped, creeping toward a WRONG target would drag the
+  // meal for 15+ seconds. That is the worst outcome available, so refuse it and
+  // say so instead.
+  const GROUND_MAX_ERROR_M = 0.15;
+
+  let groundSamples = [];
+  let groundTarget = null;          // { position: THREE.Vector3, quaternion: THREE.Quaternion }
+  let groundRaf = null;
+  let groundLastFrameAt = 0;
+  let groundCorrections = 0;
   let trackingNormalSince = 0;
   let lastLifecycleChangeAt = performance.now();
   let candidate;
@@ -509,6 +555,121 @@
     recordDiagnostic('candidate-start', { epoch: candidate.epoch, source, scaleMode });
   };
 
+  /* Collect post-commit observations of the flyer and, only when they agree
+   * with each other AND disagree with where the meal currently sits, aim a slow
+   * correction at them. */
+  const considerGroundCorrection = (sample, now) => {
+    if (!sample || !hasLocked) return;
+    // Never correct on a degraded pose. LIMITED tracking is exactly when the
+    // engine's own estimate is least trustworthy, so a "drift" measured then is
+    // as likely to be the measurement moving as the meal.
+    if (trackingStatus !== 'NORMAL') { groundSamples.length = 0; return; }
+
+    const previous = groundSamples[groundSamples.length - 1];
+    if (!stability.shouldRetainSample(sample, previous, stabilityOptions)) return;
+
+    groundSamples.push(sample);
+    groundSamples = groundSamples
+      .filter((entry) => now - entry.time <= stabilityOptions.maxWindowMs)
+      .slice(-stabilityOptions.maxSamples);
+
+    // Same bar the original commit had to clear: a real cluster, not one frame.
+    const evaluation = stability.evaluateCluster(groundSamples, stabilityOptions);
+    if (!evaluation.stable || !evaluation.medoid) return;
+
+    const medoid = evaluation.medoid;
+    const object = anchor.object3D;
+    const dx = medoid.position.x - object.position.x;
+    const dy = medoid.position.y - object.position.y;
+    const dz = medoid.position.z - object.position.z;
+    const error = Math.hypot(dx, dy, dz);
+    const deadband = Math.max(GROUND_DEADBAND_M, GROUND_DEADBAND_FLYER * medoid.width);
+    if (error <= deadband) return;
+
+    if (error > GROUND_MAX_ERROR_M) {
+      // Do not chase it. Surface it -- this is the signal that the lock itself
+      // is wrong, which is a different problem from drift.
+      recordDiagnostic('ground-correction-refused', {
+        error: Number(error.toFixed(4)), limit: GROUND_MAX_ERROR_M,
+        reason: 'too large to be drift; likely a mis-detection'
+      });
+      groundSamples.length = 0;
+      return;
+    }
+
+    const THREE = window.THREE;
+    if (!THREE) return;
+    groundTarget = {
+      position: new THREE.Vector3(medoid.position.x, medoid.position.y, medoid.position.z),
+      quaternion: new THREE.Quaternion(medoid.rotation.x, medoid.rotation.y,
+                                       medoid.rotation.z, medoid.rotation.w)
+    };
+    groundCorrections += 1;
+    recordDiagnostic('ground-correction-started', {
+      error: Number(error.toFixed(4)), deadband: Number(deadband.toFixed(4)),
+      samples: evaluation.sampleCount, spanMs: Math.round(evaluation.spanMs || 0),
+      corrections: groundCorrections
+    });
+    startGroundLoop();
+  };
+
+  const stopGroundLoop = () => {
+    if (groundRaf !== null) { window.cancelAnimationFrame(groundRaf); groundRaf = null; }
+    groundLastFrameAt = 0;
+  };
+
+  const startGroundLoop = () => {
+    if (groundRaf !== null) return;
+    groundLastFrameAt = performance.now();
+    const step = () => {
+      groundRaf = null;
+      if (!groundTarget || !hasLocked) { stopGroundLoop(); return; }
+
+      const nowMs = performance.now();
+      const dt = Math.min(0.05, Math.max(0, (nowMs - groundLastFrameAt) / 1000));
+      groundLastFrameAt = nowMs;
+
+      const object = anchor.object3D;
+      const remaining = object.position.distanceTo(groundTarget.position);
+      if (remaining <= GROUND_SETTLE_M) {
+        recordDiagnostic('ground-correction-settled', {
+          residual: Number(remaining.toFixed(4)), corrections: groundCorrections
+        });
+        groundTarget = null;
+        stopGroundLoop();
+        return;
+      }
+
+      // Rate-capped, never proportional: a proportional move is fastest exactly
+      // when the error is largest, which is when a jump is most visible.
+      const maxStep = GROUND_MAX_M_PER_S * dt;
+      object.position.lerp(groundTarget.position, Math.min(1, maxStep / remaining));
+
+      const maxRad = (GROUND_MAX_DEG_PER_S * Math.PI / 180) * dt;
+      const angle = object.quaternion.angleTo(groundTarget.quaternion);
+      if (angle > 1e-4) {
+        object.quaternion.rotateTowards(groundTarget.quaternion, Math.min(maxRad, angle));
+      }
+
+      // Scale is deliberately NOT corrected. A scale error means a distance
+      // estimate moved, and resizing food in front of someone judging a PORTION
+      // is the one change they are guaranteed to notice.
+      object.updateMatrix();
+      object.updateMatrixWorld(true);
+
+      groundRaf = window.requestAnimationFrame(step);
+    };
+    groundRaf = window.requestAnimationFrame(step);
+  };
+
+  // Let the diagnostics HUD read the grounding state; without this a silent
+  // correction is indistinguishable from no correction at all.
+  window.STEAKOUT_GROUND_STATE = () => ({
+    corrections: groundCorrections,
+    correcting: !!groundTarget,
+    samples: groundSamples.length
+  });
+
   const commitCandidate = (sample, evaluation, now) => {
     if (!candidate || hasLocked || !sample) return;
     const committedEpoch = candidate.epoch;
@@ -592,6 +753,7 @@
         lastCommittedTargetLogAt = now;
         recordDiagnostic('target-after-commit', { source, sample: poseForLog(sample) });
       }
+      considerGroundCorrection(sample, now);
       return;
     }
     if (!sample) {
@@ -815,6 +977,13 @@
         clearProgressAdvance();
         clearLostGrace();
         clearLockedHide();
+        // A correction loop must never outlive the lock it was correcting: the
+        // anchor is about to be re-acquired, and a surviving rAF would keep
+        // dragging it toward a target measured against the OLD lock.
+        stopGroundLoop();
+        groundTarget = null;
+        groundSamples.length = 0;
+        groundCorrections = 0;
         hasLocked = false;
         targetVisible = false;
         candidate = undefined;
