@@ -366,42 +366,15 @@
 }
 
 /* ==========================================================================
-   HEADER — brand | logo | social, all measured
+   HEADER ORDER — left alone, deliberately
    ==========================================================================
-   Measured at 393px. The header is 373 wide with 12px padding, and the three
-   pieces fit the existing width exactly in this order:
-       brand 187 + gap 9 + logo 50 + gap 9 + social 92 = 347
-   which is the same total the original order used, so nothing has to shrink.
+   The logo position has been moved three times on request and broken the
+   header twice. The original order (logo | brand | social) is known-good and
+   measures 94px, so it stays until the target position is settled.
 
-   An earlier attempt put SOCIAL on the left. Wrong: social belongs on the far
-   right where it has always been (13px inset), and the logo goes between the
-   wordmark and it.
-
-   grid-row: 1 on all three is essential. Assigning a later DOM child to an
-   earlier column otherwise creates a new implicit row, which doubled the header
-   to 179.6px and stacked the pieces vertically. Pinned, it measures 94px --
-   identical to the original.
+   What IS kept below is the wordmark sizing and the step-label clearance --
+   both measured, both unambiguous.
    ========================================================================== */
-
-.marker-hud.marker-hud--top {
-  grid-template-columns: minmax(0, 1fr) 50px auto !important;
-}
-
-.marker-hud--top .marker-brand {
-  grid-column: 1 !important;
-  grid-row: 1 !important;
-}
-
-.marker-hud--top .marker-logo-home {
-  grid-column: 2 !important;
-  grid-row: 1 !important;
-  justify-self: center !important;
-}
-
-.marker-hud--top #marker-social {
-  grid-column: 3 !important;
-  grid-row: 1 !important;
-}
 
 /* The wordmark was 22.4px next to a 24x23 AR badge -- the badge was as tall as
    the words it sat beside, so it read as the louder element. Wordmark up to
