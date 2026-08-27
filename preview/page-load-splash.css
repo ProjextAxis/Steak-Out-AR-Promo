@@ -85,7 +85,7 @@ html.is-preloading-ar body { overflow:hidden !important; }
 #ar-splash.is-page-load.is-waiting .page-load-status__dots {
   animation: statusDotsIn .38s cubic-bezier(.2, .9, .25, 1.35) .46s forwards !important;
 }
-#ar-splash.is-page-load-exit { animation:pageLoadSplashExit .78s ease forwards !important; pointer-events:none !important; }
+#ar-splash.is-page-load-exit { animation:pageLoadSplashExit .38s ease forwards !important; pointer-events:none !important; }
 
 @keyframes pageLoadStatusIn { from { opacity: 0 } to { opacity: 1 } }
 

@@ -372,7 +372,7 @@
     if ('requestIdleCallback' in window) {
       window.requestIdleCallback(loadBrowserAR, { timeout: 1600 });
     } else {
-      window.setTimeout(loadBrowserAR, 500);
+      window.setTimeout(loadBrowserAR, 150);   // warm the AR frame sooner
     }
   };
 

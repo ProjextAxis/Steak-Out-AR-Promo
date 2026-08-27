@@ -3,15 +3,15 @@
   if (!splash) return;
 
   const logo = splash.querySelector('img');
-  const MIN_MS = 1600;
+  const MIN_MS = 700;
   const MAX_MS = 9000;
   const FOCUS_SETTLE_MS = 220;
-  const ENTRANCE_MS = 1500;
+  const ENTRANCE_MS = 700;
   const PULSE_MS = 6200;
   // In-app WebViews often never report focus. Without these the entrance never
   // starts, and every exit path below waits on it.
-  const ENTRANCE_FALLBACK_MS = 850;
-  const AR_FRAME_GRACE_MS = 1400;
+  const ENTRANCE_FALLBACK_MS = 300;
+  const AR_FRAME_GRACE_MS = 600;
   const started = performance.now();
 
   let modelReady = false;
@@ -125,7 +125,7 @@
   // the splash open — the markup already ships a usable logo.
   Promise.race([
     window.STEAKOUT_LOGO_READY || Promise.resolve(),
-    new Promise((resolve) => window.setTimeout(resolve, 600))
+    new Promise((resolve) => window.setTimeout(resolve, 220))
   ]).finally(() => waitForFocus());
 
   window.setTimeout(() => {
@@ -140,7 +140,7 @@
     entranceDone = true;
     startPulse();
     maybeFinish();
-  }, ENTRANCE_FALLBACK_MS + ENTRANCE_MS + 400);
+  }, ENTRANCE_FALLBACK_MS + ENTRANCE_MS + 200);
 
   // The AR frame is only a warm-up; it must never hold the splash open.
   window.setTimeout(() => {
@@ -183,7 +183,7 @@
       // Hidden is not enough: it stays a full-screen fixed layer holding the
       // logo, so any stray class or animation can flash it back over the page.
       splash.remove();
-    }, 820);
+    }, 420);   // must stay >= the .38s CSS exit or it snaps away mid-fade
   };
 
   function maybeFinish() {
