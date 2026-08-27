@@ -104,19 +104,49 @@
 
 /* Becoming ACTIVE is the moment worth seeing. One overshoot, then settle. */
 .marker-progress__step[data-state="active"] .marker-progress__circle {
-  animation: stepBecameActive .62s cubic-bezier(.2, .9, .25, 1.5);
+  animation: stepBecameActive .78s cubic-bezier(.34, 1.2, .38, 1);
 }
 
-/* Bigger than felt tasteful on paper. At 58px on a phone, held for under half a
-   second, over live video, a 1.16x pop is invisible -- the eye reads it as
-   nothing happening. This is the one moment the interface responds to the
-   customer, so it has to actually register. */
+/* A real POP, not a colour change.
+ *
+ * A step going active is the one moment the interface acknowledges the person
+ * holding the phone. A tint swap does not register at 58px over live video --
+ * the eye reads it as nothing happening.
+ *
+ * So it springs: compress, overshoot well past rest, settle back through a
+ * smaller counter-bounce. Two overshoots is what separates "sprung" from
+ * "scaled" -- one overshoot still reads as a mechanical tween. A ring pushes
+ * outward on the same beat so the pop has somewhere to go instead of just
+ * being a bigger circle.
+ */
 @keyframes stepBecameActive {
-  0%   { transform: scale(.86); box-shadow: 0 2px 10px rgba(0,0,0,.55); }
-  35%  { transform: scale(1.34); box-shadow: 0 0 26px 6px rgba(181,18,27,.95); }
-  60%  { transform: scale(.96); box-shadow: 0 0 16px 2px rgba(181,18,27,.55); }
-  100% { transform: scale(1);   box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+  0%   { transform: scale(.82);  box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+  28%  { transform: scale(1.38); box-shadow: 0 0 30px 8px rgba(181,18,27,.95); }
+  52%  { transform: scale(.93);  box-shadow: 0 0 18px 3px rgba(181,18,27,.6); }
+  72%  { transform: scale(1.08); box-shadow: 0 0 22px 5px rgba(181,18,27,.75); }
+  88%  { transform: scale(.98);  box-shadow: 0 0 14px 2px rgba(181,18,27,.45); }
+  100% { transform: scale(1);    box-shadow: 0 2px 10px rgba(0,0,0,.55); }
 }
+
+/* The ring: a halo that expands and fades as the circle springs, so the energy
+   appears to leave the step rather than stopping at its edge. */
+.marker-progress__step[data-state="active"] .marker-progress__circle::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--target-red);
+  animation: stepRing .72s cubic-bezier(.2, .7, .3, 1) both;
+  pointer-events: none;
+}
+
+@keyframes stepRing {
+  0%   { transform: scale(.7); opacity: .95; }
+  70%  { transform: scale(1.55); opacity: .18; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.marker-progress__circle { position: relative; }
 
 /* Becoming COMPLETE should read as "that one is done", not as a second alarm --
    so it settles down and back rather than overshooting up. */
@@ -195,27 +225,30 @@
  * Only the close badge is removed here. That was the actual request. */
 
 /* ==========================================================================
-   TRAVELLING PULSE ALONG THE CONNECTORS
+   THE BULGE — something travelling down the line
    ==========================================================================
-   A step popping tells you WHERE you are. It does not tell you that something
-   moved from one place to the next. A bulge running along the connector does:
-   it reads as progress being handed forward, which is the whole point of a
-   stepper.
+   A dot sliding along a line reads as a loading bar. A BULGE reads as something
+   being carried: the line stays skinny, a swelling passes through it, and the
+   swelling stretches slightly as it moves and settles as it arrives. That is
+   what makes it feel like a thing travelling rather than a value changing.
 
    The lines are siblings BETWEEN the steps, so `[data-state="complete"] + line`
-   selects exactly the connector leaving a step that has just finished -- the
-   pulse therefore always travels in the direction of travel, with no JS needed
-   to pick the right line.
+   is exactly the connector leaving a step that just finished -- the bulge always
+   runs in the direction of travel, with no JS choosing the line.
+
+   Everything animates on TRANSFORM and opacity only, never width/height/left,
+   so it composites on the GPU and stays smooth on a phone already running SLAM.
    ========================================================================== */
 
 .marker-progress__line {
   position: relative;
   overflow: visible;
-  /* Not yet travelled: present, but clearly not the live part of the path. */
-  opacity: .38;
+  height: 2px !important;          /* skinnier, so the bulge reads against it */
+  border-radius: 2px;
+  opacity: .34;                    /* not yet travelled */
+  transition: opacity .3s ease;
 }
 
-/* Once a step is done, the path behind it is lit. */
 .marker-progress__step[data-state="complete"] + .marker-progress__line {
   opacity: 1;
 }
@@ -225,20 +258,26 @@
   position: absolute;
   top: 50%;
   left: 0;
-  width: 16px;
-  height: 7px;
-  margin-top: -3.5px;
-  border-radius: 4px;
-  background: #fff;
-  box-shadow: 0 0 12px 3px rgba(181, 18, 27, .95);
-  animation: connectorPulse .62s cubic-bezier(.45, 0, .25, 1) both;
+  width: 26px;
+  height: 13px;
+  margin: 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+              #fff 0%, var(--target-red) 45%, var(--target-red) 100%);
+  box-shadow: 0 0 16px 5px rgba(181, 18, 27, .9);
+  will-change: transform, opacity;
+  animation: snakeBulge .92s cubic-bezier(.37, 0, .63, 1) both;
 }
 
-@keyframes connectorPulse {
-  0%   { left: -6px;  opacity: 0; transform: translateX(-50%) scaleX(.4); }
-  18%  {              opacity: 1; transform: translateX(-50%) scaleX(1); }
-  78%  {              opacity: 1; transform: translateX(-50%) scaleX(1); }
-  100% { left: 100%;  opacity: 0; transform: translateX(-50%) scaleX(.4); }
+@keyframes snakeBulge {
+  /* swallowed: nothing, then it forms at the mouth of the line */
+  0%   { left: 0%;   transform: translate(-50%, -50%) scale(.15, .15); opacity: 0; }
+  14%  { left: 8%;   transform: translate(-50%, -50%) scale(1, 1);     opacity: 1; }
+  /* mid-travel it stretches along the direction it is moving */
+  50%  { left: 50%;  transform: translate(-50%, -50%) scale(1.22, .88); opacity: 1; }
+  /* then rounds out again as it slows into the next step */
+  86%  { left: 92%;  transform: translate(-50%, -50%) scale(1, 1);      opacity: 1; }
+  100% { left: 100%; transform: translate(-50%, -50%) scale(.15, .15);  opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
