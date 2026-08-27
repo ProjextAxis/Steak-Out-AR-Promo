@@ -128,23 +128,6 @@
   100% { transform: scale(1);    box-shadow: 0 2px 10px rgba(0,0,0,.55); }
 }
 
-/* The ring: a halo that expands and fades as the circle springs, so the energy
-   appears to leave the step rather than stopping at its edge. */
-.marker-progress__step[data-state="active"] .marker-progress__circle::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid var(--target-red);
-  animation: stepRing .72s cubic-bezier(.2, .7, .3, 1) both;
-  pointer-events: none;
-}
-
-@keyframes stepRing {
-  0%   { transform: scale(.7); opacity: .95; }
-  70%  { transform: scale(1.55); opacity: .18; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
 
 .marker-progress__circle { position: relative; }
 
@@ -312,10 +295,7 @@
 
 .marker-progress__step[data-state="complete"]
   + .marker-progress__line
-  + .marker-progress__step[data-state="active"] .marker-progress__circle::before {
-  animation-delay: .58s;
-}
-
+  + 
 .marker-progress__step[data-state="complete"]
   + .marker-progress__line
   + .marker-progress__step[data-state="active"] > strong {
@@ -331,4 +311,56 @@
   72%  { transform: translateY(-3px) scale(1.08);   box-shadow: 0 6px 22px 5px rgba(181,18,27,.75); }
   88%  { transform: translateY(0) scale(.98);       box-shadow: 0 0 14px 2px rgba(181,18,27,.45); }
   100% { transform: translateY(0) scale(1);         box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+}
+
+
+/* ==========================================================================
+   SIZE CARRIES THE STATE
+   ==========================================================================
+   No ripple. The ring was decoration around the circle rather than something
+   happening TO it, so it read as an effect layered on top instead of the step
+   itself responding.
+
+   The circle now holds its state in its own size: the live step is visibly
+   BIGGER and stays that way, and the step it just left visibly SHRINKS. Both
+   halves matter -- a step growing tells you where you are now, a step shrinking
+   is what makes it read as having moved on rather than two things being lit.
+   ========================================================================== */
+
+.marker-progress__circle {
+  position: relative;
+  transform-origin: 50% 50%;
+}
+
+/* Resting sizes per state. The animations below overshoot around these and
+   settle onto them, so the circle STAYS bigger rather than springing back. */
+.marker-progress__step[data-state="upcoming"] .marker-progress__circle {
+  transform: scale(.88);
+}
+
+.marker-progress__step[data-state="complete"] .marker-progress__circle {
+  animation: stepShrinkAway .5s cubic-bezier(.35, 0, .3, 1) both;
+}
+
+.marker-progress__step[data-state="active"] .marker-progress__circle {
+  animation: stepBecameActive .72s cubic-bezier(.34, 1.25, .38, 1) both;
+}
+
+/* Grows, lifts, and STAYS at 1.2. The final keyframe is the resting size, and
+   `both` holds it -- so the live step is permanently the largest thing in the
+   ribbon, not just briefly. */
+@keyframes stepBecameActive {
+  0%   { transform: translateY(0) scale(.86);     box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+  34%  { transform: translateY(-8px) scale(1.42); box-shadow: 0 12px 30px 8px rgba(181,18,27,.95); }
+  62%  { transform: translateY(1px) scale(1.10);  box-shadow: 0 2px 18px 4px rgba(181,18,27,.7); }
+  82%  { transform: translateY(-2px) scale(1.25); box-shadow: 0 6px 22px 5px rgba(181,18,27,.8); }
+  100% { transform: translateY(0) scale(1.20);    box-shadow: 0 4px 18px 4px rgba(181,18,27,.65); }
+}
+
+/* The one being left behind. Visibly collapses from the size it held while
+   active down past its resting size and settles -- so you SEE it hand over. */
+@keyframes stepShrinkAway {
+  0%   { transform: scale(1.20); }
+  55%  { transform: scale(.78); }
+  100% { transform: scale(.92); }
 }
