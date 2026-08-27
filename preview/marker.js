@@ -1165,7 +1165,23 @@
 
         isRunning = true;
         clearCameraWatchdog();
-        if (!targetVisible && !hasLocked) renderInstruction('scanning');
+        if (!targetVisible && !hasLocked) {
+          // The markup ships step 1 already complete and step 2 already active,
+          // so the ribbon opens mid-flow and the 1 -> 2 transition never
+          // happens -- there is nothing for the animation to animate, and the
+          // customer never sees the thing react to what they just did.
+          //
+          // Show step 1 as active for a beat FIRST, then advance. This is not
+          // theatre: tapping VIEW IN AR is step 1, and it completed a moment
+          // ago. The animation is showing something true, just slightly later
+          // than it happened.
+          setProgressStep(1);
+          window.setTimeout(() => {
+            if (runToken !== sessionToken || !isRunning) return;
+            if (targetVisible || hasLocked) return;   // real progress wins
+            renderInstruction('scanning');
+          }, 420);
+        }
         if (socialDock) socialDock.hidden = false;
         if (orderLink) orderLink.hidden = false;
         guide.hidden = false;
