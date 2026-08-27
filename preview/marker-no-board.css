@@ -287,3 +287,48 @@
   }
   .marker-progress__line { opacity: 1; }
 }
+
+/* ==========================================================================
+   ARRIVAL — the pop happens WHEN THE BULGE LANDS
+   ==========================================================================
+   The pop and the travel were firing on the same beat, so the dot arrived into
+   a circle that had already reacted. Cause and effect were simultaneous, which
+   reads as two unrelated animations rather than one event.
+
+   Now the destination waits. The bulge sets off, travels, and the circle pops
+   as it lands -- so the pop is visibly CAUSED by the thing arriving.
+
+   The selector does the sequencing with no JS: an active step that is preceded
+   by a completed step THROUGH A CONNECTOR is one the bulge is travelling
+   toward, so it waits. A bare active step -- step 1 on open, with nothing
+   before it -- has no incoming bulge and pops immediately.
+   ========================================================================== */
+
+.marker-progress__step[data-state="complete"]
+  + .marker-progress__line
+  + .marker-progress__step[data-state="active"] .marker-progress__circle {
+  animation-delay: .58s;
+}
+
+.marker-progress__step[data-state="complete"]
+  + .marker-progress__line
+  + .marker-progress__step[data-state="active"] .marker-progress__circle::before {
+  animation-delay: .58s;
+}
+
+.marker-progress__step[data-state="complete"]
+  + .marker-progress__line
+  + .marker-progress__step[data-state="active"] > strong {
+  animation-delay: .58s;
+}
+
+/* "Pop UP" rather than just "grow": the circle lifts as it springs and settles
+   back down, so the arrival has a direction instead of only a size. */
+@keyframes stepBecameActive {
+  0%   { transform: translateY(0) scale(.82);       box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+  28%  { transform: translateY(-7px) scale(1.38);   box-shadow: 0 10px 30px 8px rgba(181,18,27,.95); }
+  52%  { transform: translateY(1px) scale(.93);     box-shadow: 0 0 18px 3px rgba(181,18,27,.6); }
+  72%  { transform: translateY(-3px) scale(1.08);   box-shadow: 0 6px 22px 5px rgba(181,18,27,.75); }
+  88%  { transform: translateY(0) scale(.98);       box-shadow: 0 0 14px 2px rgba(181,18,27,.45); }
+  100% { transform: translateY(0) scale(1);         box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+}
