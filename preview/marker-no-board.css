@@ -156,3 +156,41 @@
     animation: none;
   }
 }
+
+/* ==========================================================================
+   AR HEADER — drop the close badge, move the mark to the right
+   ==========================================================================
+   marker.css injects a red "×" badge onto the logo in embedded mode as a
+   close-AR affordance. It reads as damage rather than as a control: a red cross
+   stuck on the brand mark looks like an error state, and it is the first thing
+   the eye lands on. The header already has the logo linking home, so the badge
+   was duplicating an affordance while degrading the logo.
+
+   The mark also moves to the RIGHT of the header. Leading with the bull put the
+   brand where the eye starts, ahead of the thing the customer actually needs to
+   read ("$12 LUNCH PREVIEW"). Trailing it keeps the brand present without it
+   being the first obstacle.
+
+   Loaded last, so this wins over marker.css without editing it.
+   ========================================================================== */
+
+.is-embedded .marker-logo-home::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Text first, mark trailing. grid-column places the mark in the last track
+   rather than reordering the DOM, so tab order and screen-reader order stay as
+   authored. */
+.marker-hud.marker-hud--top {
+  grid-template-columns: minmax(0, 1fr) 62px auto !important;
+}
+
+.marker-hud--top .marker-logo-home {
+  grid-column: 2 !important;
+  justify-self: end !important;
+}
+
+.marker-hud--top .marker-brand {
+  grid-column: 1 !important;
+}
