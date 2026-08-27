@@ -83,7 +83,7 @@
       // Sizes as multiples of the meal's footprint.
       poolSize: { default: 1.18, min: 0 },
       receiverSize: { default: 1.30, min: 0 },
-      // Light position in footprint units, relative to the meal's centre on the
+      // Light position in footprint units, relative to the meal's center on the
       // flyer. Mostly overhead (z) with a small lean so the shadow reads as
       // directional without sliding out from under the plate.
       lightOffset: { type: 'vec3', default: { x: 0.12, y: 0.19, z: 1.15 } },
@@ -101,7 +101,7 @@
       this.measured = false;
       this.worldScale = 0;
       this.footprint = 0;
-      this.centre = { x: 0, y: 0 };
+      this.center = { x: 0, y: 0 };
       this.orthoHalf = 0;
       this.shadowNear = 0;
       this.shadowFar = 0;
@@ -301,7 +301,7 @@
 
       // Intensity 0 by default: this light exists to produce a shadow mask, not
       // to relight the meal. ShadowMaterial's alpha comes from the shadow test,
-      // not from the light's colour, so the meal keeps A-Frame's default
+      // not from the light's color, so the meal keeps A-Frame's default
       // lighting untouched.
       this.light = new THREE.DirectionalLight(0xffffff, data.lightIntensity);
       this.light.name = 'steakoutShadowLight';
@@ -321,7 +321,7 @@
       // second, producing a texture that never changes. That is pure heat, and
       // heat is what makes minute 5 worse than minute 1.
       // tick() below re-arms needsUpdate whenever the rig matrix actually
-      // moves, so pre-lock behaviour is unchanged.
+      // moves, so pre-lock behavior is unchanged.
       this.light.shadow.autoUpdate = false;
       this.light.shadow.needsUpdate = true;
       this.lightRig.add(this.light);
@@ -367,8 +367,8 @@
 
       // x/y span the flyer, z stands off it.
       this.footprint = Math.max(box.max.x - box.min.x, box.max.y - box.min.y);
-      this.centre.x = (box.max.x + box.min.x) / 2;
-      this.centre.y = (box.max.y + box.min.y) / 2;
+      this.center.x = (box.max.x + box.min.x) / 2;
+      this.center.y = (box.max.y + box.min.y) / 2;
       this.height = box.max.z - Math.min(0, box.min.z);
 
       if (!(this.footprint > 0)) {
@@ -394,13 +394,13 @@
       if (this.pool) {
         const size = footprint * data.poolSize;
         this.pool.scale.set(size, size, 1);
-        this.pool.position.set(this.centre.x, this.centre.y, lift);
+        this.pool.position.set(this.center.x, this.center.y, lift);
       }
 
       if (this.receiver) {
         const size = footprint * data.receiverSize;
         this.receiver.scale.set(size, size, 1);
-        this.receiver.position.set(this.centre.x, this.centre.y, lift * 2);
+        this.receiver.position.set(this.center.x, this.center.y, lift * 2);
         // Frustum exactly covers the receiver: no wasted shadow-map texels, and
         // nothing that could catch a shadow falls outside it.
         this.orthoHalf = size / 2;
@@ -408,11 +408,11 @@
 
       if (this.light) {
         this.light.position.set(
-          this.centre.x + footprint * data.lightOffset.x,
-          this.centre.y + footprint * data.lightOffset.y,
+          this.center.x + footprint * data.lightOffset.x,
+          this.center.y + footprint * data.lightOffset.y,
           footprint * data.lightOffset.z
         );
-        this.light.target.position.set(this.centre.x, this.centre.y, 0);
+        this.light.target.position.set(this.center.x, this.center.y, 0);
         // Brackets the meal comfortably: the light sits ~1.17 footprints off
         // the flyer, the meal's crown reaches ~0.34 of a footprint up.
         this.shadowNear = footprint * 0.35;

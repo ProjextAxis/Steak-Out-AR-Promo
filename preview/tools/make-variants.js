@@ -27,12 +27,12 @@ const VARIANTS = [
   /* ---- baselines ------------------------------------------------------- */
   {
     name: 'v00-pristine',
-    note: 'Untouched artwork, greyscaled the same way the compiler does. Reproduces the currently shipped target.',
+    note: 'Untouched artwork, grayscaled the same way the compiler does. Reproduces the currently shipped target.',
     pipeline: []
   },
   {
     name: 'v01-grey-only',
-    note: 'Explicit greyscale pass and nothing else. Tests whether pre-greyscaling buys anything.',
+    note: 'Explicit grayscale pass and nothing else. Tests whether pre-greyscaling buys anything.',
     pipeline: [{ op: 'brightness', args: { delta: 0 } }]
   },
 

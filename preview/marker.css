@@ -1091,7 +1091,7 @@ a {
    device that had it enabled. Restore this block to honour the setting. */
 
 
-/* Aiming guide for the centred acquisition crop. See ar-reticle.js. */
+/* Aiming guide for the centerd acquisition crop. See ar-reticle.js. */
 #ar-reticle {
   position: fixed;
   z-index: 5;

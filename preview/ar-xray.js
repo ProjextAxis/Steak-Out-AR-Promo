@@ -3,7 +3,7 @@
  * RIG MODE: with ALWAYS_ON the HUD is on screen permanently and cannot be
  * tapped shut, because the test phone is bolted to the gimbal and cannot be
  * tapped at all. Set ALWAYS_ON = false to restore the opt-in ?ar-debug=1
- * behaviour -- do that before this is live in front of customers. */
+ * behavior -- do that before this is live in front of customers. */
 (() => {
   const ALWAYS_ON = false;   // Customer default. ?ar-debug=1 or ?dev=1 opts in.
   const params = new URLSearchParams(location.search);

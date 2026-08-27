@@ -40,7 +40,7 @@ Practically: keep `ar` and `ar-modes` off `<model-viewer>`, never call
 | MindAR | filterMinCF `0.001`, filterBeta `1000` (both stock), missTolerance `10`, warmupTolerance `2` |
 | Camera | `ar-camera-tune.js` asks for 1080p and records what it gets — see 5b |
 
-Scale needs no tape measure: MindAR normalises the marker to **1 unit wide**, so
+Scale needs no tape measure: MindAR normalizes the marker to **1 unit wide**, so
 plate width as a multiple of flyer width is `0.3521 * scale`. 2.84 makes them equal.
 
 ## 4. Facts established from the mind-ar source — trust these
@@ -72,8 +72,8 @@ x = width/2  - cropSize + (i % 3) * cropSize/2
 y = height/2 - cropSize + floor(i / 3) * cropSize/2      // i = 0..8, then wraps
 ```
 
-so the union of the nine windows spans **2 x cropSize per axis**, centred on the
-frame — 1024px across on a 1080-wide feed, not 512. The centred `detect()` is
+so the union of the nine windows spans **2 x cropSize per axis**, centerd on the
+frame — 1024px across on a 1080-wide feed, not 512. The centerd `detect()` is
 reached exactly once, from `dummyRun()`, and never again.
 
 **But do NOT size the aiming reticle to the swept region.** That mistake shipped
@@ -127,7 +127,7 @@ Measured across four builds, ~29s each, same scene:
 was measured when `ar-camera-tune.js` capped resolution DOWN. It now asks UP,
 and the letters were re-pointed to match: **A and B ask for 1080p, C and D leave
 the request untouched as a control.** The labels in `config.js` said 720p/1080p
-for one commit after the behaviour changed, so anyone who recorded `?ar=C`
+for one commit after the behavior changed, so anyone who recorded `?ar=C`
 during that window measured the browser default, not 1080p.
 
 **All within noise.** Neither the 720p cap nor the lean target caused it — D
@@ -166,7 +166,7 @@ but a larger print is out of budget, so the levers are framing (see the reticle
 correction in section 4), resolution (`?res=`), and `warmupTolerance` (`?warm=`).
 
 Frame inspection shows it locks only when the phone is close and the flyer is
-centred, which matches the centred-crop finding. Leading hypothesis is therefore
+centerd, which matches the centerd-crop finding. Leading hypothesis is therefore
 **how much of the frame the flyer physically fills**, i.e. print size. That is the
 one factor the tuning study explicitly could not model.
 
@@ -254,7 +254,7 @@ If the overlay does not appear at all, the AR iframe is not receiving the
 parameters — `config.js` forwards `ar=` and `xray=1` into `marker.html`, and that
 forwarding was confirmed working on the deployed preview.
 
-### Analysing the recording
+### Analyzing the recording
 
 Use ffmpeg frame-by-frame. Do not eyeball, and do not trust a summary: an earlier
 measurement reported 79% uptime and was wrong, because the detector counted a
@@ -264,8 +264,8 @@ yellow snack bag in frame as fries. The real figure was 20%.
 
 - **Print-simulation variants of the marker.** 26 tested. Both stages are already
   contrast-invariant (NCC for tracking, FREAK for matching), so contrast, gamma and
-  blur are normalised away, and a flatter source yields *fewer* points against
-  `SD_THRESH`. Sharpening and binarising also fail; binarising notably.
+  blur are normalized away, and a flatter source yields *fewer* points against
+  `SD_THRESH`. Sharpening and binarizing also fail; binarizing notably.
 - **Multi-target `.mind` files.** 6 combinations. The worker breaks on first match
   and every gain landed on a higher target index, but `marker.html` declares one
   anchor at `targetIndex: 0` with `maxTrack` 1 — so those matches render nothing

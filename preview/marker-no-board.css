@@ -81,10 +81,10 @@
    A state that exists for a quarter of a second is invisible: the customer
    perceives 2 -> 4 and never sees the thing respond to them.
 
-   Fixing it by padding step 3 with a minimum dwell would mean showing "CENTRE
+   Fixing it by padding step 3 with a minimum dwell would mean showing "CENTER
    IT" after the meal has already locked -- a small lie, and the lock is the one
    moment that must stay honest. So nothing is slowed. Instead the CHANGE itself
-   is made legible: colour eases rather than snaps, and a step that becomes
+   is made legible: color eases rather than snaps, and a step that becomes
    active pops once. Even 250ms of step 3 now registers as movement.
 
    Appended here rather than as a new file so the AR page does not take another
@@ -107,7 +107,7 @@
   animation: stepBecameActive .78s cubic-bezier(.34, 1.2, .38, 1);
 }
 
-/* A real POP, not a colour change.
+/* A real POP, not a color change.
  *
  * A step going active is the one moment the interface acknowledges the person
  * holding the phone. A tint swap does not register at 58px over live video --
@@ -202,12 +202,12 @@
  * Only the close badge is removed here. That was the actual request. */
 
 /* ==========================================================================
-   THE BULGE — something travelling down the line
+   THE BULGE — something traveling down the line
    ==========================================================================
    A dot sliding along a line reads as a loading bar. A BULGE reads as something
    being carried: the line stays skinny, a swelling passes through it, and the
    swelling stretches slightly as it moves and settles as it arrives. That is
-   what makes it feel like a thing travelling rather than a value changing.
+   what makes it feel like a thing traveling rather than a value changing.
 
    The lines are siblings BETWEEN the steps, so `[data-state="complete"] + line`
    is exactly the connector leaving a step that just finished -- the bulge always
@@ -222,7 +222,7 @@
   overflow: visible;
   height: 2px !important;          /* skinnier, so the bulge reads against it */
   border-radius: 2px;
-  opacity: .34;                    /* not yet travelled */
+  opacity: .34;                    /* not yet traveled */
   transition: opacity .3s ease;
 }
 
@@ -267,14 +267,14 @@
 /* ==========================================================================
    IT POPS THE SECOND IT TURNS RED
    ==========================================================================
-   This used to hold the pop back by .58s so it fired as the travelling bulge
+   This used to hold the pop back by .58s so it fired as the traveling bulge
    landed. On paper that made the arrival the cause of the pop. In the hand it
    just read as lag: the circle went red instantly and then sat there, red and
    inert, for over half a second before anything moved. A control that changes
-   colour and does not respond feels broken, and no amount of choreography is
+   color and does not respond feels broken, and no amount of choreography is
    worth that.
 
-   So the delays are gone. Colour and pop are now the same event, on the same
+   So the delays are gone. Color and pop are now the same event, on the same
    frame -- the circle turns red and springs simultaneously.
 
    The bulge is NOT removed; it is the thing being carried down the line and it
@@ -283,7 +283,7 @@
    (~245ms) then again at 82% (~590ms), so a .44s bulge lands between the two
    beats, while the circle is still visibly moving. The dot and the spring read
    as ONE event rather than a sequence. Much under .40s and the bulge stops
-   reading as something travelling and becomes a flicker; much over .50s and it
+   reading as something traveling and becomes a flicker; much over .50s and it
    is trailing the pop again, which is the problem this is fixing.
    ========================================================================== */
 
@@ -399,9 +399,9 @@
   }
 }
 
-/* The badge read low because flexbox centres it on the LINE BOX while the eye
-   centres it on the LETTERS. Rustler's ink fills 1.9px..30.4px of a 39px line
-   box, so the wordmark's optical centre is 16.1px down and the badge's is
+/* The badge read low because flexbox centers it on the LINE BOX while the eye
+   centers it on the LETTERS. Rustler's ink fills 1.9px..30.4px of a 39px line
+   box, so the wordmark's optical center is 16.1px down and the badge's is
    19.5px -- 3.4px too low, and more obvious now the wordmark is bigger.
    -.15em of the badge's own size is ~3px back up. Visual only: `relative`
    offsets paint, not layout, so the header geometry is untouched. */
@@ -467,7 +467,7 @@
    no previous-sibling combinator. Confirmed supported: Safari 15.4+ (iOS
    included) and Chrome 105+, and CSS.supports('selector(:has(+ div))') returns
    true here. On anything older that half simply does not match and the left
-   connector keeps the 1.23px overlap it has TODAY -- current behaviour, so
+   connector keeps the 1.23px overlap it has TODAY -- current behavior, so
    there is no regression to fall back to.
    ========================================================================== */
 

@@ -1,12 +1,12 @@
 /*
- * imageops.js — greyscale image pipeline used to simulate what a phone camera
+ * imageops.js — grayscale image pipeline used to simulate what a phone camera
  * actually sees when it looks at the PRINTED Steak Out flyer.
  *
  * Everything works on a plain { data: Float32Array, width, height } buffer of
- * 0..255 greyscale samples. Float, not Uint8, so a chain of operations does not
- * accumulate rounding error; it is quantised once on the way out.
+ * 0..255 grayscale samples. Float, not Uint8, so a chain of operations does not
+ * accumulate rounding error; it is quantized once on the way out.
  *
- * Why greyscale: MindAR's compiler throws colour away immediately —
+ * Why grayscale: MindAR's compiler throws color away immediately —
  * compiler-base.js reduces every pixel to (R + G + B) / 3 before it detects a
  * single feature. Simulating in grey is therefore not a shortcut, it is exactly
  * the signal the compiler sees.
@@ -17,7 +17,7 @@
 const fs = require('fs');
 const { loadImage, createCanvas } = require('./resolve-mindar.js').canvas;
 
-/** Load any image file as a greyscale buffer, matching MindAR's (R+G+B)/3. */
+/** Load any image file as a grayscale buffer, matching MindAR's (R+G+B)/3. */
 async function loadGrey(path) {
   const img = await loadImage(path);
   const canvas = createCanvas(img.width, img.height);
@@ -33,7 +33,7 @@ async function loadGrey(path) {
   return { data, width: img.width, height: img.height };
 }
 
-/** Write a greyscale buffer out as an 8-bit RGB PNG (R = G = B, so the
+/** Write a grayscale buffer out as an 8-bit RGB PNG (R = G = B, so the
  *  compiler's (R+G+B)/3 recovers these exact values). */
 function saveGrey(image, path) {
   const canvas = createCanvas(image.width, image.height);
@@ -177,7 +177,7 @@ function perspective(image, { tiltX = 0, tiltY = 0, background = 255 } = {}) {
     ];
   }
 
-  // Normalise the warped quad back into the frame so nothing is cropped off.
+  // Normalize the warped quad back into the frame so nothing is cropped off.
   const xs = dst.map((p) => p[0]), ys = dst.map((p) => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -331,7 +331,7 @@ function blur(image, sigma) {
  * Two facts pull the other way. Tracking points are only selected where the
  * local 13x13 standard deviation clears SD_THRESH = 8 (tracker/extract.js), so
  * a flatter source yields FEWER points. And the tracker scores them by
- * NORMALISED cross-correlation, which is invariant to any affine change in
+ * NORMALIZED cross-correlation, which is invariant to any affine change in
  * brightness and contrast — so a crisp, high-contrast template costs nothing
  * when matched against a washed-out photo of the print. If both hold, sharper
  * beats print-like. Worth measuring rather than assuming.

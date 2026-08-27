@@ -1,7 +1,7 @@
 /*
  * The scan guide is deliberately visual, rather than a promise about a
  * tracker-private search crop. 8th Wall scans the configured image target, so
- * a stable centre guide is more honest and preserves the customer-facing UI.
+ * a stable center guide is more honest and preserves the customer-facing UI.
  */
 (() => {
   const ID = 'ar-reticle';

@@ -9,7 +9,7 @@
  * unmeasurable off-device.
  *
  * This is a line-by-line port of _computeProjection and _computeMatching from
- * mind-ar 1.2.5, same constants, same normalised-cross-correlation formula,
+ * mind-ar 1.2.5, same constants, same normalized-cross-correlation formula,
  * same argmax-over-search-window, same AR2_SIM_THRESH cut. It is a
  * reimplementation, not MindAR's own code path, so treat its absolute numbers
  * as a model — the COMPARISONS between targets are what it is for.
@@ -94,7 +94,7 @@ function computeProjection(mvp, frame, keyframe) {
 /**
  * tracker.js _computeMatching: for every compiled tracking point, slide its
  * 13x13 template over a 21x21 search window in the projected image and keep the
- * best normalised cross-correlation.
+ * best normalized cross-correlation.
  */
 function computeMatching(keyframe, projected) {
   const templateOne = AR2_DEFAULT_TS;

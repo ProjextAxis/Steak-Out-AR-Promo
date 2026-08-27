@@ -13,11 +13,11 @@
     maxSamples: 12,
     minSampleIntervalMs: 50,
     hardOutlierWindowMs: 250,
-    hardTranslationMetres: 0.10,
+    hardTranslationMeters: 0.10,
     hardTranslationFlyerWidths: 0.50,
     hardScaleRatio: 1.25,
     hardRotationDegrees: 35,
-    stableTranslationMetres: 0.015,
+    stableTranslationMeters: 0.015,
     stableTranslationFlyerWidths: 0.10,
     stableScaleRatio: 0.05,
     stableRotationDegrees: 8
@@ -89,7 +89,7 @@
     const scaleChange = scaleLogDelta(sample, reference);
     const scaleRatio = Math.expm1(scaleChange);
     const hardTranslationLimit = Math.max(
-      options.hardTranslationMetres,
+      options.hardTranslationMeters,
       options.hardTranslationFlyerWidths * reference.width
     );
     const hardScaleLimit = Math.log(options.hardScaleRatio);
@@ -117,7 +117,7 @@
 
   const medoidScore = (candidate, samples, options) => samples.reduce((score, sample) => {
     const positionLimit = Math.max(
-      options.stableTranslationMetres,
+      options.stableTranslationMeters,
       options.stableTranslationFlyerWidths * candidate.width
     );
     return score +
@@ -147,7 +147,7 @@
 
     const medoid = selectMedoid(ordered, options);
     const positionLimit = Math.max(
-      options.stableTranslationMetres,
+      options.stableTranslationMeters,
       options.stableTranslationFlyerWidths * medoid.width
     );
     const residuals = ordered.map((sample) => ({

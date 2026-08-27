@@ -58,7 +58,7 @@ function workerMatch(matcher, estimator, matchingDataList, featurePoints) {
 
     const modelViewTransform = estimator.estimate({ screenCoords, worldCoords });
     // The worker breaks out of the target loop as soon as a keyframe matched,
-    // whether or not the pose solved. Mirror that, so cost is modelled honestly.
+    // whether or not the pose solved. Mirror that, so cost is modeled honestly.
     return {
       targetIndex: modelViewTransform ? i : -1,
       keyframeIndex,

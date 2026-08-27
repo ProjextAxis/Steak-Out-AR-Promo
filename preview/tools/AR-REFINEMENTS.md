@@ -35,7 +35,7 @@ brief windows where it does.
 ### Correction to an earlier measurement
 
 A first pass reported 79% uptime, 24 appearances and sub-0.2s flicker. That was
-wrong. The detector counted warm saturated pixels across a wide centre crop, and a
+wrong. The detector counted warm saturated pixels across a wide center crop, and a
 **yellow snack bag sat in frame** on the left, tripping it constantly. Re-measured on
 a tight box over the flyer only, absent frames read 0.02 and present frames 0.43-0.77
 — an unambiguous gap. Trust the 20%, not the 79%.
@@ -48,17 +48,17 @@ well-lit and unoccluded in all 12 frames, and the meal renders in none of them.
 **1. The flyer is small and steeply oblique in frame.** In the recording it fills a
 minority of the width and is viewed at a shallow angle across a dark table. The
 marker-tuning study already concluded physical print size is probably the dominant
-real-world factor, and it is unmodelled in that study. Cheapest test available:
+real-world factor, and it is unmodeled in that study. Cheapest test available:
 print the flyer larger and re-record the same way.
 
 **2. The 720p camera cap may have shrunk the acquisition window.** `CropDetector`
 sizes its square from HALF the smaller dimension, so 1080p gives a 512 crop and 720p
 gives 256. That is a 4x cut in detection work, which was the point, but it also
-halves the linear search window. If the flyer sits low or off-centre it can fall
+halves the linear search window. If the flyer sits low or off-center it can fall
 outside. This is a change made shortly before this recording.
 
 **3. The lean target has 7 pyramid levels against the full build's 11.** Fewer levels
-means fewer apparent sizes the target can be recognised at, which bites hardest when
+means fewer apparent sizes the target can be recognized at, which bites hardest when
 the marker is small in frame — exactly this situation. Measured as equal on
 acquisition in simulation, but that simulation did not model print size.
 

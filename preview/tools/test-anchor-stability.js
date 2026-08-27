@@ -96,8 +96,8 @@ assert.equal(stability.evaluateCluster(liveCadenceWindow).stable, true,
 
 const responsiveOptions = {
   ...stability.DEFAULTS,
-  hardTranslationMetres: 0,
-  stableTranslationMetres: 0
+  hardTranslationMeters: 0,
+  stableTranslationMeters: 0
 };
 const smallResponsiveReference = pose({ time: 100, width: 0.02 });
 const responsiveMove = stability.comparePoses(
@@ -106,6 +106,6 @@ const responsiveMove = stability.comparePoses(
   responsiveOptions
 );
 assert.equal(responsiveMove.hard, true,
-  'responsive outlier gates normalize translation by flyer width without a metre floor');
+  'responsive outlier gates normalize translation by flyer width without a meter floor');
 
 console.log('anchor stability tests passed');

@@ -51,11 +51,11 @@ html.is-preloading-ar body { overflow:hidden !important; }
   opacity: 0;
 }
 
-/* Trailing letter-spacing sits after the last glyph, so a centred box reads a
-   half-step left. Nudge the ink back to true optical centre. */
+/* Trailing letter-spacing sits after the last glyph, so a centerd box reads a
+   half-step left. Nudge the ink back to true optical center. */
 #ar-splash .page-load-status__word { margin-left: .08em; }
 
-/* Out of flow so a 1-dot frame and a 3-dot frame centre identically. */
+/* Out of flow so a 1-dot frame and a 3-dot frame center identically. */
 #ar-splash .page-load-status__dots {
   position: absolute;
   left: 100%;

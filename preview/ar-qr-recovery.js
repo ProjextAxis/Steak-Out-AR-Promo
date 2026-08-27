@@ -27,10 +27,10 @@
 (() => {
   const CFG = (window.STEAKOUT_AR_CONFIG && window.STEAKOUT_AR_CONFIG.marker) || {};
 
-  // The QR's printed edge length in METRES, measured on the actual flyer.
+  // The QR's printed edge length in METERS, measured on the actual flyer.
   // Everything downstream scales linearly with this: get it wrong and the meal
   // lands at the right angle but the wrong distance.
-  const QR_SIZE_M = Number(CFG.qrPhysicalSizeMetres || 0.075);
+  const QR_SIZE_M = Number(CFG.qrPhysicalSizeMeters || 0.075);
 
   // Only while lost, and cheaply. Decoding every frame would cost more than the
   // tracking it is backstopping.
@@ -64,7 +64,7 @@
    * so  r1 = K^-1 h1 / lambda,  r2 = K^-1 h2 / lambda,  r3 = r1 x r2,
    *     t  = K^-1 h3 / lambda,  lambda = 1 / |K^-1 h1|
    * The recovered r1,r2 are not exactly orthonormal (noise), so they are
-   * re-orthogonalised before use.
+   * re-orthogonalized before use.
    * -------------------------------------------------------------------- */
 
   const solveHomography = (src, dst) => {
@@ -113,7 +113,7 @@
     let r2 = h2.map((v) => v * lambda);
     const t = h3.map((v) => v * lambda);
 
-    // Re-orthogonalise: keep r1, project r2 off it, r3 = r1 x r2.
+    // Re-orthogonalize: keep r1, project r2 off it, r3 = r1 x r2.
     const dot = r1[0] * r2[0] + r1[1] * r2[1] + r1[2] * r2[2];
     r2 = r2.map((v, i) => v - dot * r1[i]);
     const rn1 = Math.hypot(...r1), rn2 = Math.hypot(...r2);

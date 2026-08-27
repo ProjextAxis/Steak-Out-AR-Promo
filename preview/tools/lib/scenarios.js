@@ -114,7 +114,7 @@ const SCENARIOS = [
     optical: [{ op: 'noise', args: { sigma: 3, seed: 911 } }]
   },
   {
-    name: 's12-offcentre',
+    name: 's12-offcenter',
     note: 'Marker pushed to the edge of the frame, where the crop window has to find it.',
     heightFrac: 0.62, pitch: 8, yaw: 12, roll: -8, offsetX: 0.35, offsetY: -0.12, seed: 112,
     photometric: [{ op: 'contrast', args: { black: 50, white: 200 } }],
@@ -212,7 +212,7 @@ const SCENARIOS_HARD = [
     optical: [{ op: 'noise', args: { sigma: 4, seed: 807 } }]
   },
   {
-    name: 'h08-centre-glare',
+    name: 'h08-center-glare',
     note: 'Reflection sitting over the middle of the sheet, wiping out the QR block.',
     heightFrac: 0.80, pitch: 5, yaw: 5, roll: 0, seed: 208,
     photometric: [
@@ -223,7 +223,7 @@ const SCENARIOS_HARD = [
   },
   {
     name: 'h09-glare-blur-dim',
-    note: 'Centre glare, 2.8px smear, crushed contrast, all at once.',
+    note: 'Center glare, 2.8px smear, crushed contrast, all at once.',
     heightFrac: 0.62, pitch: 15, yaw: 12, roll: 8, seed: 209,
     photometric: [
       { op: 'contrast', args: { black: 88, white: 168 } },

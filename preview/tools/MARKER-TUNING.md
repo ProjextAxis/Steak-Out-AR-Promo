@@ -10,7 +10,7 @@ not work here, and would introduce a visible failure mode with the current
 `marker.html` markup.
 
 This is a negative result, reported as one. What follows is the evidence, and an
-optional file-size optimisation that the numbers *do* support.
+optional file-size optimization that the numbers *do* support.
 
 ---
 
@@ -61,13 +61,13 @@ one of those. Measured by instantiating the real `CropDetector`:
 Feature counts alone cannot answer the question, so the harness runs the real
 algorithms. `tools/lib/scene.js` renders the flyer as a plane in 3D, projected
 through the same pinhole model MindAR assumes for pose estimation (45 degree
-vertical FOV, principal point centred). Because the scene is synthetic the exact
+vertical FOV, principal point centerd). Because the scene is synthetic the exact
 pose is known — the ground-truth pose reprojects the target's corners onto the
 rendered quad to within 1.8e-13 px.
 
 | tool | what it drives | what it answers |
 |---|---|---|
-| `tools/make-variants.js` | greyscale image pipeline | renders print-simulated sources |
+| `tools/make-variants.js` | grayscale image pipeline | renders print-simulated sources |
 | `tools/compile-mind-multi.js` | `OfflineCompiler` | compiles 1..N images into one `.mind` |
 | `tools/mind-stats.js` | `@msgpack/msgpack` | decodes and reports what is really inside |
 | `tools/match-sim.js` | **MindAR's own** `CropDetector` → `Matcher` → `Estimator` | does it lock on? |
@@ -97,7 +97,7 @@ approving everything:
 tracker's four hot kernels are WebGL `userCode` GLSL with no CPU fallback, so
 `Tracker.track()` cannot run under Node's tfjs CPU backend. The port follows
 `_computeProjection` and `_computeMatching` line by line with the same constants
-and the same normalised-cross-correlation formula. Its absolute survivor counts
+and the same normalized-cross-correlation formula. Its absolute survivor counts
 are a model; the comparisons between targets are what it is for.
 
 ---
@@ -176,7 +176,7 @@ The intuition — "compile from something that looks like the print" — is
 reasonable and turns out to be wrong, for a specific reason: **both stages of
 MindAR are already contrast-invariant.**
 
-The tracker scores points by *normalised* cross-correlation, which is invariant
+The tracker scores points by *normalized* cross-correlation, which is invariant
 to any affine change in brightness and contrast. A crisp high-contrast template
 costs nothing when matched against a washed-out photograph of the print. The
 matcher uses FREAK descriptors, which are binary intensity comparisons between
@@ -189,8 +189,8 @@ can hurt. Simulating them into the target buys nothing and costs something:
 clears `SD_THRESH = 8.0`, so a flatter source yields *fewer* points.
 
 This also predicted the failure of the opposite approach, which I tested to be
-sure: sharpening (`v80`, 78.3%) and hard binarisation (`v83`, 71.7%) do not help
-either, and binarisation is the one candidate that is significantly *worse*.
+sure: sharpening (`v80`, 78.3%) and hard binarization (`v83`, 71.7%) do not help
+either, and binarization is the one candidate that is significantly *worse*.
 
 What the algorithms are *not* invariant to is **geometry and lost detail** —
 which is exactly what the two controls show. Skew (`v61`) and heavy blur destroy
@@ -376,11 +376,11 @@ What feature counts do **not** tell you:
 What the simulations do **not** cover:
 
 - **Real print structure.** Halftone dots, ink spread, paper grain and stock
-  texture are not modelled — only contrast, blur, glare, skew and noise.
-- **Real camera behaviour.** No rolling shutter, JPEG artefacts, chroma noise,
+  texture are not modeled — only contrast, blur, glare, skew and noise.
+- **Real camera behavior.** No rolling shutter, JPEG artefacts, chroma noise,
   autofocus hunting or auto-exposure oscillation.
 - **The real physical size of the flyer**, which sets how many camera pixels it
-  occupies and is probably the single biggest unmodelled factor.
+  occupies and is probably the single biggest unmodeled factor.
 - **The tracking stage as MindAR actually runs it.** `track-sim` is a CPU port;
   the shipped path is WebGL, on GPUs with 16-bit float precision limits that
   `tracker.js` explicitly works around via `PRECISION_ADJUST`.
@@ -425,7 +425,7 @@ what it is actually granted. See `tools/HANDOFF.md` section 5b.
 3. Whether the print's real contrast is worse than the 95..160 crush of the hard
    tier. Photograph it under the actual restaurant lighting and compare.
 4. Whether glare from the venue's lighting sits over the QR block. Section 3's
-   `h08-centre-glare` models this and it is one of the harder cases.
+   `h08-center-glare` models this and it is one of the harder cases.
 
 ---
 

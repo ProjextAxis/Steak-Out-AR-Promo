@@ -94,10 +94,10 @@
   const LOCKED_COPY_HIDE_MS = 2200;
   const stabilityOptions = Object.freeze({
     ...stability.DEFAULTS,
-    // Responsive coordinates are target-relative, not metres. In that mode,
+    // Responsive coordinates are target-relative, not meters. In that mode,
     // all translation gates scale only with the observed flyer width.
-    hardTranslationMetres: scaleMode === 'absolute' ? stability.DEFAULTS.hardTranslationMetres : 0,
-    stableTranslationMetres: scaleMode === 'absolute' ? stability.DEFAULTS.stableTranslationMetres : 0
+    hardTranslationMeters: scaleMode === 'absolute' ? stability.DEFAULTS.hardTranslationMeters : 0,
+    stableTranslationMeters: scaleMode === 'absolute' ? stability.DEFAULTS.stableTranslationMeters : 0
   });
 
   let startPromise;
@@ -139,7 +139,7 @@
 
   // Deadband. Below this the drift is not worth touching, and correcting it
   // would mean moving the meal more often than the world actually drifts.
-  // Sits just above stabilityOptions.stableTranslationMetres (0.015), which is
+  // Sits just above stabilityOptions.stableTranslationMeters (0.015), which is
   // the spread a GOOD lock already shows -- correcting inside that would be
   // chasing measurement noise.
   const GROUND_DEADBAND_M = 0.022;
@@ -150,7 +150,7 @@
   const GROUND_MAX_DEG_PER_S = 2.0;
   // Stop before the deadband so it cannot oscillate around the threshold.
   const GROUND_SETTLE_M = 0.004;
-  // Upper gate. Genuine SLAM drift over a sitting is centimetres. A discrepancy
+  // Upper gate. Genuine SLAM drift over a sitting is centimeters. A discrepancy
   // this large is far more likely a mis-detection, a reflection, or a second
   // copy of the flyer than the world having moved 15cm -- and because the
   // correction is rate-capped, creeping toward a WRONG target would drag the
@@ -252,7 +252,7 @@
 
   const instructionStates = {
     scanning: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Put the flyer inside the box and move a little closer.', status: '', statusState: '' },
-    holding: { step: 3, title: 'CENTRE THE GRAPHIC AND MOVE CLOSER', body: 'Hold steady while Steak Out locks your $12 lunch to this table.', status: '', statusState: '' },
+    holding: { step: 3, title: 'CENTER THE GRAPHIC AND MOVE CLOSER', body: 'Hold steady while Steak Out locks your $12 lunch to this table.', status: '', statusState: '' },
     locked: { step: 4, title: 'YOUR $12 LUNCH IS RIGHT HERE', body: 'Move around it to see the portion before you order.', status: '', statusState: 'active' },
     lost: { step: 2, title: 'POINT BACK AT THE TABLE GRAPHIC', body: 'Bring the full graphic back into frame and reduce glare.', status: '', statusState: '' },
     error: { step: 2, title: 'ALLOW THE CAMERA TO CONTINUE', body: 'Allow camera access, then close and reopen Steak Out AR.', status: 'CAMERA ERROR', statusState: 'error' }
@@ -284,7 +284,7 @@
       if (sc && sc.renderer && sc.object3D && sc.camera) {
         sc.renderer.compile(sc.object3D, sc.camera);
       }
-    } catch (e) { /* warming is an optimisation; never block the model */ }
+    } catch (e) { /* warming is an optimization; never block the model */ }
     return hasLocked ? setPlacementSolid() : setPlacementGhost();
   });
 
@@ -636,7 +636,7 @@
     if (error > GROUND_MAX_ERROR_M) {
       // An error this big is not drift -- the LOCK is wrong. Creeping is the
       // wrong tool (it would drag the meal for 15+ seconds) but so is refusing,
-      // which was the original behaviour and left the meal stranded in the
+      // which was the original behavior and left the meal stranded in the
       // wrong place forever with no way back.
       //
       // The cluster that produced this already had to be stable under the same

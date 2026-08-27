@@ -9,7 +9,7 @@
  * The flyer is treated as a real plane in 3D and projected through the same
  * pinhole camera model MindAR assumes for pose estimation (controller.js):
  *   fovy = 45 degrees, f = (frameHeight / 2) / tan(fovy / 2), principal point
- *   at the frame centre. So the geometry the matcher is asked to solve is the
+ *   at the frame center. So the geometry the matcher is asked to solve is the
  *   geometry it was designed for.
  */
 const ops = require('./imageops.js');
@@ -68,7 +68,7 @@ function projectQuad({ frameW, frameH, aspect, heightFrac, pitch, yaw, roll, off
 }
 
 /**
- * Render `src` into a frame-sized greyscale buffer, warped onto `quad`, over a
+ * Render `src` into a frame-sized grayscale buffer, warped onto `quad`, over a
  * textured background. Inverse-mapped with bilinear sampling.
  *
  * The background is not flat: a real table has its own gradient and grain, and
@@ -199,10 +199,10 @@ function modelViewTransform({ frameW, frameH, targetW, targetH, heightFrac, pitc
     rotate3([0, 0, 1], { pitch, yaw, roll })
   ];
 
-  // The plane is centred on the optical axis, so the target's top-left corner
+  // The plane is centerd on the optical axis, so the target's top-left corner
   // sits at -(W/2, H/2) before rotation. Fold that into the translation.
-  const centre = [(s * targetW) / 2, (s * targetH) / 2, 0];
-  const rc = [0, 1, 2].map((r) => col[0][r] * centre[0] + col[1][r] * centre[1] + col[2][r] * centre[2]);
+  const center = [(s * targetW) / 2, (s * targetH) / 2, 0];
+  const rc = [0, 1, 2].map((r) => col[0][r] * center[0] + col[1][r] * center[1] + col[2][r] * center[2]);
   const T = [offsetX * planeW, offsetY * planeH, depth];
 
   return [0, 1, 2].map((r) => [
