@@ -698,6 +698,92 @@
     groundRaf = window.requestAnimationFrame(step);
   };
 
+  /* ------------------------------------------------------------------
+   * QR RECOVERY
+   *
+   * ar-qr-recovery.js watches camera frames while the flyer is LOST and
+   * publishes the QR's pose relative to the camera. That is a way back from a
+   * wrong anchor in exactly the conditions where feature matching has already
+   * failed -- steep angle, blur, dim light.
+   *
+   * Two conversions have to be right or this silently lands the meal in the
+   * wrong place:
+   *   1. OpenCV camera convention (+Z forward, +Y down) -> three.js (-Z
+   *      forward, +Y up). That is a 180-degree flip about X: diag(1,-1,-1).
+   *   2. Camera space -> WORLD space, by multiplying through the camera's
+   *      current world matrix. The anchor lives in world space.
+   * ------------------------------------------------------------------ */
+  const qrRecoveryEnabled = (on) => {
+    window.dispatchEvent(new CustomEvent('steakout-qr-recovery', { detail: { enabled: !!on } }));
+  };
+
+  const onQrPose = (event) => {
+    const THREE = window.THREE;
+    const detail = event && event.detail;
+    if (!THREE || !detail || !detail.pose || !hasLocked) return;
+    // Only a lost flyer justifies this. While the target is tracked, the image
+    // tracker is strictly better and grounding already handles drift.
+    if (targetVisible) return;
+
+    const cam = scene && scene.camera;
+    if (!cam) return;
+
+    const p = detail.pose.position;
+    const q = detail.pose.quaternion;
+    if (![p.x, p.y, p.z].every(Number.isFinite)) return;
+    // Reject implausible distances outright: a QR solved at 6cm or 5m is a bad
+    // corner read, not a diner looking at a table flyer.
+    const dist = Math.hypot(p.x, p.y, p.z);
+    if (!(dist > 0.10 && dist < 2.5)) {
+      recordDiagnostic('qr-pose-rejected', { dist: Number(dist.toFixed(3)), reason: 'implausible-distance' });
+      return;
+    }
+
+    const flip = new THREE.Matrix4().makeRotationX(Math.PI);   // diag(1,-1,-1)
+    const local = new THREE.Matrix4().compose(
+      new THREE.Vector3(p.x, p.y, p.z),
+      new THREE.Quaternion(q.x, q.y, q.z, q.w),
+      new THREE.Vector3(1, 1, 1)
+    );
+    cam.updateMatrixWorld(true);
+    const world = new THREE.Matrix4()
+      .multiplyMatrices(cam.matrixWorld, flip.multiply(local));
+
+    const wPos = new THREE.Vector3();
+    const wQuat = new THREE.Quaternion();
+    const wScale = new THREE.Vector3();
+    world.decompose(wPos, wQuat, wScale);
+
+    const object = anchor.object3D;
+    const error = object.position.distanceTo(wPos);
+    // Below the deadband the anchor is already right; a QR solve is noisier
+    // than the anchor it would replace, so leave it alone.
+    if (error <= GROUND_MAX_ERROR_M) {
+      recordDiagnostic('qr-pose-ignored', { error: Number(error.toFixed(4)), reason: 'anchor-already-close' });
+      return;
+    }
+
+    recordDiagnostic('qr-relock', {
+      error: Number(error.toFixed(4)), dist: Number(dist.toFixed(3)),
+      text: detail.text ? String(detail.text).slice(0, 40) : null
+    });
+    stopGroundLoop();
+    groundTarget = null;
+    groundSamples.length = 0;
+    object.position.copy(wPos);
+    object.quaternion.copy(wQuat);
+    // Scale is NOT taken from the QR solve -- the committed scale came from the
+    // image target, which measures the whole flyer rather than one small square,
+    // and is the more trustworthy of the two.
+    object.visible = true;
+    object.updateMatrix();
+    object.updateMatrixWorld(true);
+    lockedSnapshot = transformSnapshot();
+    setDiagnosticState('committed', { reason: 'qr-relock' });
+  };
+
+  window.addEventListener('steakout-qr-pose', onQrPose);
+
   // Let the diagnostics HUD read the grounding state; without this a silent
   // correction is indistinguishable from no correction at all.
   window.STEAKOUT_GROUND_STATE = () => ({
@@ -892,6 +978,9 @@
 
   const onImageFound = (event) => {
     if (!sessionActive || !isOurTarget(event)) return;
+    // The image tracker is back and is strictly better than a QR solve. Stand
+    // the backstop down rather than letting two sources fight over the anchor.
+    qrRecoveryEnabled(false);
     acceptTargetSample(event.detail, 'found');
   };
 
@@ -904,7 +993,9 @@
     if (!sessionActive || !isOurTarget(event)) return;
     targetVisible = false;
     recordDiagnostic('target-lost', { committed: hasLocked, epoch: candidate?.epoch });
-    if (hasLocked) return;
+    // Only worth scanning once there is a committed anchor that could BE wrong.
+    // Before commit the acquisition flow already owns the screen.
+    if (hasLocked) { qrRecoveryEnabled(true); return; }
     anchor.emit('targetLost');
     resetCandidate('target-lost', { emitLost: false });
     clearLostGrace();
