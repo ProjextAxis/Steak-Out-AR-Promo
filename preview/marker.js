@@ -587,13 +587,26 @@
     if (error <= deadband) return;
 
     if (error > GROUND_MAX_ERROR_M) {
-      // Do not chase it. Surface it -- this is the signal that the lock itself
-      // is wrong, which is a different problem from drift.
-      recordDiagnostic('ground-correction-refused', {
+      // An error this big is not drift -- the LOCK is wrong. Creeping is the
+      // wrong tool (it would drag the meal for 15+ seconds) but so is refusing,
+      // which was the original behaviour and left the meal stranded in the
+      // wrong place forever with no way back.
+      //
+      // The cluster that produced this already had to be stable under the same
+      // medoid/outlier rules that gated the first commit, so this is not one bad
+      // frame. Re-commit to it. A single corrected jump beats a permanently
+      // wrong meal, and the customer is being shown something untrue until it
+      // happens.
+      recordDiagnostic('ground-relock', {
         error: Number(error.toFixed(4)), limit: GROUND_MAX_ERROR_M,
-        reason: 'too large to be drift; likely a mis-detection'
+        samples: evaluation.sampleCount, spanMs: Math.round(evaluation.spanMs || 0)
       });
+      stopGroundLoop();
+      groundTarget = null;
       groundSamples.length = 0;
+      applyPoseSample(medoid);
+      lockedSnapshot = transformSnapshot();
+      setDiagnosticState('committed', { reason: 'relocked' });
       return;
     }
 
