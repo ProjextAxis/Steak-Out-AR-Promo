@@ -249,7 +249,7 @@
               #fff 0%, var(--target-red) 45%, var(--target-red) 100%);
   box-shadow: 0 0 16px 5px rgba(181, 18, 27, .9);
   will-change: transform, opacity;
-  animation: snakeBulge .92s cubic-bezier(.37, 0, .63, 1) both;
+  animation: snakeBulge .44s cubic-bezier(.37, 0, .63, 1) both;
 }
 
 @keyframes snakeBulge {
@@ -272,35 +272,27 @@
 }
 
 /* ==========================================================================
-   ARRIVAL — the pop happens WHEN THE BULGE LANDS
+   IT POPS THE SECOND IT TURNS RED
    ==========================================================================
-   The pop and the travel were firing on the same beat, so the dot arrived into
-   a circle that had already reacted. Cause and effect were simultaneous, which
-   reads as two unrelated animations rather than one event.
+   This used to hold the pop back by .58s so it fired as the travelling bulge
+   landed. On paper that made the arrival the cause of the pop. In the hand it
+   just read as lag: the circle went red instantly and then sat there, red and
+   inert, for over half a second before anything moved. A control that changes
+   colour and does not respond feels broken, and no amount of choreography is
+   worth that.
 
-   Now the destination waits. The bulge sets off, travels, and the circle pops
-   as it lands -- so the pop is visibly CAUSED by the thing arriving.
+   So the delays are gone. Colour and pop are now the same event, on the same
+   frame -- the circle turns red and springs simultaneously.
 
-   The selector does the sequencing with no JS: an active step that is preceded
-   by a completed step THROUGH A CONNECTOR is one the bulge is travelling
-   toward, so it waits. A bare active step -- step 1 on open, with nothing
-   before it -- has no incoming bulge and pops immediately.
+   The bulge is NOT removed; it is the thing being carried down the line and it
+   stays. It just has to keep up, so it runs in .44s instead of .92s. That
+   length is chosen against the pop: the pop is .72s and overshoots at 34%
+   (~245ms) then again at 82% (~590ms), so a .44s bulge lands between the two
+   beats, while the circle is still visibly moving. The dot and the spring read
+   as ONE event rather than a sequence. Much under .40s and the bulge stops
+   reading as something travelling and becomes a flicker; much over .50s and it
+   is trailing the pop again, which is the problem this is fixing.
    ========================================================================== */
-
-.marker-progress__step[data-state="complete"]
-  + .marker-progress__line
-  + .marker-progress__step[data-state="active"] .marker-progress__circle {
-  animation-delay: .58s;
-}
-
-.marker-progress__step[data-state="complete"]
-  + .marker-progress__line
-  + 
-.marker-progress__step[data-state="complete"]
-  + .marker-progress__line
-  + .marker-progress__step[data-state="active"] > strong {
-  animation-delay: .58s;
-}
 
 /* "Pop UP" rather than just "grow": the circle lifts as it springs and settles
    back down, so the arrival has a direction instead of only a size. */
@@ -366,44 +358,130 @@
 }
 
 /* ==========================================================================
-   HEADER ORDER — left alone, deliberately
+   HEADER — LOGO LEFT, BIGGER WORDMARK, BIGGER BADGE, TIGHTER SUBTITLE
    ==========================================================================
-   The logo position has been moved three times on request and broken the
-   header twice. The original order (logo | brand | social) is known-good and
-   measures 94px, so it stays until the target position is settled.
+   POSITION: verified, not changed. The mark is the first child of the header
+   grid, so it lands in column 1 -- measured at a 393px viewport it sits 13px in
+   from the header's left edge at 48x48. "Logo hard left" is already what the
+   original layout does, so the grid is not touched. Reassigning columns is what
+   broke this header twice before: moving a later DOM child into an earlier
+   column opens an implicit second row and the header doubles to ~180px.
 
-   What IS kept below is the wordmark sizing and the step-label clearance --
-   both measured, both unambiguous.
+   SIZE: the wordmark and the badge grow TOGETHER. The badge was never the
+   problem -- it only looked oversized because the wordmark beside it was too
+   small. Both are now driven off one font-size so they cannot drift apart.
+
+   THE ARITHMETIC (measured at 393px, is-embedded, social visible):
+     brand column     = 100vw - 206px            -> 187px at 393px
+     rendered lockup  = 4.5717 x wordmark size
+   That ratio is measured, and it is exactly linear (checked at 20/30/39/40px)
+   because the letter-spacing, the flex gap, and the badge's size and padding
+   are all em-based below -- so nothing in the lockup is a fixed cost.
+
+     largest that fits = (187 - 6px safety) / 4.5717 = 39.6px
+
+   Hence the 39px cap: a 178.3px lockup in a 187px column, 8.7px spare.
+   40px leaves 4.1px, and 42px OVERFLOWS the column by 7.1px. That 8.7px is the
+   whole remaining budget -- the wordmark and the badge cannot both grow further
+   without the lockup running into the social icons.
+
+   Below ~390px the column is narrower, so the size follows the column down
+   instead of overflowing it: 375px -> 35.6px, 360px -> 32.4px. The 24px floor
+   holds down to a 322px viewport, below which no phone ships.
    ========================================================================== */
 
-/* The wordmark was 22.4px next to a 24x23 AR badge -- the badge was as tall as
-   the words it sat beside, so it read as the louder element. Wordmark up to
-   27px, badge down to 19.7x16, and the subtitle pulled up so the block reads as
-   one unit instead of two lines with a hole between them. */
-.marker-hud--top .marker-brand strong {
-  font-size: 27px !important;
-  line-height: 1 !important;
+@media (max-width: 430px) {
+  .marker-hud--top .marker-brand strong {
+    font-size: clamp(24px, (100vw - 212px) / 4.5717, 39px) !important;
+    line-height: 1 !important;
+    column-gap: .18em !important;
+  }
+
+  /* BIGGER, never smaller. .52em of a 39px wordmark is a 20.3px badge in a
+     36.2 x 33.5px red box -- against 14px in 24.4 x 23 before, so +48% wide and
+     +46% tall. Being em-based, it tracks the wordmark at every width. */
+  .marker-hud--top .marker-brand strong b {
+    font-size: .52em !important;
+    padding: .35em .45em .30em !important;
+  }
 }
 
+/* The badge read low because flexbox centres it on the LINE BOX while the eye
+   centres it on the LETTERS. Rustler's ink fills 1.9px..30.4px of a 39px line
+   box, so the wordmark's optical centre is 16.1px down and the badge's is
+   19.5px -- 3.4px too low, and more obvious now the wordmark is bigger.
+   -.15em of the badge's own size is ~3px back up. Visual only: `relative`
+   offsets paint, not layout, so the header geometry is untouched. */
 .marker-hud--top .marker-brand strong b {
-  font-size: 11px !important;
-  padding: 3px 5px 2px !important;
+  position: relative;
+  top: -.15em;
+}
+
+/* "$12 LUNCH PREVIEW" pulled up under the wordmark.
+   The dead space was never mainly the 7px grid gap. A line-height:1 box on a
+   display face leaves ~22% of its own height empty BELOW the letters: at 39px
+   that is 8.65px of nothing, plus the 7px gap, plus the 1px an earlier pass
+   added -- 15.4px of white between the two inks, which is what he is reacting
+   to. Taking the LAYOUT gap to -5px leaves 4.4px ink-to-ink, so the two lines
+   read as one lockup. The negative margin cannot collide: it is reclaiming
+   empty line box, not letters. */
+.marker-hud--top .marker-brand {
+  row-gap: 0 !important;
 }
 
 .marker-hud--top .marker-brand small {
-  margin-top: 1px !important;
+  margin-top: -5px !important;
   letter-spacing: .02em !important;
 }
 
 /* ==========================================================================
-   STEP LABEL CLEARANCE
+   THE LIVE STEP DROPS ITS LABEL
    ==========================================================================
-   Measured: an active circle grows 49.3 -> 67.2px, which eats 9px of the gap
-   below it and leaves the label 1.4px of clearance -- touching, at any rounding.
-   Reserving the space the grown circle needs puts it back to 14.4px active and
-   23.4px idle, so nothing ever collides regardless of which step is live.
+   The previous rule put margin-top:20px on EVERY label. That moved the whole
+   row down together and therefore said nothing about which step was live, so it
+   is gone. Only the ACTIVE label is offset now: the drop itself is the
+   selection cue -- the live label hangs below the line its neighbours sit on,
+   under the one circle that is also bigger.
+
+   20px on the active label alone happens to be the exact row height the blanket
+   rule produced (56px circle + 20 + 9.8px label = 85.8px), so the progress
+   block keeps its height and nothing around it reflows. The inactive labels
+   return to the 7px the design asks for -- 13px higher than the blanket rule
+   left them, which is the point of removing it.
+
+   It doubles as clearance. The active circle is the one that grows (49.3 ->
+   67.2px at scale 1.2) and its visual bottom sits 5.6px below its layout box,
+   so a 7px label would clear it by 1.4px -- touching, at any rounding. At 20px
+   it clears by 14.4px. The circles that did not grow keep 9-10px at 7px.
    ========================================================================== */
 
-.marker-progress__step > strong {
+.marker-progress__step[data-state="active"] > strong {
   margin-top: 20px !important;
+}
+
+/* ==========================================================================
+   THE CONNECTORS EITHER SIDE OF THE LIVE STEP GET OUT OF ITS WAY
+   ==========================================================================
+   Measured at 393px: the step cell is 64.75px wide and the active circle is
+   67.2px across, so it overhangs its own cell by 1.23px on each side and BOTH
+   flanking connectors run underneath it. Shortening each by 6px, at the end
+   facing the circle, turns a 1.23px overlap into 4.77px of daylight.
+
+   Only the two touching the active step move. Every other connector keeps its
+   full 22px, so the ribbon does not decay into a row of dots.
+
+   :has() carries the "connector BEFORE the active step" half, because CSS has
+   no previous-sibling combinator. Confirmed supported: Safari 15.4+ (iOS
+   included) and Chrome 105+, and CSS.supports('selector(:has(+ div))') returns
+   true here. On anything older that half simply does not match and the left
+   connector keeps the 1.23px overlap it has TODAY -- current behaviour, so
+   there is no regression to fall back to.
+   ========================================================================== */
+
+.marker-progress__step[data-state="active"] + .marker-progress__line {
+  margin-left: 6px;
+}
+
+.marker-progress__line:has(+ .marker-progress__step[data-state="active"]) {
+  margin-right: 6px;
 }
