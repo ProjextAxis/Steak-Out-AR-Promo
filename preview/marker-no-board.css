@@ -199,3 +199,58 @@
 .marker-hud--top .marker-brand {
   grid-column: 1 !important;
 }
+
+/* ==========================================================================
+   TRAVELLING PULSE ALONG THE CONNECTORS
+   ==========================================================================
+   A step popping tells you WHERE you are. It does not tell you that something
+   moved from one place to the next. A bulge running along the connector does:
+   it reads as progress being handed forward, which is the whole point of a
+   stepper.
+
+   The lines are siblings BETWEEN the steps, so `[data-state="complete"] + line`
+   selects exactly the connector leaving a step that has just finished -- the
+   pulse therefore always travels in the direction of travel, with no JS needed
+   to pick the right line.
+   ========================================================================== */
+
+.marker-progress__line {
+  position: relative;
+  overflow: visible;
+  /* Not yet travelled: present, but clearly not the live part of the path. */
+  opacity: .38;
+}
+
+/* Once a step is done, the path behind it is lit. */
+.marker-progress__step[data-state="complete"] + .marker-progress__line {
+  opacity: 1;
+}
+
+.marker-progress__step[data-state="complete"] + .marker-progress__line::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 12px 3px rgba(181, 18, 27, .95);
+  animation: connectorPulse .62s cubic-bezier(.45, 0, .25, 1) both;
+}
+
+@keyframes connectorPulse {
+  0%   { left: -6px;  opacity: 0; transform: translateX(-50%) scaleX(.4); }
+  18%  {              opacity: 1; transform: translateX(-50%) scaleX(1); }
+  78%  {              opacity: 1; transform: translateX(-50%) scaleX(1); }
+  100% { left: 100%;  opacity: 0; transform: translateX(-50%) scaleX(.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker-progress__step[data-state="complete"] + .marker-progress__line::after {
+    animation: none;
+    display: none;
+  }
+  .marker-progress__line { opacity: 1; }
+}
