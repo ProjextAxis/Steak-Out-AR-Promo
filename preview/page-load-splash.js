@@ -70,6 +70,12 @@
   };
 
   const startEntrance = () => {
+    // Once finish() has run the splash is on its way out (or already gone).
+    // Replaying the entrance here puts the logo back at full opacity ON TOP of
+    // the rendered page -- the 4-frame flash. clearTimeout in finish() cannot
+    // prevent this on its own, because a timer that has ALREADY fired is by
+    // then sitting in the double-rAF below and is no longer cancellable.
+    if (finished) return;
     if (!logo || finished || entranceAnimation) return;
 
     // Run the loading line with the logo, not after it. The splash is now short
@@ -108,7 +114,11 @@
         entranceScheduled = false;
         return;
       }
-      requestAnimationFrame(() => requestAnimationFrame(startEntrance));
+      if (finished) { entranceScheduled = false; return; }
+      requestAnimationFrame(() => {
+        if (finished) return;
+        requestAnimationFrame(() => { if (!finished) startEntrance(); });
+      });
     }, FOCUS_SETTLE_MS);
   };
 
@@ -174,6 +184,11 @@
     finished = true;
     window.clearInterval(dotTimer);
     window.clearTimeout(focusTimer);
+    // Detach the schedulers outright. A guard that is merely checked can still
+    // be raced; a listener that no longer exists cannot fire at all.
+    window.removeEventListener('focus', scheduleEntranceOnRealFocus);
+    window.removeEventListener('pageshow', scheduleEntranceOnRealFocus);
+    document.removeEventListener('visibilitychange', scheduleEntranceOnRealFocus);
     pulseAnimation?.cancel();
     splash.classList.add('is-page-load-exit');
     window.setTimeout(() => {
