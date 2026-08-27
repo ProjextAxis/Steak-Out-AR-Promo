@@ -601,3 +601,26 @@
     opacity: .95;
   }
 }
+
+/* ==========================================================================
+   ACTIVE STEP LABEL — bigger, and lifted
+   ==========================================================================
+   Measured at 440px: the live label was 11px sitting 14px below its
+   neighbours, which pushed it further from its own circle than it needed to be
+   and left it the same size as the steps it was meant to stand out from.
+
+   13px with a 15px top margin instead. Swept 11/20, 12/16, 13/15, 13/13 and
+   14/13:
+     - 13/15 keeps 9.2px of clearance under the enlarged circle (was 14.2)
+     - still drops 9px below the inactive labels, so the offset remains the
+       selection cue
+     - ribbon height 85.7 vs 88.8, so nothing below it reflows downward
+   13/13 was the alternative but cuts clearance to 7.2px, and the circle is at
+   its largest exactly when this label is live -- that is not the moment to
+   spend margin.
+   ========================================================================== */
+
+.marker-progress__step[data-state="active"] > strong {
+  font-size: 13px !important;
+  margin-top: 15px !important;
+}
