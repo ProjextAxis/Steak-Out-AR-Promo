@@ -573,9 +573,32 @@
       .filter((entry) => now - entry.time <= stabilityOptions.maxWindowMs)
       .slice(-stabilityOptions.maxSamples);
 
-    // Same bar the original commit had to clear: a real cluster, not one frame.
-    const evaluation = stability.evaluateCluster(groundSamples, stabilityOptions);
-    if (!evaluation.stable || !evaluation.medoid) return;
+    // Two different bars, because the two decisions are not the same bet.
+    //
+    // Nudging a GOOD anchor must clear the full commit bar -- 6 samples over
+    // 250ms -- because the thing being replaced is currently correct.
+    //
+    // Replacing a KNOWN-BAD anchor is the opposite bet. We already have a
+    // confirmed large disagreement, so the meal is provably in the wrong place;
+    // holding out for the full bar means the customer keeps looking at
+    // something untrue. Recovery is also usually a GLANCE at the flyer rather
+    // than someone holding it steady, so the commit bar may never be met and
+    // the re-lock would never fire at all. Still a validated cluster with the
+    // same outlier rejection -- just attainable in passing.
+    let evaluation = stability.evaluateCluster(groundSamples, stabilityOptions);
+    if (!evaluation.stable || !evaluation.medoid) {
+      const recoveryOptions = { ...stabilityOptions, minSamples: 4, minWindowMs: 150 };
+      const recovery = stability.evaluateCluster(groundSamples, recoveryOptions);
+      if (!recovery.stable || !recovery.medoid) return;
+      // Only usable for the re-lock path below, never to nudge a good anchor.
+      const object0 = anchor.object3D;
+      const far = Math.hypot(
+        recovery.medoid.position.x - object0.position.x,
+        recovery.medoid.position.y - object0.position.y,
+        recovery.medoid.position.z - object0.position.z) > GROUND_MAX_ERROR_M;
+      if (!far) return;
+      evaluation = recovery;
+    }
 
     const medoid = evaluation.medoid;
     const object = anchor.object3D;
