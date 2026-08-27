@@ -30,3 +30,18 @@
 .marker-instruction strong {
   text-shadow: 0 1px 3px rgba(0, 0, 0, .92), 0 0 10px rgba(0, 0, 0, .55);
 }
+
+/* The circles keep their own fill and border, but the board used to sit behind
+   them providing contrast. Over live camera -- a bright plate, a pale
+   tablecloth -- a dark disc with a 70%-alpha red ring can wash out. Make the
+   SHAPE unambiguous without bringing the rectangle back. */
+.marker-progress__circle {
+  background: rgba(10, 8, 8, .82) !important;
+  border-color: var(--target-red) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .55) !important;
+}
+
+.marker-progress__step[data-state="active"] .marker-progress__circle {
+  background: var(--target-red) !important;
+  border-color: var(--target-red) !important;
+}
