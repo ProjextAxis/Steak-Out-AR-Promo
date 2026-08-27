@@ -1,0 +1,58 @@
+/* Strip the backing board and the circles from the four-step ribbon.
+ *
+ * The step card (.marker-instruction) was an opaque rounded panel and each icon
+ * sat on its own filled disc (.marker-progress__circle). Together they covered a
+ * large block of the camera view -- the thing the customer is actually trying to
+ * look at -- for UI that only needs to be readable, not framed.
+ *
+ * Loaded LAST so it wins over marker.css / marker-target.css /
+ * marker-panel-tight.css / marker-panel-compact.css without editing any of them,
+ * which keeps this a single-file revert.
+ *
+ * Removing the panels removes the contrast they were providing, so the type and
+ * icons get their own shadow instead -- otherwise white-on-white text vanishes
+ * against a bright plate or tablecloth.
+ */
+
+.marker-instruction {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.marker-progress__circle,
+.marker-progress__step[data-state="active"] .marker-progress__circle,
+.marker-progress__step[data-state="done"] .marker-progress__circle {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* The connecting rule between steps was drawn to sit on the board. Keep it, but
+   soften it so it reads as a hairline over live video rather than a bar. */
+.marker-progress__line {
+  opacity: .55;
+}
+
+/* Contrast the panels used to provide. */
+.marker-progress__step > strong,
+.marker-progress__number,
+.marker-instruction__title,
+.marker-instruction strong {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .92), 0 0 10px rgba(0, 0, 0, .55);
+}
+
+.marker-progress__circle svg {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .92));
+}
+
+/* The active step lost its red disc, so mark it on the icon itself -- otherwise
+   there is no indication of where the customer is in the flow. */
+.marker-progress__step[data-state="active"] .marker-progress__circle svg {
+  color: var(--target-red);
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, .95));
+}
