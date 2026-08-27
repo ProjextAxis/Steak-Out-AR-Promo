@@ -332,10 +332,20 @@
 
   const revealCamera = async () => {
     if (!splash) return;
+    // The splash logo flies to the header logo's position over 620ms -- but the
+    // header logo is already sitting there the whole time, so for the entire
+    // flight there are TWO bulls on screen, one chasing the other. Landing it
+    // accurately made that worse, not better: they end up overlapping.
+    //
+    // It has to be a HANDOFF. The header logo stays hidden while the splash
+    // logo is in flight, and only appears once the splash has gone -- so
+    // exactly one bull is visible at every moment.
+    document.documentElement.classList.add('is-docking-logo');
     splash.classList.add('is-revealing');
     await new Promise((resolve) => setTimeout(resolve, 620));
     splash.hidden = true;
     splash.classList.remove('is-live', 'is-revealing');
+    document.documentElement.classList.remove('is-docking-logo');
   };
 
   const errorSummary = () => {

@@ -535,5 +535,69 @@
     width: max-content;
     max-width: 100%;
     justify-self: center;
+
+/* ==========================================================================
+   ONE BULL AT A TIME
+   ==========================================================================
+   During the 620ms dock the splash logo flies toward the header logo, which is
+   already sitting in place -- so two bulls are on screen, one chasing the other.
+   Landing the flight accurately made it worse rather than better: they finish
+   overlapping.
+
+   marker.js sets .is-docking-logo on <html> for exactly the duration of the
+   flight. The header logo hides for that window and reappears the instant the
+   splash is gone, so the splash logo IS the header logo arriving rather than a
+   second copy of it.
+
+   visibility rather than opacity: it must not fade in and briefly double.
+   ========================================================================== */
+
+.is-docking-logo .marker-hud--top .marker-logo-home {
+  visibility: hidden;
+}
+
+/* ==========================================================================
+   LARGER PHONES (431px+) — the sizing above never reached them
+   ==========================================================================
+   Everything above is scoped to max-width:430px, which meant an iPhone 16 Pro
+   Max (440x956 CSS) got NONE of it and kept the base clamp's 28.6px wordmark.
+   The device this is being tested on is a 16 Pro Max, so the fixes were being
+   judged on a layout they had never applied to.
+
+   And at 440 the imbalance has a different cause. Measured there:
+       logo    58x58
+       social  106x56
+       brand   182 x 38.2   <- only 38px tall between two ~57px elements
+   The text was not badly spaced so much as UNDERSIZED: a small block marooned
+   between two large ones, which is what reads as incoherent.
+
+   Swept 28.6/32/34/36/38 against the 182px column. 38/15 puts the brand block
+   at 54.3px -- level with the 58px logo and 56px social, so all three finally
+   carry the same weight -- with ink at 167.6px and 14.4px of column to spare.
+   Ratio 2.53:1, gentler than the 3:1 used on smaller screens because there is
+   room here for the second line to be properly readable rather than a caption.
+   ========================================================================== */
+
+@media (min-width: 431px) {
+  .marker-hud--top .marker-brand strong {
+    font-size: 38px !important;
+    line-height: 1 !important;
+  }
+
+  .marker-hud--top .marker-brand strong b {
+    font-size: .46em !important;
+    padding: .16em .30em .12em !important;
+    border-radius: 3px;
+    letter-spacing: .04em;
+    position: relative;
+    top: -.15em;
+  }
+
+  .marker-hud--top .marker-brand small {
+    font-size: 15px !important;
+    letter-spacing: .05em !important;
+    margin-top: -1px !important;
+    line-height: 1.15 !important;
+    opacity: .95;
   }
 }
