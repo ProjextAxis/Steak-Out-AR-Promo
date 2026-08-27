@@ -104,7 +104,7 @@
 
     <a class="marker-order" id="marker-order" href="https://order.toasttab.com/online/steakout-sewell" target="_top" aria-label="Order Steak Out on Toast" hidden>ORDER NOW</a>
 
-    <a-scene id="marker-scene" ar-environment xrweb="delayRun: true; cameraDirection: back; allowedDevices: mobile; disableDefaultEnvironment: true; disableDesktopCameraControls: true; disableDesktopTouchEmulation: true; disableXrTablet: true; disableXrTouchEmulation: true; scale: responsive; disableWorldTracking: false; enableLighting: true" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-scene id="marker-scene" gltf-model="dracoDecoderPath: ./vendor/draco/" ar-environment xrweb="delayRun: true; cameraDirection: back; allowedDevices: mobile; disableDefaultEnvironment: true; disableDesktopCameraControls: true; disableDesktopTouchEmulation: true; disableXrTablet: true; disableXrTouchEmulation: true; scale: responsive; disableWorldTracking: false; enableLighting: true" embedded loading-screen="enabled: false" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       <!-- Responsive world scale uses the camera's starting Y as its reference.
            8th Wall requires a non-zero value; 1.6 is A-Frame's standard eye height. -->
       <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
