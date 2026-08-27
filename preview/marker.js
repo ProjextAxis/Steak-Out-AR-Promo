@@ -1175,6 +1175,16 @@
           // theatre: tapping VIEW IN AR is step 1, and it completed a moment
           // ago. The animation is showing something true, just slightly later
           // than it happened.
+          // The ribbon must be VISIBLE before the state changes, or the
+          // animation never runs -- CSS animations do not play on hidden
+          // elements, so the transition happens off-screen and the customer
+          // sees only the end state. This is the same mistake as before, one
+          // layer down: renderInstruction() unhides AND advances in one go, so
+          // unhide first, then step.
+          if (instruction) {
+            instruction.hidden = false;
+            instruction.dataset.state = 'scanning';
+          }
           setProgressStep(1);
           window.setTimeout(() => {
             if (runToken !== sessionToken || !isRunning) return;

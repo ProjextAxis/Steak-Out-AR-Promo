@@ -24,7 +24,7 @@ assert.ok(configIndex >= 0 && configIndex < stabilityIndex && stabilityIndex < d
 assert.match(markerHtml, /scale: responsive/, 'responsive scale is the default test mode');
 assert.doesNotMatch(markerHtml, /<a-camera\s+position="0\s+0\s+0"/, 'responsive mode never starts at camera Y zero');
 assert.match(markerHtml, /<a-camera\s+position="0\s+1\.6\s+0"/, 'camera uses the calibrated nonzero start height');
-assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=20260827-step12/, 'parent iframe carries the new immutable cache token');
+assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=20260827-pop/, 'parent iframe carries the new immutable cache token');
 assert.match(indexHtml, /allow="[^"]*clipboard-write/, 'AR iframe grants clipboard-write so the diagnostics log can be saved/copied');
 assert.match(configSource, /'ar-debug'/, 'parent forwards the opt-in diagnostics flag');
 assert.match(configSource, /'xrscale'/, 'parent forwards the scale A\/B flag');
