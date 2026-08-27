@@ -18,6 +18,13 @@
   const ID = 'steakout-portrait-gate';
   if (document.getElementById(ID)) return;
 
+  // NEVER run inside an iframe. The AR view is an embedded document whose
+  // viewport is the iframe's, not the device's -- so a landscape media query
+  // can match on an upright phone and paint an opaque panel over the entire AR
+  // experience. That is exactly what happened. The top-level page is the only
+  // place that can correctly judge device orientation.
+  try { if (window.top !== window.self) return; } catch (e) { return; }
+
   // 1. The real thing, where it exists. Rejection is expected and harmless.
   const tryLock = () => {
     try {
