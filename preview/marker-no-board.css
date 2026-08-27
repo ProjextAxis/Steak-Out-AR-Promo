@@ -24,11 +24,37 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* Contrast the board used to provide, for the text only. */
+/* Contrast the board used to provide, for the text only.
+ *
+ * A drop shadow was the obvious choice and the wrong one -- it smudges, and on
+ * a busy camera feed a soft dark halo reads as dirt behind the letters rather
+ * than as depth. A thin stroke gives a hard edge instead: the glyph stays crisp
+ * at any size, and it holds against both a white plate and a dark table without
+ * the letters looking like they are sinking.
+ *
+ * paint-order puts the stroke UNDER the fill, so the outline never eats into
+ * the letterform -- without it a 3px stroke visually thins the type.
+ */
 .marker-progress__step > strong,
 .marker-instruction__title,
 .marker-instruction strong {
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .92), 0 0 10px rgba(0, 0, 0, .55);
+  paint-order: stroke fill;
+  -webkit-text-stroke: 3px rgba(8, 6, 6, .88);
+  text-shadow: none;
+}
+
+/* Safari applies -webkit-text-stroke to the glyph only; the counters (holes in
+   a, e, o) can still fill with background on very busy frames. A single tight
+   shadow at low alpha closes those without reintroducing a halo. */
+@supports not (paint-order: stroke) {
+  .marker-progress__step > strong,
+  .marker-instruction__title,
+  .marker-instruction strong {
+    -webkit-text-stroke: 0;
+    text-shadow:
+      -1px -1px 0 rgba(8, 6, 6, .9), 1px -1px 0 rgba(8, 6, 6, .9),
+      -1px  1px 0 rgba(8, 6, 6, .9), 1px  1px 0 rgba(8, 6, 6, .9);
+  }
 }
 
 /* The circles keep their own fill and border, but the board used to sit behind
