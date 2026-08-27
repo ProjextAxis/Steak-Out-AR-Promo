@@ -228,7 +228,19 @@
   food.setAttribute('rotation', markerConfig.modelRotation || '90 0 0');
   const modelScale = Number(markerConfig.modelScale || 9);
   food.setAttribute('scale', `${modelScale} ${modelScale} ${modelScale}`);
-  food.addEventListener('model-loaded', () => hasLocked ? setPlacementSolid() : setPlacementGhost());
+  food.addEventListener('model-loaded', () => {
+    // Compile the opaque variant NOW, behind the splash. Flipping
+    // material.transparent at commit otherwise triggers a GLSL link on the
+    // render thread at the worst possible moment.
+    try {
+      setFoodOpacity(1);
+      const sc = food.sceneEl;
+      if (sc && sc.renderer && sc.object3D && sc.camera) {
+        sc.renderer.compile(sc.object3D, sc.camera);
+      }
+    } catch (e) { /* warming is an optimisation; never block the model */ }
+    return hasLocked ? setPlacementSolid() : setPlacementGhost();
+  });
 
   if (orderLink && config.orderUrl) orderLink.href = config.orderUrl;
   if (instagramLink && config.social?.instagramUrl) instagramLink.href = config.social.instagramUrl;
@@ -843,7 +855,7 @@
             imageTargetData: [target],
             scale: scaleMode,
             disableWorldTracking: false,
-            enableLighting: true
+            enableLighting: false
           });
           hasStartedEngine = true;
           sessionActive = true;
