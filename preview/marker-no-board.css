@@ -184,21 +184,15 @@
   display: none !important;
 }
 
-/* Text first, mark trailing. grid-column places the mark in the last track
-   rather than reordering the DOM, so tab order and screen-reader order stay as
-   authored. */
-.marker-hud.marker-hud--top {
-  grid-template-columns: minmax(0, 1fr) 62px auto !important;
-}
-
-.marker-hud--top .marker-logo-home {
-  grid-column: 2 !important;
-  justify-self: end !important;
-}
-
-.marker-hud--top .marker-brand {
-  grid-column: 1 !important;
-}
+/* The header LAYOUT is deliberately left alone.
+ *
+ * Reassigning its grid columns to move the mark right broke it: the logo landed
+ * on its own row, the brand text was pushed down, and the social icons were
+ * clipped into an oval. The existing 62px / 1fr / auto grid is tuned to the
+ * content it holds, and overriding two of its three tracks from another
+ * stylesheet was never going to survive contact.
+ *
+ * Only the close badge is removed here. That was the actual request. */
 
 /* ==========================================================================
    TRAVELLING PULSE ALONG THE CONNECTORS
