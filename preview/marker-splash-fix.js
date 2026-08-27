@@ -20,7 +20,20 @@
       svg.removeAttribute('width');
       svg.removeAttribute('height');
       const cleaned = new XMLSerializer().serializeToString(svg);
-      splashLogo.src = URL.createObjectURL(new Blob([cleaned], { type: 'image/svg+xml' }));
+      const url = URL.createObjectURL(new Blob([cleaned], { type: 'image/svg+xml' }));
+      splashLogo.src = url;
+
+      // Give the HEADER logo the same artwork. The splash logo docks onto the
+      // header logo and then hands over to it -- but they were different images:
+      // this cleaned SVG at 173x150 with object-fit:fill, versus a 128x128 webp
+      // with object-fit:contain. Landing on the identical rect still swapped one
+      // rendering for another, so the bull visibly jumped size and proportion at
+      // the handoff. Same source and same fit means the swap is invisible.
+      const headerLogo = document.querySelector('.marker-logo-home img');
+      if (headerLogo) {
+        headerLogo.src = url;
+        headerLogo.style.objectFit = 'fill';
+      }
     } catch (error) {
       console.warn('Could not clean marker splash SVG:', error);
     }
