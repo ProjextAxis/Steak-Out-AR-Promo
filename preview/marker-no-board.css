@@ -527,3 +527,13 @@
     letter-spacing: .04em;
   }
 }
+/* Keep the brand lockup optically centered between the logo and social dock.
+   The middle grid track grows on wider phones; centering the lockup prevents
+   that extra width from collecting on only the social side. */
+@media (max-width: 430px) {
+  .marker-hud--top .marker-brand {
+    width: max-content;
+    max-width: 100%;
+    justify-self: center;
+  }
+}
