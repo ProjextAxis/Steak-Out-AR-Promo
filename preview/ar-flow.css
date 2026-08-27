@@ -374,11 +374,12 @@ body:has(.ar-guide[open]) {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ar-guide__sheet {
-    animation: none;
-  }
-}
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
+
 
 /* Park the landing page's hero model-viewer while AR is open.
  *
@@ -534,15 +535,9 @@ body.browser-ar-open {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .browser-ar-layer {
-    transition: none;
-  }
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
 
-  .browser-ar-loading.is-active::before,
-  .browser-ar-loading.is-active img,
-  .browser-ar-loading.is-active span {
-    animation-duration: .01ms;
-    animation-delay: 0s;
-  }
-}

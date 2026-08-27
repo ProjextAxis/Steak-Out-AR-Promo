@@ -112,12 +112,9 @@ html.is-preloading-ar body { overflow:hidden !important; }
 }
 @keyframes pageLoadSplashExit { from{opacity:1} to{opacity:0} }
 
-@media(prefers-reduced-motion:reduce){
-  #ar-splash.is-page-load img { opacity:1; transform:none; }
-  #ar-splash .page-load-status__ch,
-  #ar-splash .page-load-status__dots {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-}
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
+

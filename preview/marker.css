@@ -659,22 +659,12 @@ a {
   }
 }
 
-@media (prefers-reduced-motion:reduce) {
-  .ar-splash.is-live .ar-splash__logo,
-  .ar-splash.is-live .ar-splash__glow,
-  .ar-splash.is-revealing .ar-splash__logo {
-    animation-duration: .01ms !important;
-    animation-delay: 0s !important;
-  }
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
 
-  .marker-instruction,
-  .marker-instruction__surface,
-  .marker-instruction__icon,
-  .marker-instruction__chevron,
-  .marker-scan-guide {
-    transition-duration: .01ms !important;
-  }
-}
 
 .is-embedded .marker-intro {
   display: none;
@@ -1094,11 +1084,12 @@ a {
   }
 }
 
-@media (prefers-reduced-motion:reduce) {
-  .marker-progress__circle {
-    transition: none;
-  }
-}
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
+
 
 /* Aiming guide for the centred acquisition crop. See ar-reticle.js. */
 #ar-reticle {

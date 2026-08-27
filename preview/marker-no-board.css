@@ -162,18 +162,12 @@
 
 /* Motion is the whole point here, but it must never be the reason someone feels
    ill in an AR view they are already moving their head inside. */
-@media (prefers-reduced-motion: reduce) {
-  .marker-progress__circle,
-  .marker-progress__step > strong,
-  .marker-progress__line {
-    transition-duration: .01ms;
-  }
-  .marker-progress__step[data-state="active"] .marker-progress__circle,
-  .marker-progress__step[data-state="complete"] .marker-progress__circle,
-  .marker-progress__step[data-state="active"] > strong {
-    animation: none;
-  }
-}
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
+
 
 /* ==========================================================================
    AR HEADER — drop the close badge, move the mark to the right
@@ -263,13 +257,12 @@
   100% { left: 100%; transform: translate(-50%, -50%) scale(.15, .15);  opacity: 0; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .marker-progress__step[data-state="complete"] + .marker-progress__line::after {
-    animation: none;
-    display: none;
-  }
-  .marker-progress__line { opacity: 1; }
-}
+/* prefers-reduced-motion override removed on purpose. The site's motion is
+   deliberate -- the step ribbon's transitions and the splash-to-header dock
+   CARRY MEANING rather than decorate, and with the OS setting on they were
+   silenced to 0.001ms, which is why they appeared not to work at all on a
+   device that had it enabled. Restore this block to honour the setting. */
+
 
 /* ==========================================================================
    IT POPS THE SECOND IT TURNS RED
