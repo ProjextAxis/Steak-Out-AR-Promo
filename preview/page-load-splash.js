@@ -191,14 +191,35 @@
     document.removeEventListener('visibilitychange', scheduleEntranceOnRealFocus);
     pulseAnimation?.cancel();
     splash.classList.add('is-page-load-exit');
-    window.setTimeout(() => {
+
+    // Belt and braces. Guarding the code paths that could re-show the splash
+    // was not enough -- it still flashed back over the rendered page for four
+    // frames. So stop relying on knowing WHICH path does it.
+    //
+    // An inline style beats any stylesheet rule, any class, and any CSS
+    // animation, including ones marked !important. Once the fade is done the
+    // element is made unable to paint at all, BEFORE it is detached, so there
+    // is no window in which a stray class or a late animation can bring it
+    // back. Removal then just tidies up.
+    const kill = () => {
+      splash.style.setProperty('animation', 'none', 'important');
+      splash.style.setProperty('opacity', '0', 'important');
+      splash.style.setProperty('visibility', 'hidden', 'important');
+      splash.style.setProperty('display', 'none', 'important');
+      splash.style.setProperty('pointer-events', 'none', 'important');
       splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
-      // Hidden is not enough: it stays a full-screen fixed layer holding the
-      // logo, so any stray class or animation can flash it back over the page.
       splash.remove();
-    }, 420);   // must stay >= the .38s CSS exit or it snaps away mid-fade
+    };
+
+    // Prefer the animation's own end over a hand-tuned timeout: a timeout that
+    // is even slightly short kills it mid-fade, and one that is long leaves the
+    // element alive with nothing holding it invisible.
+    let killed = false;
+    const once = () => { if (!killed) { killed = true; kill(); } };
+    splash.addEventListener('animationend', once, { once: true });
+    window.setTimeout(once, 600);   // fallback if the animation never fires
   };
 
   function maybeFinish() {
