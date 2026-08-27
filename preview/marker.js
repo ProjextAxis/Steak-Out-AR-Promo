@@ -340,6 +340,20 @@
     // It has to be a HANDOFF. The header logo stays hidden while the splash
     // logo is in flight, and only appears once the splash has gone -- so
     // exactly one bull is visible at every moment.
+    // MEASURE the real landing spot instead of hardcoding it. The header logo
+    // is 48x48 at inset 13/23 below 430px, but 58x58 at inset 17/27 above it --
+    // so any fixed value is correct on exactly one class of phone and wrong on
+    // the rest. Reading the element's own rect makes the dock land accurately
+    // on every screen, and keeps working if the header is ever re-laid-out.
+    const headerLogo = document.querySelector('.marker-logo-home');
+    if (headerLogo) {
+      const r = headerLogo.getBoundingClientRect();
+      if (r.width > 0) {
+        splash.style.setProperty('--dock-left', `${Math.round(r.left)}px`);
+        splash.style.setProperty('--dock-top', `${Math.round(r.top)}px`);
+        splash.style.setProperty('--dock-size', `${Math.round(r.width)}px`);
+      }
+    }
     document.documentElement.classList.add('is-docking-logo');
     splash.classList.add('is-revealing');
     await new Promise((resolve) => setTimeout(resolve, 620));
