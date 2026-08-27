@@ -274,9 +274,26 @@
     const scaleDelta = Math.abs(snapshot.scale[0] / expectedScale[0] - 1);
     const positionLimit = Math.max(0.002, expectedScale[0] * 0.01);
     if (positionDelta > positionLimit || rotationDelta > 0.5 || scaleDelta > 0.005) {
-      lastInvariantWarningAt = now;
-      setAnchorState('fault', { reason: 'anchor-invariant' });
-      record('anchor-invariant-warning', { positionDelta, rotationDelta, scaleDelta, positionLimit, snapshot });
+      // The invariant is "nothing moves the anchor after commit", which was true
+      // until grounding started deliberately correcting SLAM drift toward the
+      // flyer. A sanctioned correction is not a fault -- reporting it as one
+      // buries real faults under a constant false alarm, and makes the HUD say
+      // the lock is broken at the exact moment it is being repaired.
+      let grounding = false;
+      try {
+        const g = window.STEAKOUT_GROUND_STATE && window.STEAKOUT_GROUND_STATE();
+        grounding = !!(g && g.correcting);
+      } catch (e) { /* the AR page may not expose it; treat as a real fault */ }
+
+      if (grounding) {
+        record('anchor-moved-by-grounding', {
+          positionDelta, rotationDelta, scaleDelta, positionLimit
+        });
+      } else {
+        lastInvariantWarningAt = now;
+        setAnchorState('fault', { reason: 'anchor-invariant' });
+        record('anchor-invariant-warning', { positionDelta, rotationDelta, scaleDelta, positionLimit, snapshot });
+      }
     }
   };
 
