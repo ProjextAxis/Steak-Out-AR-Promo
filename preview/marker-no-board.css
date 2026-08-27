@@ -485,3 +485,45 @@
 .marker-progress__line:has(+ .marker-progress__step[data-state="active"]) {
   margin-right: 6px;
 }
+
+/* ==========================================================================
+   BRAND LOCKUP — proportion, not just size
+   ==========================================================================
+   The sizes were individually correct and the block still read badly: top
+   heavy, crammed, incoherent. Three separate causes:
+
+   1. HIERARCHY TOO STEEP. A 39px wordmark over a 10.6px subtitle is a 3.7:1
+      ratio. That is a headline with a footnote stapled under it, not a lockup.
+      Raising the subtitle to 13px brings it to 3:1, where the second line reads
+      as part of the same object.
+
+   2. NO BREATHING ROOM. An earlier pass cut the gap to 4.4px ink-to-ink, which
+      is tighter than the wordmark's own internal spacing -- the subtitle looked
+      like it had fallen into the descenders. ~7px lets the two lines separate
+      without drifting apart.
+
+   3. THE SUBTITLE DID NOT SPAN THE LOCKUP. The wordmark plus badge runs 178px;
+      the subtitle only ran ~103px, leaving a hole under the badge and making
+      the whole block look unbalanced to the right. A wider subtitle carries the
+      eye across the full width the line above occupies.
+   ========================================================================== */
+
+@media (max-width: 430px) {
+  .marker-hud--top .marker-brand small {
+    font-size: 13px !important;
+    letter-spacing: .055em !important;
+    margin-top: -1px !important;
+    line-height: 1.15 !important;
+    opacity: .95;
+  }
+
+  /* Sit the badge on the wordmark's optical line rather than letting it tower.
+     Slightly less tall than the caps beside it reads as a companion mark; as
+     tall or taller reads as a competing slab, which is what it was doing. */
+  .marker-hud--top .marker-brand strong b {
+    font-size: .46em !important;
+    padding: .16em .30em .12em !important;
+    border-radius: 3px;
+    letter-spacing: .04em;
+  }
+}
