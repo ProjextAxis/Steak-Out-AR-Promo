@@ -366,44 +366,71 @@
 }
 
 /* ==========================================================================
-   HEADER — logo mirrored to the right
+   HEADER — brand | logo | social, all measured
    ==========================================================================
-   MEASURED, not guessed. At a 393px viewport the header is 373 wide with 12px
-   padding and tracks "50px 187px 92px":
+   Measured at 393px. The header is 373 wide with 12px padding, and the three
+   pieces fit the existing width exactly in this order:
+       brand 187 + gap 9 + logo 50 + gap 9 + social 92 = 347
+   which is the same total the original order used, so nothing has to shrink.
 
-     logo    48x48  left 13   (13px inset from the LEFT edge)
-     brand   187    left 72
-     social  92x49  left 268  (13px inset from the RIGHT edge)
+   An earlier attempt put SOCIAL on the left. Wrong: social belongs on the far
+   right where it has always been (13px inset), and the logo goes between the
+   wordmark and it.
 
-   The right side was never empty -- the social dock occupies it, leaving a 9px
-   gap. That is why simply retargeting the logo collapsed the layout earlier: it
-   was being moved into space that was already taken.
-
-   So the logo and the social dock SWAP, and the logo lands on exactly the
-   mirror of its old inset: left 312, i.e. 13px from the right edge.
-
-   grid-row: 1 is the part that was missing before. Assigning a later DOM child
-   to an earlier column creates a new implicit row -- that is what doubled the
-   header to 179.6px and stacked the three items vertically. Pinning all three
-   to row 1 keeps the measured height at exactly 94px.
+   grid-row: 1 on all three is essential. Assigning a later DOM child to an
+   earlier column otherwise creates a new implicit row, which doubled the header
+   to 179.6px and stacked the pieces vertically. Pinned, it measures 94px --
+   identical to the original.
    ========================================================================== */
 
 .marker-hud.marker-hud--top {
-  grid-template-columns: auto minmax(0, 1fr) 50px !important;
+  grid-template-columns: minmax(0, 1fr) 50px auto !important;
 }
 
-.marker-hud--top #marker-social {
+.marker-hud--top .marker-brand {
   grid-column: 1 !important;
   grid-row: 1 !important;
 }
 
-.marker-hud--top .marker-brand {
+.marker-hud--top .marker-logo-home {
   grid-column: 2 !important;
+  grid-row: 1 !important;
+  justify-self: center !important;
+}
+
+.marker-hud--top #marker-social {
+  grid-column: 3 !important;
   grid-row: 1 !important;
 }
 
-.marker-hud--top .marker-logo-home {
-  grid-column: 3 !important;
-  grid-row: 1 !important;
-  justify-self: end !important;
+/* The wordmark was 22.4px next to a 24x23 AR badge -- the badge was as tall as
+   the words it sat beside, so it read as the louder element. Wordmark up to
+   27px, badge down to 19.7x16, and the subtitle pulled up so the block reads as
+   one unit instead of two lines with a hole between them. */
+.marker-hud--top .marker-brand strong {
+  font-size: 27px !important;
+  line-height: 1 !important;
+}
+
+.marker-hud--top .marker-brand strong b {
+  font-size: 11px !important;
+  padding: 3px 5px 2px !important;
+}
+
+.marker-hud--top .marker-brand small {
+  margin-top: 1px !important;
+  letter-spacing: .02em !important;
+}
+
+/* ==========================================================================
+   STEP LABEL CLEARANCE
+   ==========================================================================
+   Measured: an active circle grows 49.3 -> 67.2px, which eats 9px of the gap
+   below it and leaves the label 1.4px of clearance -- touching, at any rounding.
+   Reserving the space the grown circle needs puts it back to 14.4px active and
+   23.4px idle, so nothing ever collides regardless of which step is live.
+   ========================================================================== */
+
+.marker-progress__step > strong {
+  margin-top: 20px !important;
 }
