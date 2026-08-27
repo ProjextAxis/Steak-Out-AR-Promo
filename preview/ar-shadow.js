@@ -313,6 +313,17 @@
       // to receive shadows.
       this.light.shadow.bias = 0;
       this.light.shadow.normalBias = 0;
+      // Freeze the shadow map. The light rig is rigid with respect to the
+      // anchor, and marker.js commits the anchor ONCE (hasLocked is set before
+      // the pose is written, and acceptTargetSample early-returns forever
+      // after). So once locked, every shadow map rendered is byte-identical to
+      // the last one -- a full depth pass over 104k triangles, 60 times a
+      // second, producing a texture that never changes. That is pure heat, and
+      // heat is what makes minute 5 worse than minute 1.
+      // tick() below re-arms needsUpdate whenever the rig matrix actually
+      // moves, so pre-lock behaviour is unchanged.
+      this.light.shadow.autoUpdate = false;
+      this.light.shadow.needsUpdate = true;
       this.lightRig.add(this.light);
 
       this.light.target = new THREE.Object3D();
@@ -446,6 +457,13 @@
       const scale = Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
       // MindAR parks a lost target on an all-zero matrix; never adopt it.
       if (!(scale > 1e-8) || !Number.isFinite(scale)) return;
+
+      // Re-render the shadow map only when the rig has genuinely moved.
+      if (!this.lastRigMatrix) this.lastRigMatrix = new THREE.Matrix4();
+      if (!this.lastRigMatrix.equals(this.matrix)) {
+        this.lastRigMatrix.copy(this.matrix);
+        if (this.light && this.light.shadow) this.light.shadow.needsUpdate = true;
+      }
 
       rig.matrix.copy(this.matrix);
       rig.matrixWorldNeedsUpdate = true;

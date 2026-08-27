@@ -380,6 +380,25 @@ body:has(.ar-guide[open]) {
   }
 }
 
+/* Park the landing page's hero model-viewer while AR is open.
+ *
+ * The AR layer is `position: fixed; inset: 0` -- it PAINTS OVER the hero, it
+ * does not remove it. model-viewer only stops its render loop when the element
+ * leaves the viewport (an IntersectionObserver, which measures geometry, not
+ * occlusion) or the document is hidden. Neither happens: the page is merely
+ * scroll-locked with the hero still on screen.
+ *
+ * So without this the phone runs TWO WebGL contexts and two copies of the
+ * 104,077-triangle meal for the whole session, and the invisible one is
+ * auto-rotating at 16deg/s with soft shadows at full frame rate.
+ *
+ * display:none gives the element no box, so the observer reports
+ * not-intersecting and model-viewer parks itself; it resumes when the class is
+ * removed on close. Nothing is visible under the opaque overlay, so there is no
+ * visual change.
+ */
+body.browser-ar-open .viewer-shell { display: none; }
+
 body.browser-ar-open {
   overflow: hidden;
 }
