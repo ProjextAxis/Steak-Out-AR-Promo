@@ -828,6 +828,11 @@
     candidate = undefined;
     setPlacementSolid();
     renderInstruction('locked');
+    /* The meal is now physically on their table. This is the only moment in
+       the whole flow that means the experience actually WORKED -- reaching the
+       camera only means they got past a permission prompt. Commit-once means
+       this fires exactly once per session, which is what makes it countable. */
+    postToParent('steakout-ar-locked');
     setDiagnosticState('committed', { epoch: committedEpoch });
     recordDiagnostic('anchor-committed', {
       epoch: committedEpoch,
@@ -1217,7 +1222,13 @@
           }, 420);
         }
         if (socialDock) socialDock.hidden = false;
-        if (orderLink) orderLink.hidden = false;
+        /* NOTE: the ORDER NOW button appears here, when the camera session
+           starts -- NOT when the meal locks. So order_shown lands alongside
+           camera_live and is not, on its own, evidence the AR worked. If the
+           button should only exist once there is a meal to order, this line
+           belongs in commitCandidate instead; that is a product call, not a
+           measurement one. */
+        if (orderLink) { orderLink.hidden = false; postToParent('steakout-ar-order-shown'); }
         guide.hidden = false;
         await revealCamera();
         if (runToken === sessionToken && isRunning) postToParent('steakout-ar-camera-live');
@@ -1289,7 +1300,22 @@
       if (event.data?.type === 'steakout-ar-start') start();
       else if (event.data?.type === 'steakout-ar-stop') stop();
       else if (event.data?.type === 'steakout-ar-motion-blocked') showMotionBlockedFault();
+      else if (event.data?.type === 'steakout-ar-order-url') {
+        /* The parent owns the visit, so it owns the decorated order url. This
+           document just accepts it, which keeps `c` off this frame's query
+           string entirely. */
+        if (orderLink && typeof event.data.url === 'string' && event.data.url) {
+          orderLink.href = event.data.url;
+        }
+      }
     });
+
+    /* The link is target="_top", so the tap tears this document down. The
+       message is queued on the parent's event loop before the top-level
+       navigation can commit, and the parent answers it with sendBeacon --
+       which is built to outlive exactly this. A plain fetch would be killed
+       mid-flight. */
+    orderLink?.addEventListener('click', () => postToParent('steakout-ar-order-tapped'));
     window.addEventListener('keydown', (event) => { if (event.key === 'Escape') postToParent('steakout-ar-close'); });
 
     // Parent app.js gates start on this message. It must precede the engine

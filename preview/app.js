@@ -1,4 +1,57 @@
 (() => {
+  /* ------------------------------------------------------------------
+   * Visit identity: which flyer sent them, and one id to stitch the visit.
+   *
+   * `c` only ever appears on the FIRST url (?c=window, ?c=table). Every step
+   * after that is a tap inside this document or a hop into the AR iframe, so
+   * it has to be captured on arrival and carried, or it is gone by the time
+   * anything worth measuring happens.
+   *
+   * sessionStorage on purpose: it dies with the tab. A cookie or localStorage
+   * would outlive the visit and start identifying a PERSON across visits,
+   * which is not what this measures and not something a lunch promo should be
+   * doing. Two keys, no personal data, nothing that survives the tab closing.
+   *
+   * Every accessor is wrapped: Safari private mode THROWS on sessionStorage
+   * rather than returning null, and measurement must never break the meal.
+   * ------------------------------------------------------------------ */
+  const SESSION_KEY = 'steakout.session';
+  const SOURCE_KEY = 'steakout.source';
+
+  const readStore = (key) => {
+    try { return window.sessionStorage.getItem(key); } catch (error) { return null; }
+  };
+  const writeStore = (key, value) => {
+    try { window.sessionStorage.setItem(key, value); } catch (error) { /* private mode */ }
+  };
+
+  const newSessionId = () => {
+    try {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+      }
+    } catch (error) { /* fall through to the manual id */ }
+    // randomUUID needs a secure context AND Safari 15.4+. Neither is
+    // guaranteed on a diner's phone, and an unstitched visit is worse than an
+    // ugly id.
+    return 'sx-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  };
+
+  const session = (() => {
+    const existing = readStore(SESSION_KEY);
+    if (existing) return existing;
+    const fresh = newSessionId();
+    writeStore(SESSION_KEY, fresh);
+    return fresh;
+  })();
+
+  const source = (() => {
+    // A `c` on the url always wins and is remembered for the rest of the tab.
+    const fromUrl = new URLSearchParams(location.search).get('c');
+    if (fromUrl) { writeStore(SOURCE_KEY, fromUrl); return fromUrl; }
+    return readStore(SOURCE_KEY) || 'direct';
+  })();
+
   const viewer = document.querySelector('#meal-viewer');
   const status = document.querySelector('#ar-status');
   const modeToggle = document.querySelector('#mode-toggle');
@@ -121,10 +174,6 @@
 
   if (config.modelUrl) viewer.src = config.modelUrl;
 
-  document.querySelectorAll('[data-order-link]').forEach((link) => {
-    if (config.orderUrl) link.href = config.orderUrl;
-  });
-
   if (!config.showModeToggle && modeToggle) modeToggle.hidden = true;
 
   const setStatus = (label, state = '') => {
@@ -133,10 +182,55 @@
     status.dataset.state = state;
   };
 
+  /* Where events go once there is somewhere to send them.
+   *
+   * Deliberately EMPTY. sendBeacon is skipped entirely while it is, so this
+   * whole path ships and is verifiable today against window.dataLayer, and
+   * starts reporting the moment this one string is filled in -- no other
+   * change, no redeploy of the AR itself.
+   *
+   * sendBeacon rather than fetch: it never blocks the main thread, never
+   * rejects on a dead host, and is the only send that reliably survives the
+   * document being torn down. That last part is the whole reason it is here --
+   * order_tapped fires as the tab is already navigating to Toast, which is
+   * exactly the case a normal fetch loses. */
+  const COLLECTOR_URL = '';
+
   const track = (eventName, detail = {}) => {
+    // dataLayer stays the local, inspectable record -- now stamped with the
+    // visit so every entry can be tied to one diner and one flyer.
     window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({ event: eventName, ...detail });
+    window.dataLayer.push({ event: eventName, ...detail, source, session });
+
+    if (!COLLECTOR_URL) return;
+    try {
+      navigator.sendBeacon?.(COLLECTOR_URL, JSON.stringify({
+        name: eventName, source, session, at: Date.now(), meta: detail
+      }));
+    } catch (error) { /* measurement never breaks the experience */ }
   };
+
+  /* Carry the visit into Toast so an order can be matched back to the flyer
+   * that produced it, if Toast ever exposes order data. `c` and the session
+   * id only -- nothing that identifies a person. */
+  const decorateOrderUrl = (base) => {
+    if (!base) return base;
+    try {
+      const url = new URL(base, location.href);
+      url.searchParams.set('c', source);
+      url.searchParams.set('s', session);
+      return url.toString();
+    } catch (error) { return base; }
+  };
+
+  /* Order links on the LANDING page. This loop used to sit further up and only
+   * set the href; it lives here now because it needs decorateOrderUrl, which
+   * needs the session. The in-AR ORDER NOW button is a different element in a
+   * different document and is handled over postMessage below. */
+  document.querySelectorAll('[data-order-link]').forEach((link) => {
+    if (config.orderUrl) link.href = decorateOrderUrl(config.orderUrl);
+    link.addEventListener('click', () => track('order_tapped', { from: 'landing' }));
+  });
 
   /* Safari caches a motion refusal for the origin and will not ask again --
      not on reload, not on a new tab. Only clearing the site's data or quitting
@@ -147,9 +241,9 @@
   const startMessage = () =>
     (motionBlocked ? 'steakout-ar-motion-blocked' : 'steakout-ar-start');
 
-  const postToBrowserAR = (type) => {
+  const postToBrowserAR = (type, extra) => {
     if (!browserARFrameReady || !browserARFrame?.contentWindow) return;
-    browserARFrame.contentWindow.postMessage({ type }, window.location.origin);
+    browserARFrame.contentWindow.postMessage({ type, ...extra }, window.location.origin);
   };
 
   const loadBrowserAR = () => {
@@ -218,6 +312,12 @@
 
     if (event.data?.type === 'steakout-ar-ready') {
       browserARFrameReady = true;
+      /* The AR document owns the ORDER NOW button but not the visit, so hand
+         it the decorated url rather than widening the iframe's query-param
+         allowlist. That allowlist deliberately strips everything it does not
+         recognise, and `c` has no business being a url parameter on a frame a
+         customer can see. */
+      postToBrowserAR('steakout-ar-order-url', { url: decorateOrderUrl(config.orderUrl) });
       if (browserARShouldStart) {
         postToBrowserAR(startMessage());
       }
@@ -228,11 +328,27 @@
       }
       hideBrowserARSplash();
       setStatus('AR ACTIVE', 'active');
+      track('camera_live');
     } else if (event.data?.type === 'steakout-ar-camera-error') {
       if (!browserARShouldStart) return;
       hideBrowserARSplash();
       setStatus('CAMERA ERROR', 'error');
+      track('camera_error');
+    } else if (event.data?.type === 'steakout-ar-locked') {
+      /* THE success event. "Camera started" only means they got past the
+         permission prompt; this means the meal is actually sitting on their
+         table. lock -> order_tapped is the number that says whether any of
+         this sells a cheesesteak. */
+      track('lock');
+    } else if (event.data?.type === 'steakout-ar-order-shown') {
+      track('order_shown');
+    } else if (event.data?.type === 'steakout-ar-order-tapped') {
+      track('order_tapped', { from: 'ar' });
     } else if (event.data?.type === 'steakout-ar-close') {
+      /* Distinct from browser_ar_closed, which fires for EVERY close including
+         Escape and the parent tearing the layer down. This one means the
+         customer deliberately left from inside AR. */
+      track('ar_closed');
       closeBrowserAR();
     }
   });
@@ -331,6 +447,12 @@
        unbranded .prompt-box-8w over our camera. Awaiting means the grant is
        already recorded for this origin by the time the engine asks. */
     motionBlocked = !(await motionGrant);
+    /* Terminal, not transient. Safari caches a motion refusal against the
+       ORIGIN -- it will not ask again on reload or in a new tab, only after
+       the site's data is cleared or Safari is quit. So this is the end of the
+       funnel for that phone, and worth counting as its own outcome rather
+       than being buried in the camera errors. */
+    if (motionBlocked) track('motion_blocked');
 
     // Steak Out AR is always the branded in-page camera. Apple's AR Quick Look
     // and Scene Viewer are never used, whatever mode the dev toggle is on.
