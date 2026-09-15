@@ -37,6 +37,10 @@
     return 'sx-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
   };
 
+  // Checked before the session is created: an existing id means this tab has
+  // already arrived once, so this load is a reload, not a new scan.
+  const isNewVisit = !readStore(SESSION_KEY);
+
   const session = (() => {
     const existing = readStore(SESSION_KEY);
     if (existing) return existing;
@@ -231,6 +235,14 @@
     if (config.orderUrl) link.href = decorateOrderUrl(config.orderUrl);
     link.addEventListener('click', () => track('order_tapped', { from: 'landing' }));
   });
+
+  /* The arrival itself -- the top of the funnel. Every other event needs a tap,
+   * so a diner who scanned the flyer, looked, and left was invisible. Fires once
+   * per visit: a reload in the same tab keeps the session, so it is not counted
+   * as a second scan, and no extra storage key is needed to know that. `source`
+   * says where they came from: the QR placement, or "direct" for anyone who
+   * typed the address or followed a link. */
+  if (isNewVisit) track('scan');
 
   /* Safari caches a motion refusal for the origin and will not ask again --
      not on reload, not on a new tab. Only clearing the site's data or quitting
