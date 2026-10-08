@@ -1045,7 +1045,9 @@ async function selftest() {
   return bad === 0 && red === MUTATIONS.length;
 }
 
-(async () => {
+module.exports = { openPage, loadText, loadCore };
+
+if (require.main === module) (async () => {
   if (process.argv.includes('--selftest')) {
     const ok = await selftest();
     if (!ok) {
