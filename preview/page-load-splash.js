@@ -5,28 +5,30 @@
   const logo = splash.querySelector('img');
   const MIN_MS = 700;
   const MAX_MS = 9000;
-  const FOCUS_SETTLE_MS = 220;
-  const ENTRANCE_MS = 700;
-  const PULSE_MS = 6200;
-  // In-app WebViews often never report focus. Without these the entrance never
-  // starts, and every exit path below waits on it.
-  const ENTRANCE_FALLBACK_MS = 300;
+  // The logo's entrance and pulse are CSS now (page-load-splash.css), started by
+  // the img's own onload in the markup. They used to be scripted here, armed off
+  // timers that a busy main thread let fire back to back: the pulse replaced the
+  // entrance in the same frame and the logo popped in without its spin.
+  // This file no longer starts, stops or replaces any animation. It builds the
+  // loading line and decides when the splash may leave.
+  //
+  // Backstops for an animation that never reports finishing. They only allow
+  // the exit; they cannot cut anything short that is still on screen.
+  const LOGO_BACKSTOP_MS = 1500;
+  const ANIMATION_BACKSTOP_MS = 1600;
   const AR_FRAME_GRACE_MS = 600;
   const started = performance.now();
 
   let modelReady = false;
   let arFrameReady = false;
   let entranceDone = false;
+  let lineDone = false;
   let finished = false;
   let dotTimer;
   let dotCount = 0;
-  let entranceAnimation;
-  let pulseAnimation;
-  let entranceScheduled = false;
-  let focusTimer;
 
   splash.classList.add('is-page-load', 'is-active');
-  splash.classList.remove('is-entering', 'is-waiting', 'is-page-load-exit');
+  splash.classList.remove('is-entering', 'is-page-load-exit');
   splash.setAttribute('aria-hidden', 'false');
   document.documentElement.classList.add('is-preloading-ar');
 
@@ -58,99 +60,44 @@
     }, 700);
   };
 
-  const startPulse = () => {
-    if (!logo || finished || pulseAnimation) return;
-    splash.classList.add('is-waiting');
-    startDots();
-    pulseAnimation = logo.animate([
-      { transform: 'translateY(0) rotate(0deg) scale(.98)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' },
-      { transform: 'translateY(0) rotate(0deg) scale(1.14)', opacity: .9, filter: 'drop-shadow(0 0 40px rgba(186,31,44,.46))', offset: .5 },
-      { transform: 'translateY(0) rotate(0deg) scale(.98)', opacity: 1, filter: 'drop-shadow(0 0 0 rgba(186,31,44,0))' }
-    ], { duration: PULSE_MS, easing: 'ease-in-out', iterations: Infinity });
+  // The CSS animations with these names running inside the splash.
+  // document.getAnimations() flushes style first, so animations a class change
+  // has only just triggered are already in the list.
+  const splashAnimations = (names) => document.getAnimations().filter((a) =>
+    names.includes(a.animationName) && splash.contains(a.effect?.target));
+
+  const whenFinished = (animations, done) => {
+    let called = false;
+    const once = () => { if (!called) { called = true; done(); } };
+    Promise.all(animations.map((a) => a.finished.catch(() => {}))).then(once);
+    window.setTimeout(once, ANIMATION_BACKSTOP_MS);
   };
 
-  const startEntrance = () => {
-    // Once finish() has run the splash is on its way out (or already gone).
-    // Replaying the entrance here puts the logo back at full opacity ON TOP of
-    // the rendered page -- the 4-frame flash. clearTimeout in finish() cannot
-    // prevent this on its own, because a timer that has ALREADY fired is by
-    // then sitting in the double-rAF below and is no longer cancellable.
-    if (finished) return;
-    if (!logo || finished || entranceAnimation) return;
-
-    // Run the loading line with the logo, not after it. The splash is now short
-    // enough that waiting for the entrance would cut the letters off.
-    splash.classList.add('is-waiting');
-    startDots();
-
-    entranceAnimation = logo.animate([
-      { transform: 'translateY(108vh) rotate(-220deg) scale(.28)', opacity: .08 },
-      { transform: 'translateY(82vh) rotate(-175deg) scale(.38)', opacity: .42, offset: .16 },
-      { transform: 'translateY(54vh) rotate(-118deg) scale(.52)', opacity: .7, offset: .34 },
-      { transform: 'translateY(30vh) rotate(-66deg) scale(.68)', opacity: .9, offset: .52 },
-      { transform: 'translateY(12vh) rotate(-24deg) scale(.84)', opacity: 1, offset: .68 },
-      { transform: 'translateY(2vh) rotate(-5deg) scale(.96)', opacity: 1, offset: .8 },
-      { transform: 'translateY(0) rotate(3deg) scale(1.04)', opacity: 1, offset: .88 },
-      { transform: 'translateY(0) rotate(-1deg) scale(.99)', opacity: 1, offset: .95 },
-      { transform: 'translateY(0) rotate(0deg) scale(1)', opacity: 1 }
-    ], { duration: ENTRANCE_MS, easing: 'cubic-bezier(.16,.72,.18,1)', fill: 'forwards' });
-
-    entranceAnimation.finished.then(() => {
-      entranceDone = true;
-      startPulse();
-      maybeFinish();
-    }).catch(() => {});
+  // Normally the markup's onload has already set is-logo-ready and the entrance
+  // is in flight (or done) by the time this deferred file runs. Setting it here
+  // too covers a logo that loaded before the attribute could see it, or never.
+  let watchingEntrance = false;
+  const watchEntrance = () => {
+    if (watchingEntrance) return;
+    watchingEntrance = true;
+    splash.classList.add('is-logo-ready');
+    whenFinished(splashAnimations(['pageLoadLogoIn']), () => { entranceDone = true; maybeFinish(); });
   };
+  if (!logo || logo.complete || splash.classList.contains('is-logo-ready')) watchEntrance();
+  else {
+    logo.addEventListener('load', watchEntrance, { once: true });
+    logo.addEventListener('error', watchEntrance, { once: true });
+    window.setTimeout(watchEntrance, LOGO_BACKSTOP_MS);
+  }
 
-  const pageIsActuallyForeground = () =>
-    document.visibilityState === 'visible' && document.hasFocus();
-
-  const scheduleEntranceOnRealFocus = () => {
-    if (finished || entranceAnimation || entranceScheduled || !pageIsActuallyForeground()) return;
-    entranceScheduled = true;
-    window.clearTimeout(focusTimer);
-    focusTimer = window.setTimeout(() => {
-      if (!pageIsActuallyForeground()) {
-        entranceScheduled = false;
-        return;
-      }
-      if (finished) { entranceScheduled = false; return; }
-      requestAnimationFrame(() => {
-        if (finished) return;
-        requestAnimationFrame(() => { if (!finished) startEntrance(); });
-      });
-    }, FOCUS_SETTLE_MS);
-  };
-
-  const waitForFocus = () => {
-    scheduleEntranceOnRealFocus();
-    if (!entranceAnimation && !finished) window.setTimeout(waitForFocus, 120);
-  };
-
-  window.addEventListener('focus', scheduleEntranceOnRealFocus);
-  window.addEventListener('pageshow', scheduleEntranceOnRealFocus);
-  document.addEventListener('visibilitychange', scheduleEntranceOnRealFocus);
-
-  // Let the logo settle before animating it, but never let a slow fetch hold
-  // the splash open — the markup already ships a usable logo.
-  Promise.race([
-    window.STEAKOUT_LOGO_READY || Promise.resolve(),
-    new Promise((resolve) => window.setTimeout(resolve, 220))
-  ]).finally(() => waitForFocus());
-
-  window.setTimeout(() => {
-    if (!entranceAnimation && !finished) startEntrance();
-  }, ENTRANCE_FALLBACK_MS);
-
-  // A paused document (backgrounded tab, throttled WebView) can leave the
-  // entrance promise unresolved forever. Treat the entrance as done on time
-  // regardless, so the normal exit runs instead of falling through to MAX_MS.
-  window.setTimeout(() => {
-    if (entranceDone || finished) return;
-    entranceDone = true;
-    startPulse();
+  // The loading line runs alongside the logo, and the splash holds until it has
+  // landed -- a fast load used to cut it off mid-flight.
+  splash.classList.add('is-waiting');
+  startDots();
+  whenFinished(splashAnimations(['statusCharIn', 'statusCharInAlt', 'statusDotsIn']), () => {
+    lineDone = true;
     maybeFinish();
-  }, ENTRANCE_FALLBACK_MS + ENTRANCE_MS + 200);
+  });
 
   // The AR frame is only a warm-up; it must never hold the splash open.
   window.setTimeout(() => {
@@ -180,16 +127,9 @@
 
   const finish = (force) => {
     if (finished) return;
-    if (!force && !entranceDone) return;
+    if (!force && !(entranceDone && lineDone)) return;
     finished = true;
     window.clearInterval(dotTimer);
-    window.clearTimeout(focusTimer);
-    // Detach the schedulers outright. A guard that is merely checked can still
-    // be raced; a listener that no longer exists cannot fire at all.
-    window.removeEventListener('focus', scheduleEntranceOnRealFocus);
-    window.removeEventListener('pageshow', scheduleEntranceOnRealFocus);
-    document.removeEventListener('visibilitychange', scheduleEntranceOnRealFocus);
-    pulseAnimation?.cancel();
     splash.classList.add('is-page-load-exit');
 
     // Belt and braces. Guarding the code paths that could re-show the splash
@@ -207,7 +147,7 @@
       splash.style.setProperty('visibility', 'hidden', 'important');
       splash.style.setProperty('display', 'none', 'important');
       splash.style.setProperty('pointer-events', 'none', 'important');
-      splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit');
+      splash.classList.remove('is-active', 'is-page-load', 'is-waiting', 'is-page-load-exit', 'is-logo-ready');
       splash.setAttribute('aria-hidden', 'true');
       document.documentElement.classList.remove('is-preloading-ar');
       splash.remove();
@@ -218,12 +158,19 @@
     // element alive with nothing holding it invisible.
     let killed = false;
     const once = () => { if (!killed) { killed = true; kill(); } };
-    splash.addEventListener('animationend', once, { once: true });
+    // Only the splash's own exit counts. animationend bubbles, and a letter or
+    // dot finishing on the exit's first frame used to remove the splash 17ms in.
+    const onExitEnd = (event) => {
+      if (event.target !== splash || event.animationName !== 'pageLoadSplashExit') return;
+      splash.removeEventListener('animationend', onExitEnd);
+      once();
+    };
+    splash.addEventListener('animationend', onExitEnd);
     window.setTimeout(once, 600);   // fallback if the animation never fires
   };
 
   function maybeFinish() {
-    if (finished || !entranceDone) return;
+    if (finished || !entranceDone || !lineDone) return;
     const elapsed = performance.now() - started;
     if (elapsed < MIN_MS) {
       window.setTimeout(maybeFinish, MIN_MS - elapsed);

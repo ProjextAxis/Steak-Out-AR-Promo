@@ -1,11 +1,24 @@
 html.is-preloading-ar,
 html.is-preloading-ar body { overflow:hidden !important; }
 
+/* opacity is deliberately NOT !important. An !important opacity outranks every
+   CSS animation, so pageLoadSplashExit could never fade the splash -- it held
+   at full black until the script removed it: a hard cut, not a fade. */
 #ar-splash.is-page-load {
   display:flex !important; position:fixed !important; inset:0 !important; z-index:100000 !important;
-  opacity:1 !important; visibility:visible !important; pointer-events:auto !important; background:#000 !important;
+  opacity:1; visibility:visible !important; pointer-events:auto !important; background:#000 !important;
   align-items:center !important; justify-content:center !important; flex-direction:column !important;
 }
+
+/* styles.css still carries the retired splash (splashFade, logoPop, wordFade)
+   on .ar-splash.is-active, and the markup ships is-active. Until the script
+   arrived, logoPop owned the logo: a dim pop at center, then flung off the
+   top-left -- a second of black, or a collision with the entrance. wordFade
+   flashed the markup's "STEAK OUT" text. All three off. */
+#ar-splash.is-page-load,
+#ar-splash.is-page-load img,
+#ar-splash.is-page-load > span { animation:none; }
+#ar-splash.is-page-load > span { opacity:0; }
 
 #ar-splash.is-page-load img {
   width:min(62vw,320px) !important; max-height:38vh !important; object-fit:contain !important;
@@ -13,9 +26,62 @@ html.is-preloading-ar body { overflow:hidden !important; }
   opacity:.08; transform:translateY(108vh) rotate(-220deg) scale(.28);
 }
 
+/* The entrance and the pulse are CSS, not script. is-logo-ready is set by the
+   img's own onload in the markup, so they start the moment the logo can be
+   drawn -- long before the deferred scripts run -- and transform/opacity run
+   on the compositor, so a main thread busy booting the model and the AR frame
+   can no longer delay, skip or overlap them. The pulse waits out the entrance. */
+#ar-splash.is-page-load.is-logo-ready img {
+  animation:
+    pageLoadLogoIn .7s linear both,
+    pageLoadLogoPulse 6.2s ease-in-out .7s infinite;
+}
+
+#ar-splash.is-page-load.is-logo-ready img,
 #ar-splash.is-page-load.has-started-entrance img,
 #ar-splash.is-page-load.is-waiting img {
   will-change:transform,opacity,filter;
+}
+
+/* The original entrance curve, cubic-bezier(.16,.72,.18,1) across the whole
+   flight, sampled every 25ms. CSS eases each keyframe gap on its own, so the
+   curve is baked into the stops and the animation runs linear. */
+@keyframes pageLoadLogoIn {
+  0%      { transform:translateY(108vh) rotate(-220deg) scale(0.28); opacity:0.08; }
+  3.57%   { transform:translateY(81.65vh) rotate(-174.28deg) scale(0.3818); opacity:0.424; }
+  7.14%   { transform:translateY(57.29vh) rotate(-124.7deg) scale(0.5036); opacity:0.667; }
+  10.71%  { transform:translateY(38.59vh) rotate(-84.62deg) scale(0.6227); opacity:0.828; }
+  14.29%  { transform:translateY(24.91vh) rotate(-54.12deg) scale(0.7252); opacity:0.928; }
+  17.86%  { transform:translateY(15.37vh) rotate(-31.86deg) scale(0.8101); opacity:0.981; }
+  21.43%  { transform:translateY(9.04vh) rotate(-18.37deg) scale(0.8756); opacity:1; }
+  25%     { transform:translateY(4.76vh) rotate(-10.25deg) scale(0.9268); opacity:1; }
+  28.57%  { transform:translateY(1.81vh) rotate(-4.23deg) scale(0.9677); opacity:1; }
+  32.14%  { transform:translateY(0.98vh) rotate(-0.93deg) scale(1.0007); opacity:1; }
+  35.71%  { transform:translateY(0.3vh) rotate(1.78deg) scale(1.0278); opacity:1; }
+  39.29%  { transform:translateY(0vh) rotate(2.41deg) scale(1.0326); opacity:1; }
+  42.86%  { transform:translateY(0vh) rotate(1.34deg) scale(1.0192); opacity:1; }
+  46.43%  { transform:translateY(0vh) rotate(0.43deg) scale(1.0079); opacity:1; }
+  50%     { transform:translateY(0vh) rotate(-0.33deg) scale(0.9983); opacity:1; }
+  53.57%  { transform:translateY(0vh) rotate(-0.98deg) scale(0.9902); opacity:1; }
+  57.14%  { transform:translateY(0vh) rotate(-0.81deg) scale(0.9919); opacity:1; }
+  60.71%  { transform:translateY(0vh) rotate(-0.65deg) scale(0.9935); opacity:1; }
+  64.29%  { transform:translateY(0vh) rotate(-0.51deg) scale(0.9949); opacity:1; }
+  67.86%  { transform:translateY(0vh) rotate(-0.4deg) scale(0.996); opacity:1; }
+  71.43%  { transform:translateY(0vh) rotate(-0.3deg) scale(0.997); opacity:1; }
+  75%     { transform:translateY(0vh) rotate(-0.22deg) scale(0.9978); opacity:1; }
+  78.57%  { transform:translateY(0vh) rotate(-0.16deg) scale(0.9984); opacity:1; }
+  82.14%  { transform:translateY(0vh) rotate(-0.1deg) scale(0.999); opacity:1; }
+  85.71%  { transform:translateY(0vh) rotate(-0.06deg) scale(0.9994); opacity:1; }
+  89.29%  { transform:translateY(0vh) rotate(-0.04deg) scale(0.9996); opacity:1; }
+  92.86%  { transform:translateY(0vh) rotate(-0.02deg) scale(0.9998); opacity:1; }
+  96.43%  { transform:translateY(0vh) rotate(0deg) scale(1); opacity:1; }
+  100%    { transform:translateY(0vh) rotate(0deg) scale(1); opacity:1; }
+}
+
+/* Starts and ends at the entrance's resting pose, so the hand-off is seamless. */
+@keyframes pageLoadLogoPulse {
+  0%, 100% { transform:translateY(0) rotate(0deg) scale(1); opacity:1; filter:drop-shadow(0 0 0 rgba(186,31,44,0)); }
+  50%      { transform:translateY(0) rotate(0deg) scale(1.14); opacity:.9; filter:drop-shadow(0 0 40px rgba(186,31,44,.46)); }
 }
 
 /* Set on the spans, not just the parent: styles.css has `.ar-splash span`
