@@ -371,9 +371,11 @@ const CONFIG = {
   // Name in the personal note and on the send button.
   OWNER_NAME: "Brian",
 
-  // Google review link. Google Business Profile → "Ask for reviews" → copy link.
-  // Looks like https://g.page/r/XXXXXXXXXXXX/review
-  GOOGLE_REVIEW_URL: "",
+  // Google review link. Google Business Profile → "Ask for reviews" → copy link,
+  // which looks like https://g.page/r/XXXXXXXXXXXX/review. This one is Google's
+  // own write-a-review address for the listing's place ID (Steak Out, 641
+  // Woodbury Glassboro Rd, Sewell; checked on Google Maps 2026-10-08). Either works.
+  GOOGLE_REVIEW_URL: "https://search.google.com/local/writereview?placeid=ChIJ-TdkPLbQxokRgbjEMzNg37Y",
 
   // The Collector's address: the Cloudflare Worker that Orbit reads from, the
   // same one the lunch AR page reports to. Just the address, with nothing after
