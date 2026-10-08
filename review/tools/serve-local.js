@@ -10,8 +10,8 @@
  * copy of review/index.html that is SERVED has its two settings changed: the
  * Collector address (so events and messages go to a Collector on this machine,
  * see steak-out-ar-collector/test/local-server.mjs) and a Google link that only
- * has to be a real-looking address. The file in the repo is never touched, and
- * its settings stay empty until the owner fills them in.
+ * has to be a real-looking address. The file in the repo is never touched; it
+ * holds the live settings (filled 2026-10-08), which the served copy replaces.
  *
  * The served copy also leaves out the Google Fonts tags (see below), so a look at
  * the page here asks nothing of any other machine. Reads files only inside the
@@ -48,8 +48,8 @@ http.createServer((req, res) => {
     const type = TYPES[path.extname(file)] || 'application/octet-stream';
     if (path.relative(root, file) === path.join('review', 'index.html')) {
       let page = body.toString('utf8')
-        .replace('COLLECTOR_URL: ""', `COLLECTOR_URL: ${JSON.stringify(collector)}`)
-        .replace('GOOGLE_REVIEW_URL: ""', `GOOGLE_REVIEW_URL: ${JSON.stringify(google)}`);
+        .replace(/COLLECTOR_URL: "[^"]*"/, () => `COLLECTOR_URL: ${JSON.stringify(collector)}`)
+        .replace(/GOOGLE_REVIEW_URL: "[^"]*"/, () => `GOOGLE_REVIEW_URL: ${JSON.stringify(google)}`);
       // Nothing leaves this machine, so the served copy does not ask Google for
       // Open Sans either: it shows the page the way a guest network that blocks
       // Google would. (--google-fonts leaves the real tags in.)
