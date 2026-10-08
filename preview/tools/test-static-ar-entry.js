@@ -24,7 +24,10 @@ assert.ok(configIndex >= 0 && configIndex < stabilityIndex && stabilityIndex < d
 assert.match(markerHtml, /scale: responsive/, 'responsive scale is the default test mode');
 assert.doesNotMatch(markerHtml, /<a-camera\s+position="0\s+0\s+0"/, 'responsive mode never starts at camera Y zero');
 assert.match(markerHtml, /<a-camera\s+position="0\s+1\.6\s+0"/, 'camera uses the calibrated nonzero start height');
-assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=20260827-dock2/, 'parent iframe carries the new immutable cache token');
+// Any dated token will do (v=YYYYMMDD-name): the point is that the iframe URL is
+// versioned, so a new marker.js is never served from a stale cache. This used to
+// hard-code one token and went red every time the real one was bumped.
+assert.match(indexHtml, /marker\.html\?embedded=1&amp;v=\d{8}-[a-z0-9]+/, 'parent iframe carries a dated immutable cache token');
 assert.match(indexHtml, /allow="[^"]*clipboard-write/, 'AR iframe grants clipboard-write so the diagnostics log can be saved/copied');
 assert.match(configSource, /'ar-debug'/, 'parent forwards the opt-in diagnostics flag');
 assert.match(configSource, /'xrscale'/, 'parent forwards the scale A\/B flag');
