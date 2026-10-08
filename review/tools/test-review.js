@@ -281,11 +281,12 @@ function openPage(text, opts = {}) {
     return false;
   }
 
-  // Pages the settings are filled in on the copy that is run, never on the file.
+  // Each case sets the settings on the copy that is run, never on the file,
+  // whatever the shipping page has in them.
   let script = inlineScript(text.page);
   const setting = (name, value) => {
-    const needle = `${name}: ""`;
-    if (script.split(needle).length !== 2) throw new Error(`the setting ${name} is not in the page exactly once`);
+    const needle = new RegExp(`${name}: "[^"]*"`, 'g');
+    if ((script.match(needle) || []).length !== 1) throw new Error(`the setting ${name} is not in the page exactly once`);
     script = script.replace(needle, () => `${name}: ${JSON.stringify(value)}`);
   };
   setting('COLLECTOR_URL', o.collector);
@@ -1348,8 +1349,9 @@ const CASES = [
           external.map((l) => /fonts\.googleapis\.com\/css2\?family=Open\+Sans/.test(l) && /media="print"/.test(l) && /onload="this\.media='all'"/.test(l) || /rel="preconnect"/.test(l)),
           /<noscript><link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?family=Open\+Sans/.test(html),
           // every address written anywhere in the page, apart from the font host, the XML namespace the Google logo's svg names,
-          // and the two examples in the settings' comments (the Google link and the Collector)
-          (html.match(/https?:\/\/[^"'\s)<>]+/g) || []).map((u) => new URL(u).hostname).filter((h) => !['fonts.googleapis.com', 'fonts.gstatic.com', 'www.w3.org', 'g.page', 'steakout-ar-collector.your-subdomain.workers.dev'].includes(h))],
+          // the two examples in the settings' comments (the Google link and the Collector), and the live Collector
+          // the settings name (H3 holds it to exactly that address)
+          (html.match(/https?:\/\/[^"'\s)<>]+/g) || []).map((u) => new URL(u).hostname).filter((h) => !['fonts.googleapis.com', 'fonts.gstatic.com', 'www.w3.org', 'g.page', 'steakout-ar-collector.your-subdomain.workers.dev', 'steakout-ar-collector.antsojo.workers.dev'].includes(h))],
         [1, true, true, [true, true, true], true, []]);
       t('H2b the page loads no script, stylesheet, image or frame from anywhere else: no @import, no url() to another site, no other src',
         [/@import/.test(html), (html.match(/url\(\s*['"]?https?:/g) || []).length, [...html.matchAll(/<(?:img|iframe|source|video|audio)\b[^>]*\ssrc="(https?:[^"]*)"/g)].length],
@@ -1359,8 +1361,9 @@ const CASES = [
         [fontFiles, fontFiles.map((f) => fs.existsSync(path.join(reviewRoot, f))),
           fontFiles.map((f) => { const a = path.join(reviewRoot, f); const b = path.join(reviewRoot, '..', 'preview/assets', f); return fs.existsSync(b) ? fs.readFileSync(a).equals(fs.readFileSync(b)) : null; })],
         [['fonts/bebas-neue-latin.woff2', 'fonts/bebas-neue-latin-ext.woff2'], [true, true], [true, true]]);
-      t('H3 the shipping page has its settings empty: no Collector address, no Google link, and the owner is Brian',
-        [/COLLECTOR_URL: "",/.test(html), /GOOGLE_REVIEW_URL: "",/.test(html), /OWNER_NAME: "Brian",/.test(html), /Brain/.test(html), /ORBIT_URL/.test(html)], [true, true, true, false, false]);
+      t('H3 the shipping page sends to the live Collector and no other, has no Google link yet, and the owner is Brian',
+        [html.match(/COLLECTOR_URL: "[^"]*",/g), /GOOGLE_REVIEW_URL: "",/.test(html), /OWNER_NAME: "Brian",/.test(html), /Brain/.test(html), /ORBIT_URL/.test(html)],
+        [['COLLECTOR_URL: "https://steakout-ar-collector.antsojo.workers.dev",'], true, true, false, false]);
       t('H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send',
         [/userAgent\b/.test(script + core), /document\.referrer/.test(script + core), /navigator\.language/.test(script + core), /timeZone|resolvedOptions/.test(script + core),
           /location\.(href|pathname|origin|hash)/.test(script + core), /document\.cookie/.test(script + core), (script.match(/location\.search/g) || []).length],
@@ -1661,9 +1664,11 @@ const MUTATIONS = [
   mut('index: a tracker host', P, '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>', '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="preconnect" href="https://stats.example.net">', 'H2 the scripts are this site’s own, in order (the core, then the page), with a dated cache token; the only outside address is Google’s Open Sans, loaded so it cannot hold the page back (media=print until it arrives) with a noscript fallback'),
   mut('index: a stylesheet import from another site', P, '<style>\n  @font-face {\n    font-family: \'Bebas Neue\';\n    font-style: normal;\n    font-weight: 400;\n    font-display: swap;\n    src: url(\'./fonts/bebas-neue-latin.woff2\')', '<style>\n  @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue");\n  @font-face {\n    font-family: \'Bebas Neue\';\n    font-style: normal;\n    font-weight: 400;\n    font-display: swap;\n    src: url(\'./fonts/bebas-neue-latin.woff2\')', 'H2b the page loads no script, stylesheet, image or frame from anywhere else: no @import, no url() to another site, no other src'),
   mut('index: a font file that is not there', P, "src: url('./fonts/bebas-neue-latin-ext.woff2')", "src: url('./fonts/bebas-neue-ext.woff2')", 'H2c Bebas Neue is served from this site: both files named in the page exist beside it, and they are the AR page’s own files'),
-  mut('index: the Collector address is written in', P, 'COLLECTOR_URL: "",', 'COLLECTOR_URL: "https://steakout-ar-collector.example.workers.dev",', 'H3 the shipping page has its settings empty: no Collector address, no Google link, and the owner is Brian'),
-  mut('index: the Google link is written in', P, 'GOOGLE_REVIEW_URL: "",', 'GOOGLE_REVIEW_URL: "https://g.page/r/ABC/review",', 'H3 the shipping page has its settings empty: no Collector address, no Google link, and the owner is Brian'),
-  mut('index: the old setting name comes back', P, '  COLLECTOR_URL: "",', '  COLLECTOR_URL: "",\n  ORBIT_URL: "",', 'H3 the shipping page has its settings empty: no Collector address, no Google link, and the owner is Brian'),
+  mut('index: another Collector address is written in', P, 'COLLECTOR_URL: "https://steakout-ar-collector.antsojo.workers.dev",', 'COLLECTOR_URL: "https://steakout-ar-collector.example.workers.dev",', 'H3 the shipping page sends to the live Collector and no other, has no Google link yet, and the owner is Brian'),
+  mut('index: the Collector address is emptied', P, 'COLLECTOR_URL: "https://steakout-ar-collector.antsojo.workers.dev",', 'COLLECTOR_URL: "",', 'H3 the shipping page sends to the live Collector and no other, has no Google link yet, and the owner is Brian'),
+  mut('index: the page names a second Collector', P, '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>', '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="preconnect" href="https://other-collector.example.workers.dev">', 'H2 the scripts are this site’s own, in order (the core, then the page), with a dated cache token; the only outside address is Google’s Open Sans, loaded so it cannot hold the page back (media=print until it arrives) with a noscript fallback'),
+  mut('index: the Google link is written in', P, 'GOOGLE_REVIEW_URL: "",', 'GOOGLE_REVIEW_URL: "https://g.page/r/ABC/review",', 'H3 the shipping page sends to the live Collector and no other, has no Google link yet, and the owner is Brian'),
+  mut('index: the old setting name comes back', P, '  COLLECTOR_URL: "https://steakout-ar-collector.antsojo.workers.dev",', '  COLLECTOR_URL: "https://steakout-ar-collector.antsojo.workers.dev",\n  ORBIT_URL: "",', 'H3 the shipping page sends to the live Collector and no other, has no Google link yet, and the owner is Brian'),
   mut('page: the user agent is read', P, 'const nav = window.navigator || {};\n    const display', 'const nav = window.navigator || {};\n    const ua = nav.userAgent;\n    const display', 'H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send'),
   mut('page: the referrer is read', P, '    let canHover = false;\n    try { canHover = Boolean(window.matchMedia && window.matchMedia("(hover: hover)").matches); } catch (e) { /* no hover */ }\n    track("review_open"', '    const from = document.referrer;\n    let canHover = false;\n    try { canHover = Boolean(window.matchMedia && window.matchMedia("(hover: hover)").matches); } catch (e) { /* no hover */ }\n    track("review_open"', 'H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send'),
   mut('page: a cookie is read', P, 'const startedAt = Date.now();', 'const startedAt = Date.now() + (document.cookie ? 0 : 0);', 'H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send'),

@@ -835,9 +835,9 @@ const CASES = [
       t('H2 the scripts load in order (config, core, tracking, app) and carry a dated cache token',
         [order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), /tracking\.js\?v=\d{8}-[a-z0-9]+/.test(text.index), /marker\.html\?embedded=1&amp;v=\d{8}-[a-z0-9]+/.test(text.index)],
         [true, true, true]);
-      t('H3 no collector address is written into the site: config.collectorUrl is empty, app.js reads it, no constant is left',
-        [/collectorUrl:\s*''/.test(text.config), /config\.collectorUrl/.test(text.app), /COLLECTOR_URL\s*=/.test(text.app), /https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/.test(text.app + text.config + text.core + text.tracking)],
-        [true, true, false, false]);
+      t('H3 the one collector address in the site is the live Collector’s /collect, written in config only: app.js reads config.collectorUrl, no constant is left, no other script names a workers.dev address',
+        [(text.config.match(/collectorUrl:\s*'[^']*'/g) || []), /config\.collectorUrl/.test(text.app), /COLLECTOR_URL\s*=/.test(text.app), /https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/.test(text.app + text.core + text.tracking)],
+        [["collectorUrl: 'https://steakout-ar-collector.antsojo.workers.dev/collect'"], true, false, false]);
       const tracked = text.core + text.tracking;
       t('H4 the user agent, cookies, local storage, the camera and form fields are never read by the tracking',
         [/\buserAgent\b(?!Data)/.test(tracked), /document\.cookie/.test(tracked), /localStorage/.test(tracked), /getUserMedia|mediaDevices/.test(tracked), /\.value\b/.test(tracked), /querySelector\(['"]input|textarea/.test(tracked)],
@@ -959,7 +959,8 @@ const MUTATIONS = [
   // the files
   { name: 'index: a data-track key Orbit does not know', file: 'index', from: 'data-track="sign_in"', to: 'data-track="signin_link"', check: 'H1 every data-track and data-section Orbit is told about is on the page, and nothing Orbit does not know' },
   { name: 'index: tracking loads after app', file: 'index', from: '<script defer src="./tracking.js?v=20261008-track1"></script>\n  <script defer src="./app.js?v=20261008-track1"></script>', to: '<script defer src="./app.js?v=20261008-track1"></script>\n  <script defer src="./tracking.js?v=20261008-track1"></script>', check: 'H2 the scripts load in order (config, core, tracking, app) and carry a dated cache token' },
-  { name: 'config: a collector address is written in', file: 'config', from: "collectorUrl: '',", to: "collectorUrl: 'https://steakout-ar-collector.example.workers.dev/collect',", check: 'H3 no collector address is written into the site: config.collectorUrl is empty, app.js reads it, no constant is left' },
+  { name: 'config: another collector address is written in', file: 'config', from: "collectorUrl: 'https://steakout-ar-collector.antsojo.workers.dev/collect',", to: "collectorUrl: 'https://steakout-ar-collector.example.workers.dev/collect',", check: 'H3 the one collector address in the site is the live Collector’s /collect, written in config only: app.js reads config.collectorUrl, no constant is left, no other script names a workers.dev address' },
+  { name: 'config: the collector address is emptied', file: 'config', from: "collectorUrl: 'https://steakout-ar-collector.antsojo.workers.dev/collect',", to: "collectorUrl: '',", check: 'H3 the one collector address in the site is the live Collector’s /collect, written in config only: app.js reads config.collectorUrl, no constant is left, no other script names a workers.dev address' },
   { name: 'tracking: reads the user agent', file: 'tracking', from: "const nav = window.navigator || {};", to: "const nav = window.navigator || {};\n    const ua = nav.userAgent;", check: 'H4 the user agent, cookies, local storage, the camera and form fields are never read by the tracking' },
   { name: 'tracking: a fourth storage key', file: 'tracking', from: "const VISIT_KEY = 'steakout.visit';", to: "const VISIT_KEY = 'steakout.visit';\n  const PROFILE_KEY = 'steakout.profile';", check: 'H5 sessionStorage holds the two old keys and one new one, counters only' },
   { name: 'marker: closes without going through requestClose', file: 'marker', from: "event.preventDefault(); requestClose(); });", to: "event.preventDefault(); postToParent('steakout-ar-close'); });", check: 'H6 marker.js reports its run through one message with a detail, closes through one function, and the in-AR buttons are tagged' },
