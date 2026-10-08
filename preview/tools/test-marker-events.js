@@ -30,7 +30,11 @@
  *       the AR helper not loading sends "load";
  *   M7. a tap on a tagged button in the AR (ORDER NOW, close) is passed up
  *       with where it landed; a tap on anything else, or by a script, is not;
- *   M8. outside the landing page's frame nothing is posted and nothing breaks.
+ *   M8. outside the landing page's frame nothing is posted and nothing breaks;
+ *   R.  the run number is kept in the tab's sessionStorage, so a RELOAD of the
+ *       tab does not start counting from 1 again (Orbit tells runs apart by
+ *       visit and run, and the visit survives a reload); with no storage, or
+ *       garbage in it, the count still works and nothing breaks.
  *
  * NOT proven here: the real engine, a real camera, a real phone. The lock rule
  * itself (ar-anchor-stability.js) has its own test, test-anchor-stability.js.
@@ -92,7 +96,7 @@ function fakeObject3D() {
  * opts: embedded (default true), stability (default true).
  */
 function openMarker(text, opts = {}) {
-  const o = { embedded: true, stability: true, ...opts };
+  const o = { embedded: true, stability: true, storage: null, ...opts };
   let clock = 10000;
   let timerSeq = 0;
   const timers = [];
@@ -132,6 +136,8 @@ function openMarker(text, opts = {}) {
     removeEventListener: (...a) => winTarget.removeEventListener(...a),
     dispatchEvent: (ev) => fire(sandbox, ev.type, ev),
     parent,
+    ...(o.storage ? { sessionStorage: o.storage } : {}),
+    localStorage: profile.storage,
     XR8: {
       XrController: { configure() {} },
       _paused: false,
@@ -242,6 +248,32 @@ function openMarker(text, opts = {}) {
   return world;
 }
 
+// The phone's localStorage: ONE per run of the checks, shared by every page and every tab opened in it (that is
+// what makes it localStorage). marker.js must never touch it; `touched` says if it did.
+let profile = { touched: false, storage: null };
+function newProfile() {
+  const data = new Map();
+  const mark = () => { profile.touched = true; };
+  profile = {
+    touched: false,
+    storage: { getItem(key) { mark(); return data.has(key) ? data.get(key) : null; }, setItem(key, value) { mark(); data.set(key, String(value)); } }
+  };
+}
+newProfile();
+
+/**
+ * A tab's sessionStorage: shared by every page loaded in that tab, gone when the
+ * tab is. `throws` is Safari private mode, which throws on every call.
+ */
+function fakeStorage(initial = {}, { throws = false } = {}) {
+  const data = new Map(Object.entries(initial));
+  const guard = () => { if (throws) throw new Error('SecurityError: the operation is insecure'); };
+  return {
+    getItem(key) { guard(); return data.has(key) ? data.get(key) : null; },
+    setItem(key, value) { guard(); data.set(key, String(value)); }
+  };
+}
+
 /* ---------------------------------------------------------------- checks */
 
 const detailsOf = (w, type) => w.sent(type).map((m) => m.message.detail);
@@ -314,6 +346,68 @@ const CASES = [
         [live2 && live2.message.detail.run, live2 && live2.message.detail.ms === live2.at - secondStart, lock2 && lock2.message.detail.run,
           lock2 && lock2.message.detail.ms === lock2.at - live2.at, detailsOf(w, 'steakout-ar-lost').slice(-1)[0], detailsOf(w, 'steakout-ar-close').slice(-1)[0]],
         [2, true, 2, true, { run: 2, n: 1 }, { run: 2, ms: close2At - live2.at, locked: close2At - lock2.at, lost: 1 }]);
+    }
+  },
+  {
+    name: 'R the run number survives a reload of the tab',
+    async run(M, t) {
+      const { text } = M;
+      const RUN_KEY = 'steakout.ar.run';
+      // one attempt: START CAMERA, lock, a loss, leave. Returns every `run` it reported.
+      const attempt = async (w) => {
+        await w.startCamera();
+        await w.showFlyer();
+        w.flyerLost();
+        w.fire(w.sandbox, 'keydown', { key: 'Escape' });
+        const runs = (type) => detailsOf(w, type).map((d) => d.run);
+        return { live: runs('steakout-ar-camera-live'), lock: runs('steakout-ar-locked'), lost: runs('steakout-ar-lost'), close: runs('steakout-ar-close') };
+      };
+
+      const tab = fakeStorage();
+      const first = await attempt(openMarker(text, { storage: tab }));
+      t('R1 the first attempt in a tab is run 1 in every message, and the count is written down',
+        [first, tab.getItem(RUN_KEY)], [{ live: [1], lock: [1], lost: [1], close: [1] }, '1']);
+
+      // the tab reloads (refresh, TRY AGAIN, a phone dropping the tab): a NEW page, the same tab storage
+      const reloaded = openMarker(text, { storage: tab });
+      const second = await attempt(reloaded);
+      t('R2 after a reload of the tab the next attempt is run 2, not run 1 again (or Orbit would throw its timings away as repeats of the first)',
+        [second, tab.getItem(RUN_KEY)], [{ live: [2], lock: [2], lost: [2], close: [2] }, '2']);
+
+      reloaded.fromParent('steakout-ar-stop');
+      await reloaded.run(200);
+      await reloaded.startCamera();
+      t('R3 a further attempt in the same page continues, run 3', [detailsOf(reloaded, 'steakout-ar-camera-live').map((d) => d.run), tab.getItem(RUN_KEY)], [[2, 3], '3']);
+
+      const third = await attempt(openMarker(text, { storage: tab }));
+      t('R3b and the next reload continues from there, run 4', [third.live, third.close, tab.getItem(RUN_KEY)], [[4], [4], '4']);
+
+      // another tab has its own sessionStorage, so its own count. (The browser's localStorage, shared by every tab
+      // on the phone, is there too, and must stay untouched: a count that outlived the tab would start to
+      // identify a phone across visits, which is what sessionStorage was chosen to avoid.)
+      const otherTab = await attempt(openMarker(text, { storage: fakeStorage() }));
+      t('R4 another tab counts from 1 on its own: the count belongs to the tab, never to the phone', [otherTab.live, profile.touched], [[1], false]);
+
+      // no storage (Safari private mode throws on every call): counted in the page, nothing breaks
+      const priv = openMarker(text, { storage: fakeStorage({}, { throws: true }) });
+      const p1 = await attempt(priv);
+      priv.fromParent('steakout-ar-stop');
+      await priv.run(200);
+      await priv.startCamera();
+      t('R5 with a storage that throws the AR still starts, and still counts runs within the page (1, then 2)',
+        [p1.live, p1.lock, detailsOf(priv, 'steakout-ar-camera-live').map((d) => d.run)], [[1], [1], [1, 2]]);
+      // no storage object at all (an old engine)
+      const none = await attempt(openMarker(text));
+      t('R5b with no storage at all it is run 1 and nothing breaks', none.live, [1]);
+
+      // garbage in the key is not believed: not a number, a fraction, negative, zero, huge, past what tracking will send
+      const garbage = ['abc', '2.5', '-3', '0', '', '1e9', '1000', '99999999999999999999'];
+      const got = [];
+      for (const value of garbage) got.push((await attempt(openMarker(text, { storage: fakeStorage({ [RUN_KEY]: value }) }))).live[0]);
+      t('R6 garbage in the stored count is ignored: the attempt is run 1', got, garbage.map(() => 1));
+      // a good number is believed, whatever the page itself has counted
+      const trusted = await attempt(openMarker(text, { storage: fakeStorage({ [RUN_KEY]: '7' }) }));
+      t('R7 a stored 7 makes the next attempt run 8', trusted.live, [8]);
     }
   },
   {
@@ -427,7 +521,7 @@ const MUTATIONS = [
   { name: 'the logo closes without the numbers', file: K, from: "event.preventDefault(); requestClose(); });", to: "event.preventDefault(); postToParent('steakout-ar-close'); });", check: 'M4 leaving by the logo sends ar_closed’s numbers: the run, ms in AR, ms locked, times lost (the true count)' },
   { name: 'Escape closes without the numbers', file: K, from: "if (event.key === 'Escape') requestClose(); });", to: "if (event.key === 'Escape') postToParent('steakout-ar-close'); });", check: 'M4b Escape sends the same, from the same function' },
   { name: 'the next run carries the loss count over', file: K, from: '    arLostCount = 0;\n    arLostSince = 0;\n    arLostWasSent = false;\n    const operation', to: '    arLostSince = 0;\n    arLostWasSent = false;\n    const operation', check: 'M5 the next START CAMERA is run 2, timed from its own start, with nothing carried over from run 1' },
-  { name: 'the next run is not a new run', file: K, from: '    arRun += 1;\n', to: '', check: 'M5 the next START CAMERA is run 2, timed from its own start, with nothing carried over from run 1' },
+  { name: 'the next run is not a new run', file: K, from: '    arRun = Math.max(arRun, readRunCount()) + 1;\n    writeRunCount(arRun);\n', to: '', check: 'M5 the next START CAMERA is run 2, timed from its own start, with nothing carried over from run 1' },
   { name: 'the next run keeps the old start time', file: K, from: '    arStartedAt = performance.now();\n    arLiveAt = 0;', to: '    arLiveAt = 0;', check: 'M5 the next START CAMERA is run 2, timed from its own start, with nothing carried over from run 1' },
   { name: 'closing before ever being live reports ghosts', file: K, from: 'const msSince = (from) => (from ? Math.max(0, Math.round(performance.now() - from)) : 0);', to: 'const msSince = (from) => Math.max(0, Math.round(performance.now() - from));', check: 'N2 leaving before the camera was ever live says so with zeros' },
   { name: 'a permission fault is called other', file: K, from: "if (/NotAllowedError|SecurityError|PermissionDenied/i.test(summary)) return 'permission';", to: "if (/NotAllowedError|SecurityError|PermissionDenied/i.test(summary)) return 'other';", check: 'F1 a camera fault sends one short code, never the message; the panel is the one it always was' },
@@ -440,12 +534,23 @@ const MUTATIONS = [
   { name: 'a script-made click is passed up', file: K, from: "if (!event.isTrusted || !event.target || !event.target.closest) return;", to: "if (!event.target || !event.target.closest) return;", check: 'T1 a tap on ORDER NOW or the close button is passed up with where it landed (% of the screen); the camera view, a script, nothing else is' },
   { name: 'the tap position is in pixels', file: K, from: 'x: pct(clientX, window.innerWidth),', to: 'x: clientX,', check: 'T1 a tap on ORDER NOW or the close button is passed up with where it landed (% of the screen); the camera view, a script, nothing else is' },
   { name: 'a key press has no position', file: K, from: "if (clientX === 0 && clientY === 0 && event.detail === 0) {\n          const rect = tagged.getBoundingClientRect();", to: "if (false) {\n          const rect = tagged.getBoundingClientRect();", check: 'T1 a tap on ORDER NOW or the close button is passed up with where it landed (% of the screen); the camera view, a script, nothing else is' },
+  { name: 'the run count is not written down', file: K, from: '    writeRunCount(arRun);\n', to: '', check: 'R2 after a reload of the tab the next attempt is run 2, not run 1 again (or Orbit would throw its timings away as repeats of the first)' },
+  { name: 'the run count is not read back (a reload counts from 1)', file: K, from: 'arRun = Math.max(arRun, readRunCount()) + 1;', to: 'arRun += 1;', check: 'R2 after a reload of the tab the next attempt is run 2, not run 1 again (or Orbit would throw its timings away as repeats of the first)' },
+  { name: 'the stored count wins over the page’s own', file: K, from: 'arRun = Math.max(arRun, readRunCount()) + 1;', to: 'arRun = readRunCount() + 1;', check: 'R5 with a storage that throws the AR still starts, and still counts runs within the page (1, then 2)' },
+  { name: 'the page’s own count wins over the stored one', file: K, from: 'arRun = Math.max(arRun, readRunCount()) + 1;', to: 'arRun = arRun + 1;', check: 'R7 a stored 7 makes the next attempt run 8' },
+  { name: 'the count is stored one behind', file: K, from: '    writeRunCount(arRun);\n', to: '    writeRunCount(arRun - 1);\n', check: 'R3 a further attempt in the same page continues, run 3' },
+  { name: 'any stored text is believed', file: K, from: 'return Number.isInteger(stored) && stored > 0 && stored <= MAX_RUN ? stored : 0;', to: 'return stored || 0;', check: 'R6 garbage in the stored count is ignored: the attempt is run 1' },
+  { name: 'a stored count past 999 is believed', file: K, from: 'stored > 0 && stored <= MAX_RUN ? stored : 0;', to: 'stored > 0 ? stored : 0;', check: 'R6 garbage in the stored count is ignored: the attempt is run 1' },
+  { name: 'a storage that throws on read breaks the AR', file: K, from: '    } catch (error) { return 0; }\n  };\n  const writeRunCount', to: '    } catch (error) { throw error; }\n  };\n  const writeRunCount', check: 'R5 with a storage that throws the AR still starts, and still counts runs within the page (1, then 2)' },
+  { name: 'a storage that throws on write breaks the AR', file: K, from: "setItem(RUN_KEY, String(count)); } catch (error) { /* private mode */ }", to: "setItem(RUN_KEY, String(count)); } catch (error) { throw error; }", check: 'R5 with a storage that throws the AR still starts, and still counts runs within the page (1, then 2)' },
+  { name: 'the count is kept for the whole phone, not the tab', file: K, from: 'const runStore = () => window.sessionStorage;', to: 'const runStore = () => window.localStorage;', check: 'R4 another tab counts from 1 on its own: the count belongs to the tab, never to the phone' },
   { name: 'it posts outside the landing page too', file: K, from: "const postToParent = (type, detail) => {\n    if (!isEmbedded || window.parent === window) return;", to: "const postToParent = (type, detail) => {", check: 'T2 opened on its own (not inside the landing page) it posts nothing and breaks nothing, and still locks' }
 ];
 
 /* --------------------------------------------------------------- running */
 
 async function runAll(mutations, { quiet } = {}) {
+  newProfile();
   const text = loadText(mutations);
   const M = { text };
   const all = [];

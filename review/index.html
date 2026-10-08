@@ -456,6 +456,15 @@ const newSessionId = () => {
   } catch (e) { /* fall through */ }
   return "sx-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
 };
+// One random id per message attempt, kept (in the tab) until the message is stored. It lets the Collector
+// store a message once when the customer sends it again because the first answer never reached the phone.
+const newMessageId = () => {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+  } catch (e) { /* fall through */ }
+  return "mx-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+};
+const messageIds = core ? core.createMessageIds({ read: readStore, write: writeStore, makeId: newMessageId }) : null;
 const isNewVisit = !readStore(SESSION_KEY);
 const session = (() => {
   const existing = readStore(SESSION_KEY);
@@ -763,7 +772,9 @@ $("ownerForm").addEventListener("submit", async e => {
     return;
   }
 
-  const built = connected && core ? core.buildFeedback({ session, source, ...payload, at: Date.now() }) : { ok: false, reason: "unavailable" };
+  // The same words sent again (the first answer was lost) carry the same id; new words get a new one.
+  const messageId = connected && messageIds ? messageIds.idFor(payload) : null;
+  const built = connected && core ? core.buildFeedback({ session, source, ...payload, messageId, at: Date.now() }) : { ok: false, reason: "unavailable" };
   if (!built.ok) {
     err.innerHTML = built.reason === "too_long" ? tooLongLine : failedLine;
     err.classList.add("on");
@@ -784,6 +795,7 @@ $("ownerForm").addEventListener("submit", async e => {
       AbortController: window.AbortController,
     });
     if (out.ok) {
+      if (messageIds) messageIds.stored(); // stored: the next message is a new one
       sentOk(payload);
     } else {
       emit("message_failed", { r: rating, err: out.err });

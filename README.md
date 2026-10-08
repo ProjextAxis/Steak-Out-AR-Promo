@@ -112,8 +112,12 @@ empty in this repo. While it is empty the events are only kept in
 
 Never sent: camera frames, poses, QR text, the user agent, anything typed,
 anything personal. The device is a coarse `ios` / `android` / `other`, the screen
-size, and whether a mouse can hover. One extra `sessionStorage` key,
-`steakout.visit`, holds counters only and dies with the tab.
+size, and whether a mouse can hover. Two extra `sessionStorage` keys,
+`steakout.visit` (counters) and `steakout.ar.run` (how many times START CAMERA has
+been pressed in this tab, so a reload of the tab carries on from there: Orbit tells
+AR runs apart by visit and run number, and a second attempt that started again at
+"run 1" would be thrown away as a repeat of the first), hold counts only and die
+with the tab.
 
 Checks (plain node, no packages), from the repo root:
 
@@ -177,16 +181,26 @@ a free-text value cannot pass any rule.
 
 **The message** goes only to `{COLLECTOR_URL}/feedback`, only when they press Send:
 the face, the words, and a name and a phone or email only if they typed them, plus the
-visit's id and placement. The page believes only a 2xx answer ("stored"); anything
+visit's id and placement, and a random `message_id` (made when Send is first pressed
+and kept in the tab until the message is stored). The page believes only a 2xx answer ("stored"); anything
 else shows "That didn't go through. Check your connection and try again, or call us
 at (856) 464-8000." and reports only a short code (`http_4xx`, `http_5xx`, `network`
 or `timeout`). A robot that fills the hidden box is shown "sent" and nothing goes. The
 Collector keeps a message 30 days and Orbit keeps the copy.
 
+**Pressing Send again is safe.** On a weak signal the Collector can store a message
+while its answer never reaches the phone; the page then says it didn't go through and
+the customer presses Send again. The retry carries the same `message_id` (the same
+words, face, name and contact), and the Collector answers `201` without storing it a
+second time. Different words are a different message and get a new id; so does the
+next message after one was stored. The tab keeps only the id and a short code of the
+words (never the words) until the message is stored.
+
 **What it keeps on the phone:** one count in `localStorage` (`so-review-visits`,
-how many times this phone opened the page), and three `sessionStorage` keys of its
-own (`steakout.review.session`, `.source`, `.visit`: a random id, the placement, and
-counters) that die with the tab. Not the AR page's keys.
+how many times this phone opened the page), and four `sessionStorage` keys of its
+own (`steakout.review.session`, `.source`, `.visit`, `.msgid`: a random id, the
+placement, counters, and the id of a message waiting to be stored) that die with the
+tab. Not the AR page's keys.
 
 **Fonts.** Bebas Neue (the headings) is served from `review/fonts/`, the same files
 the AR page uses. Open Sans (the body text) still comes from Google Fonts, but it is

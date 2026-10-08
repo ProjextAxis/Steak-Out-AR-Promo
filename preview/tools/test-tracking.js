@@ -112,7 +112,8 @@ function readContract() {
   const sections = [...ts.slice(ts.indexOf('ORBIT_SITE_SECTIONS = ['), ts.indexOf('] as const;', ts.indexOf('ORBIT_SITE_SECTIONS = [')))
     .matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   const labelBlock = ts.slice(ts.indexOf('ORBIT_SITE_ELEMENT_LABELS'), ts.indexOf('};', ts.indexOf('ORBIT_SITE_ELEMENT_LABELS')));
-  const labels = [...labelBlock.matchAll(/^\s*([a-z_]+): '/gm)].map((m) => m[1]);
+  // 'other' (Orbit's SITE_OTHER_KEY) is the label of the one row a long list is folded into; it is not an element the page tags.
+  const labels = [...labelBlock.matchAll(/^\s*([a-z_]+): '/gm)].map((m) => m[1]).filter((key) => key !== 'other');
   return { events, sections, labels };
 }
 

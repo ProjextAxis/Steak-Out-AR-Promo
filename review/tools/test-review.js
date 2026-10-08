@@ -143,7 +143,8 @@ function readContract() {
     screens: words('ORBIT_REVIEW_SCREENS'),
     sections: words('ORBIT_REVIEW_SECTIONS'),
     pages: words('ORBIT_SITE_PAGES'),
-    labels: [...labelBlock.matchAll(/^\s*([a-z_0-9]+): '/gm)].map((m) => m[1])
+    // 'other' (Orbit's SITE_OTHER_KEY) labels the one row a long list is folded into; it is not an element the page tags.
+    labels: [...labelBlock.matchAll(/^\s*([a-z_0-9]+): '/gm)].map((m) => m[1]).filter((key) => key !== 'other')
   };
 }
 
@@ -203,6 +204,7 @@ function collectorAcceptsFeedback(raw) {
   if (typeof body.source !== 'string' || !/^[a-z0-9_-]{1,40}$/.test(body.source)) return 'source';
   if (body.at !== undefined && (!Number.isSafeInteger(body.at) || body.at < 0)) return 'at';
   if (body.page !== undefined && body.page !== 'review') return 'page';
+  if (body.message_id !== undefined && body.message_id !== null && (typeof body.message_id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(body.message_id))) return 'message_id';
   if (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) return 'rating';
   const clean = (v) => (typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g, '').trim() : null);
   const message = clean(body.message);
@@ -333,7 +335,7 @@ function openPage(text, opts = {}) {
     performance: { now: () => clock },
     sessionStorage: fakeSession,
     localStorage: fakeLocal,
-    crypto: { randomUUID: () => `00000000-0000-4000-8000-${String(++sessionCounter).padStart(12, '0')}` },
+    crypto: { randomUUID: () => `00000000-0000-4000-8000-${String(++sessionCounter + (o.uuidFrom || 0)).padStart(12, '0')}` },
     matchMedia: (query) => ({ matches: query === '(hover: hover)' ? Boolean(o.hover) : false }),
     setTimeout: (fn, ms) => { const id = ++timerSeq; timers.push({ id, fn, at: clock + (ms || 0) }); return id; },
     clearTimeout: (id) => { const i = timers.findIndex((t) => t.id === id); if (i >= 0) timers.splice(i, 1); },
@@ -736,6 +738,66 @@ const CASES = [
         [true, 'too_long', 80, 120, 'too_long', true, 'too_long']);
       t('E5 whatever the box was cut to, the body passes the Collector’s rules',
         [ok({ message: 'é'.repeat(1500), name: 'n'.repeat(200), contact: 'c'.repeat(200) }), ok({ message: 'x'.repeat(2000) })].map((b) => collectorAcceptsFeedback(b.body)), [null, null]);
+      // ---- a message sent again is one message: the id it carries
+      const withId = ok({ messageId: '0b7d5d3e-6d0e-4b0e-9c61-3f5e7a2b9a11' });
+      t('E9 a message_id goes last in the body, passes the Collector’s rules, and is left out when there is none; one the Collector would refuse is never sent',
+        [Object.keys(JSON.parse(withId.body)).slice(-2), JSON.parse(withId.body).message_id, collectorAcceptsFeedback(withId.body),
+          'message_id' in JSON.parse(ok({ messageId: undefined }).body), 'message_id' in JSON.parse(ok({ messageId: null }).body),
+          ['has space', 'a'.repeat(65), '', 12345, { a: 1 }, 'a/b', 'ü'].map((id) => { const b = ok({ messageId: id }); return b.ok === false && b.reason; })],
+        [['at', 'message_id'], '0b7d5d3e-6d0e-4b0e-9c61-3f5e7a2b9a11', null, false, false, ['message_id', 'message_id', 'message_id', 'message_id', 'message_id', 'message_id', 'message_id']]);
+      const idsOf = (store, makeId, over = {}) => core.createMessageIds({
+        read: (k) => (store.has(k) ? store.get(k) : null), write: (k, v) => { store.set(k, String(v)); }, makeId, ...over
+      });
+      const counter = () => { let n = 0; return () => `id-${++n}`; };
+      const fields = { rating: 2, message: 'SECRET-MESSAGE-WORDS, cold fries', name: 'SECRET-NAME', contact: 'secret@example.com' };
+      {
+        const store = new Map();
+        const ids = idsOf(store, counter());
+        const a = ids.idFor(fields);
+        const again = ids.idFor({ ...fields });
+        const trimmed = ids.idFor({ ...fields, message: '  SECRET-MESSAGE-WORDS, cold fries \n', name: ' SECRET-NAME ', contact: ' secret@example.com ' });
+        const reloaded = idsOf(store, () => 'a-new-page-made-this').idFor(fields);
+        t('E10 the same message gets the same id every time it is asked for: again, with spaces round it, and after a reload of the tab (a new page, the same sessionStorage)',
+          [a, again, trimmed, reloaded], ['id-1', 'id-1', 'id-1', 'id-1']);
+        // (the reloaded page is given a different id to make, so it can only answer id-1 by finding the old one in the tab)
+        t('E10b what is kept in the tab is the id and a short code, never a word the customer typed',
+          [[...store.keys()], /^id-1_[0-9a-z]{1,16}$/.test(store.get(core.MESSAGE_ID_KEY)), JSON.stringify([...store]).match(/SECRET|cold|fries|secret@/)],
+          [['steakout.review.msgid'], true, null]);
+        const different = [
+          { ...fields, message: 'SECRET-MESSAGE-WORDS, cold fries!' }, { ...fields, rating: 1 }, { ...fields, name: '' }, { ...fields, contact: '' }
+        ].map((f) => idsOf(new Map(store), () => 'made-fresh').idFor(f)); // each against the tab as it was after the first message
+        t('E11 different words, face, name or contact are a different message: a new id (a second thought is not a repeat)', different, ['made-fresh', 'made-fresh', 'made-fresh', 'made-fresh']);
+        const ids2 = idsOf(new Map(), counter());
+        const first = ids2.idFor(fields);
+        const second = ids2.idFor({ ...fields, message: 'changed' });
+        t('E11b …and an edit then a return to the first words is not the first message any more (only the message in hand keeps its id)',
+          [first, second, ids2.idFor(fields)], ['id-1', 'id-2', 'id-3']);
+        ids.stored();
+        t('E12 once a message is stored the next one starts afresh (a new id, even with the same words); the tab keeps nothing of the stored one',
+          [ids.idFor(fields), store.get(core.MESSAGE_ID_KEY).startsWith('id-2_'), (() => { ids.stored(); return store.get(core.MESSAGE_ID_KEY); })()], ['id-2', true, '']);
+      }
+      {
+        // a phone whose storage throws: the id still holds within the page
+        const throwing = { read() { throw new Error('private mode'); }, write() { throw new Error('private mode'); } };
+        const ids = core.createMessageIds({ ...throwing, makeId: counter() });
+        const a = ids.idFor(fields);
+        const again = ids.idFor(fields);
+        ids.stored();
+        t('E13 with storage that throws the id still holds from one try to the next within the page, and a stored message ends it; nothing throws',
+          [a, again, ids.idFor(fields)], ['id-1', 'id-1', 'id-2']);
+        // no storage functions at all, an id maker that fails or makes something the Collector would refuse
+        const bare = core.createMessageIds({ makeId: () => 'has a space' });
+        const made = bare.idFor(fields);
+        const broken = core.createMessageIds({ makeId: () => { throw new Error('no randomness'); } }).idFor(fields);
+        t('E13b an id maker that fails or makes an id the Collector would refuse is replaced by one of the core’s own that it takes',
+          [made, broken].map((id) => /^[A-Za-z0-9-]{1,64}$/.test(id)), [true, true]);
+        // junk where the id should be: not believed
+        const fp = core.messageFingerprint(fields);
+        const junk = ['', 'no-underscore', `kept_${fp}_extra`, `has space_${fp}`, `_${fp}`, `kept_`, `${'x'.repeat(65)}_${fp}`, `kept-id_${fp.toUpperCase()}x`, 42];
+        t('E13c junk in the stored value is not believed (even with the right code in it): a new id each time',
+          junk.map((value) => idsOf(new Map([[core.MESSAGE_ID_KEY, value]]), () => 'made-fresh').idFor(fields)), junk.map(() => 'made-fresh'));
+        t('E13d …but a good one is', idsOf(new Map([[core.MESSAGE_ID_KEY, `kept-id-7_${core.messageFingerprint(fields)}`]]), counter()).idFor(fields), 'kept-id-7');
+      }
       const send = async (planned, over = {}) => {
         const seen = [];
         const timers = [];
@@ -852,7 +914,7 @@ const CASES = [
         t('F5 a message goes to {base}/feedback and nowhere else, once: the face, the words, the name and contact, the visit, an empty hidden box',
           [w.fetches.length, post.url, post.init.method, post.init.headers, post.body],
           [1, 'https://collector.example.workers.dev/feedback', 'POST', { 'Content-Type': 'text/plain;charset=utf-8' },
-            { session: '00000000-0000-4000-8000-000000000001', source: 'receipt', page: 'review', rating: 2, message: 'SECRET-MESSAGE-WORDS\nsecond line', name: 'SECRET-NAME', contact: 'secret@example.com', website: '', at: BASE_EPOCH + 8060 }]);
+            { session: '00000000-0000-4000-8000-000000000001', source: 'receipt', page: 'review', rating: 2, message: 'SECRET-MESSAGE-WORDS\nsecond line', name: 'SECRET-NAME', contact: 'secret@example.com', website: '', at: BASE_EPOCH + 8060, message_id: '00000000-0000-4000-8000-000000000002' }]);
         t('F5b …and the Collector would take it', collectorAcceptsFeedback(post.raw), null);
         t('F5c the events of that visit, in order, in Orbit’s shapes: the face, the unhappy screen, the first key (no words), the send, message_sent with only counts, the sent screen, review_end',
           [w.names(), w.sent('message_started')[0].meta, w.sent('message_sent')[0].meta, w.sent('screen_shown').map((e) => e.meta.scr)],
@@ -891,6 +953,58 @@ const CASES = [
         t('F7b after a failure the same message can be sent again, and then it is sent: one failure, one success, the error line goes away',
           [w.fetches.length, w.screenOn(), w.sent('message_failed').length, w.sent('message_sent').length, w.byId('err').classList.contains('on')],
           [2, 'sent', 1, 1, false]);
+        // ---- the same message, sent again, is one message to the Collector
+        {
+          const r = openPage(text);
+          await toOwner(r, { face: 2, message: 'SECRET-MESSAGE-WORDS', name: 'SECRET-NAME' });
+          r.plan.push({ reject: true });
+          await r.submit();
+          const keptAfterFailure = r.storage.get('steakout.review.msgid');
+          r.advance(7000);
+          await r.submit();
+          const [one, two] = r.fetches.map((f) => f.body);
+          t('F7c a message whose answer never came is sent again with the SAME message_id (and a newer time); the id is kept in the tab until it is stored, then cleared',
+            [r.fetches.length, typeof one.message_id, one.message_id === two.message_id, two.at > one.at, one.message === two.message, r.screenOn(), /^[0-9a-f-]{36}_[0-9a-z]+$/.test(keptAfterFailure), r.storage.get('steakout.review.msgid')],
+            [2, 'string', true, true, true, 'sent', true, '']);
+          t('F7c2 …and nothing the customer typed is in what the tab kept while the message was waiting to be stored (the id and a short code)', [keptAfterFailure.match(/SECRET|cold/), keptAfterFailure.split('_').length], [null, 2]);
+          const e = openPage(text);
+          await toOwner(e, { face: 2, message: 'first try' });
+          e.plan.push({ status: 503 });
+          await e.submit();
+          e.type('msg', 'first try, with more words');
+          await e.submit();
+          const [before, after] = e.fetches.map((f) => f.body.message_id);
+          t('F7d words changed between the tries are a different message: a new id', [e.fetches.length, typeof before, before !== after], [2, 'string', true]);
+          const w1 = openPage(text);
+          await toOwner(w1, { face: 2, message: 'weak signal at the table' });
+          w1.plan.push({ hang: true });
+          fireSubmit(w1);
+          await w1.settle();
+          w1.advance(15001);
+          await w1.settle();
+          const idWas = w1.fetches[0].body.message_id;
+          // the tab reloads (same sessionStorage); the customer types the same words again
+          const w2 = openPage(text, { storage: w1.storage, local: w1.local });
+          await toOwner(w2, { face: 2, message: 'weak signal at the table' });
+          await w2.submit();
+          t('F7e a timeout, a reload of the tab, the same words typed again: the SAME message_id and the same visit, so the Collector can tell it is the message it already has',
+            [w1.sent('message_failed').map((x) => x.meta.err), w2.fetches.length, w2.fetches[0].body.message_id === idWas, w2.fetches[0].body.session === w1.fetches[0].body.session, w2.screenOn()],
+            [['timeout'], 1, true, true, 'sent']);
+          const p = openPage(text, { sessionStorageThrows: true, localStorageThrows: true });
+          await toOwner(p, { face: 2, message: 'private mode retry' });
+          p.plan.push({ reject: true });
+          await p.submit();
+          await p.submit();
+          t('F7f a phone that refuses storage still sends the retry with the same message_id (kept in the page)',
+            [p.fetches.length, typeof p.fetches[0].body.message_id, p.fetches[0].body.message_id === p.fetches[1].body.message_id], [2, 'string', true]);
+          const n = openPage(text);
+          await toOwner(n, { face: 2, message: 'same words twice, on purpose' });
+          await n.submit();
+          await toOwner(n, { face: 2, message: 'same words twice, on purpose' });
+          await n.submit();
+          t('F7g a second message with the same words after the first was stored is a new message: a new id',
+            [n.fetches.length, n.fetches[0].body.message_id !== n.fetches[1].body.message_id], [2, true]);
+        }
         const slow = openPage(text);
         await toOwner(slow, { face: 2, message: 'nobody answers' });
         slow.plan.push({ hang: true });
@@ -1186,6 +1300,25 @@ const CASES = [
           { session: '00000000-0000-4000-8000-000000000001', source: 'receipt', page: 'review', rating: 1, message: 'The steak was cold.\nNobody came back.', name: 'Pat', contact: '856-555-0142' }]);
       t('G5 the visit that sent the message and the message have the same session, so Orbit can open that visit from the message',
         exportRows.find((r) => r.name === 'message_sent').session === messagesBack[0].session, true);
+      {
+        // the page's retry after a lost answer, fed to the real Worker: both tries are answered 201, and one message is kept
+        // (the stand-in randomUUID counts 1, 2, 3 in every page, so this page is given its own run of numbers: two real tabs never share an id)
+        const r = openPage(text, { storage: new Map(), local: new Map(), uuidFrom: 500 });
+        await toOwner(r, { face: 2, message: 'Lost reply, pressed Send twice.' });
+        r.plan.push({ reject: true });
+        await r.submit();
+        r.advance(6000);
+        await r.submit();
+        const answers = [];
+        for (const f of r.fetches) {
+          const res = await call('/feedback', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'text/plain;charset=utf-8' }, body: f.raw });
+          answers.push([res.status, (await res.json()).ok]);
+        }
+        const back = (await (await call('/feedback/export?limit=500', { headers: { Authorization: 'Bearer export-key-for-tests' } })).json()).rows;
+        const mine = back.filter((m) => m.message === 'Lost reply, pressed Send twice.');
+        t('G7 the page’s retry after a lost answer, sent to the REAL Worker: both tries are answered 201, and exactly one message is kept',
+          [r.fetches.length, r.fetches[0].body.message_id === r.fetches[1].body.message_id, r.fetches[0].raw !== r.fetches[1].raw, answers, mine.length], [2, true, true, [[201, true], [201, true]], 1]);
+      }
       const stats = await (await call('/stats', { headers: { Authorization: 'Bearer stats-key-for-tests' } })).text();
       t('G6 the review visits do not show up in the AR numbers, and no word of the message is in the events or the stats',
         [JSON.parse(stats).totals, /cold|Nobody|Pat|856/.test(stats), /cold|Nobody|"Pat"|856-555/.test(JSON.stringify(exportRows))], [[], false, false]);
@@ -1232,9 +1365,10 @@ const CASES = [
         [/userAgent\b/.test(script + core), /document\.referrer/.test(script + core), /navigator\.language/.test(script + core), /timeZone|resolvedOptions/.test(script + core),
           /location\.(href|pathname|origin|hash)/.test(script + core), /document\.cookie/.test(script + core), (script.match(/location\.search/g) || []).length],
         [false, false, false, false, false, false, 1]);
-      t('H5 the page keeps one count in localStorage (a number) and three sessionStorage keys of its own, nothing else',
-        [[...script.matchAll(/localStorage\.(?:get|set)Item\("([^"]*)"/g)].map((m) => m[1]).filter((v, i, a) => a.indexOf(v) === i), [...script.matchAll(/const [A-Z_]+_KEY = "([^"]*)"/g)].map((m) => m[1]), /indexedDB|caches\.|document\.cookie/.test(script + core)],
-        [['so-review-visits'], ['steakout.review.session', 'steakout.review.source', 'steakout.review.visit'], false]);
+      t('H5 the page keeps one count in localStorage (a number) and four sessionStorage keys of its own (three in the page, the message id in the core), nothing else',
+        [[...script.matchAll(/localStorage\.(?:get|set)Item\("([^"]*)"/g)].map((m) => m[1]).filter((v, i, a) => a.indexOf(v) === i), [...script.matchAll(/const [A-Z_]+_KEY = "([^"]*)"/g)].map((m) => m[1]),
+          [...core.matchAll(/const [A-Z_]+_KEY = '([^']*)'/g)].map((m) => m[1]), /indexedDB|caches\.|document\.cookie|localStorage/.test(core), /indexedDB|caches\.|document\.cookie/.test(script)],
+        [['so-review-visits'], ['steakout.review.session', 'steakout.review.source', 'steakout.review.visit'], ['steakout.review.msgid'], false, false]);
       t('H6 events go to /collect and the message to /feedback and nowhere else; the message is sent from one place, with fetch (so its answer can be read); an event is sent with fetch only as the stand-in for a beacon (no-cors, keepalive)',
         [(core.match(/\/collect`/g) || []).length, (core.match(/\/feedback`/g) || []).length, (script.match(/window\.fetch\(/g) || []).length, (script.match(/\bfetch\(url,/g) || []).length, /sendBeacon\(url, body\)/.test(script), /keepalive: true, mode: "no-cors"/.test(script)],
         [1, 1, 1, 1, true, true]);
@@ -1280,6 +1414,23 @@ function fireSubmit(w) {
 const C = 'core';
 const P = 'page';
 const mut = (name, file, from, to, check, also) => ({ name, file, from, to, check, also });
+const E9 = 'E9 a message_id goes last in the body, passes the Collector’s rules, and is left out when there is none; one the Collector would refuse is never sent';
+const E10 = 'E10 the same message gets the same id every time it is asked for: again, with spaces round it, and after a reload of the tab (a new page, the same sessionStorage)';
+const E10B = 'E10b what is kept in the tab is the id and a short code, never a word the customer typed';
+const E11 = 'E11 different words, face, name or contact are a different message: a new id (a second thought is not a repeat)';
+const E11B = 'E11b …and an edit then a return to the first words is not the first message any more (only the message in hand keeps its id)';
+const E12 = 'E12 once a message is stored the next one starts afresh (a new id, even with the same words); the tab keeps nothing of the stored one';
+const E13 = 'E13 with storage that throws the id still holds from one try to the next within the page, and a stored message ends it; nothing throws';
+const E13B = 'E13b an id maker that fails or makes an id the Collector would refuse is replaced by one of the core’s own that it takes';
+const E13C = 'E13c junk in the stored value is not believed (even with the right code in it): a new id each time';
+const E13D = 'E13d …but a good one is';
+const F7C = 'F7c a message whose answer never came is sent again with the SAME message_id (and a newer time); the id is kept in the tab until it is stored, then cleared';
+const F7C2 = 'F7c2 …and nothing the customer typed is in what the tab kept while the message was waiting to be stored (the id and a short code)';
+const F7D = 'F7d words changed between the tries are a different message: a new id';
+const F7E = 'F7e a timeout, a reload of the tab, the same words typed again: the SAME message_id and the same visit, so the Collector can tell it is the message it already has';
+const F7F = 'F7f a phone that refuses storage still sends the retry with the same message_id (kept in the page)';
+const F7G = 'F7g a second message with the same words after the first was stored is a new message: a new id';
+const G7 = 'G7 the page’s retry after a lost answer, sent to the REAL Worker: both tries are answered 201, and exactly one message is kept';
 const MUTATIONS = [
   // ---- A the contract
   mut('core: an event Orbit does not list', C, "    message_failed: Object.freeze(['r', 'err']),\n", "    message_failed: Object.freeze(['r', 'err']),\n    free_lunch: Object.freeze([]),\n", 'A1 the events are exactly Orbit’s ORBIT_REVIEW_EVENTS'),
@@ -1367,7 +1518,7 @@ const MUTATIONS = [
   // ---- E the message
   mut('core: the message does not say it is from the review page', C, "      page: 'review',\n      rating: face,", '      rating: face,', 'E1 the body is exactly what the Collector reads: session, source, page review, rating, message, name, contact, website empty, at; trimmed'),
   mut('core: the hidden box is left out', C, "      website: '',\n", '', 'E1 the body is exactly what the Collector reads: session, source, page review, rating, message, name, contact, website empty, at; trimmed'),
-  mut('core: the message is not trimmed', C, "const words = typeof message === 'string' ? message.trim() : '';", "const words = typeof message === 'string' ? message : '';", 'E1 the body is exactly what the Collector reads: session, source, page review, rating, message, name, contact, website empty, at; trimmed'),
+  mut('core: the message is not trimmed', C, "words: typeof message === 'string' ? message.trim() : '',", "words: typeof message === 'string' ? message : '',", 'E1 the body is exactly what the Collector reads: session, source, page review, rating, message, name, contact, website empty, at; trimmed'),
   mut('core: the placement is sent raw with a message', C, '      source: cleanSource(source),\n      page: \'review\',', "      source,\n      page: 'review',", 'E1 the body is exactly what the Collector reads: session, source, page review, rating, message, name, contact, website empty, at; trimmed'),
   mut('core: a name left out counts as given', C, "nm: who ? 1 : 0, ct: reach ? 1 : 0", 'nm: 1, ct: reach ? 1 : 0', 'E2 a name and a contact left out are empty, and counted as no'),
   mut('core: a contact of spaces counts as given', C, "ct: reach ? 1 : 0", 'ct: contact ? 1 : 0', 'E2 a name and a contact left out are empty, and counted as no'),
@@ -1417,8 +1568,8 @@ const MUTATIONS = [
   mut('page: a 4 is told it loved it', P, '$("happyBar").textContent = rating === 5 ? "Glad you loved it" : "Glad you enjoyed it";', '$("happyBar").textContent = "Glad you loved it";', 'F4d a 4 is "Glad you enjoyed it" and also goes to the Google screen'),
   mut('page: a 4 goes to the owner', P, 'if (rating >= 4) {', 'if (rating >= 5) {', 'F4d a 4 is "Glad you enjoyed it" and also goes to the Google screen'),
   mut('page: a message goes to another address', P, 'const out = await core.postFeedback({\n      base: collector,', 'const out = await core.postFeedback({\n      base: "https://evil.example",', 'F5 a message goes to {base}/feedback and nowhere else, once: the face, the words, the name and contact, the visit, an empty hidden box'),
-  mut('page: a message is built with a new visit id', P, 'core.buildFeedback({ session, source, ...payload, at: Date.now() })', 'core.buildFeedback({ session: newSessionId(), source, ...payload, at: Date.now() })', 'F5 a message goes to {base}/feedback and nowhere else, once: the face, the words, the name and contact, the visit, an empty hidden box'),
-  mut('page: a message goes without its placement', P, 'core.buildFeedback({ session, source, ...payload, at: Date.now() })', 'core.buildFeedback({ session, source: "direct", ...payload, at: Date.now() })', 'F5 a message goes to {base}/feedback and nowhere else, once: the face, the words, the name and contact, the visit, an empty hidden box'),
+  mut('page: a message is built with a new visit id', P, 'core.buildFeedback({ session, source, ...payload, messageId, at: Date.now() })', 'core.buildFeedback({ session: newSessionId(), source, ...payload, messageId, at: Date.now() })', 'F5 a message goes to {base}/feedback and nowhere else, once: the face, the words, the name and contact, the visit, an empty hidden box'),
+  mut('page: a message goes without its placement', P, 'core.buildFeedback({ session, source, ...payload, messageId, at: Date.now() })', 'core.buildFeedback({ session, source: "direct", ...payload, messageId, at: Date.now() })', 'F5 a message goes to {base}/feedback and nowhere else, once: the face, the words, the name and contact, the visit, an empty hidden box'),
   mut('page: the first key is not reported', P, '  emit("message_started", { r: rating });\n', '', 'F5c the events of that visit, in order, in Orbit’s shapes: the face, the unhappy screen, the first key (no words), the send, message_sent with only counts, the sent screen, review_end'),
   mut('page: a sent message is not reported', P, '  emit("message_sent", {', '  void ({', 'F5c the events of that visit, in order, in Orbit’s shapes: the face, the unhappy screen, the first key (no words), the send, message_sent with only counts, the sent screen, review_end'),
   mut('page: message_sent counts the name wrongly', P, 'nm: payload.name ? 1 : 0,', 'nm: 1,', 'F6c without a phone or email the sent screen offers a call back instead; message_sent says no name, no contact'),
@@ -1434,7 +1585,7 @@ const MUTATIONS = [
   mut('page: the sent screen offers a call back to someone who gave a number', P, '$("sentLead").innerHTML = payload.contact\n', '$("sentLead").innerHTML = !payload.contact\n', 'F6c without a phone or email the sent screen offers a call back instead; message_sent says no name, no contact'),
   mut('page: a failure is not reported', P, '      emit("message_failed", { r: rating, err: out.err });\n', '', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: a failure says nothing to the customer', P, '      emit("message_failed", { r: rating, err: out.err });\n      err.innerHTML = failedLine;\n      err.classList.add("on");', '      emit("message_failed", { r: rating, err: out.err });', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
-  mut('page: a failure is shown as sent', P, '    if (out.ok) {\n      sentOk(payload);', '    if (true) {\n      sentOk(payload);', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
+  mut('page: a failure is shown as sent', P, '    if (out.ok) {\n', '    if (true) {\n', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: the button stays off after a failure', P, '    sending = false;\n    btn.disabled = false;\n    btn.textContent = `Send to ${CONFIG.OWNER_NAME}`;', '    sending = false;\n    btn.textContent = `Send to ${CONFIG.OWNER_NAME}`;', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: the error line has no phone', P, 'or call us at <a href="tel:${CONFIG.PHONE_TEL}" data-track="phone">${CONFIG.PHONE}</a>.`;\nconst tooLongLine', 'or call us.`;\nconst tooLongLine', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: after one send the page cannot send again', P, '    sending = false;\n    btn.disabled = false;', '    btn.disabled = false;', 'F7b after a failure the same message can be sent again, and then it is sent: one failure, one success, the error line goes away'),
@@ -1497,7 +1648,7 @@ const MUTATIONS = [
   mut('core: an event does not say its page', C, "        meta: shaped.meta,\n        page: 'review'\n", "        meta: shaped.meta,\n        page: 'ar'\n", 'G3 read back from the real /export in the shape Orbit reads: id, received_at, at, name, source, session, meta, page "review"; names only from Orbit’s list; meta keys only from Orbit’s keys'),
   mut('core: the face is sent as text', C, '      rating: face,', '      rating: String(face),', 'G2 the REAL Worker takes every event (204) and the message (201, readable by this page)'),
   mut('core: the message is sent without its contact', C, '      contact: reach,', "      contact: '',", 'G4 the message read back from the real /feedback/export in the shape Orbit reads, words intact, with the visit and the placement'),
-  mut('page: a message is sent on another visit', P, 'core.buildFeedback({ session, source, ...payload, at: Date.now() })', 'core.buildFeedback({ session: "other-visit-0001", source, ...payload, at: Date.now() })', 'G5 the visit that sent the message and the message have the same session, so Orbit can open that visit from the message'),
+  mut('page: a message is sent on another visit', P, 'core.buildFeedback({ session, source, ...payload, messageId, at: Date.now() })', 'core.buildFeedback({ session: "other-visit-0001", source, ...payload, messageId, at: Date.now() })', 'G5 the visit that sent the message and the message have the same session, so Orbit can open that visit from the message'),
   mut('core: a review visit says it is an AR visit', C, "        page: 'review'\n      });\n      if (utf8Length(body) > MAX_BODY_BYTES) return shaped;", "        page: 'ar'\n      });\n      if (utf8Length(body) > MAX_BODY_BYTES) return shaped;", 'G6 the review visits do not show up in the AR numbers, and no word of the message is in the events or the stats'),
   // ---- H the files
   mut('index: a data-track Orbit does not know', P, 'data-track="google_footer"', 'data-track="google_foot"', 'H1 every data-track and data-section on the page is one Orbit knows, and every one Orbit lists is on the page'),
@@ -1518,14 +1669,43 @@ const MUTATIONS = [
   mut('page: a cookie is read', P, 'const startedAt = Date.now();', 'const startedAt = Date.now() + (document.cookie ? 0 : 0);', 'H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send'),
   mut('page: the address of the page is read', P, 'const params = new URLSearchParams(location.search);', 'const params = new URLSearchParams(location.search);\n  const here = location.href;', 'H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send'),
   mut('page: the time zone is read', P, 'const startedAt = Date.now();', 'const startedAt = Date.now() + (Intl.DateTimeFormat().resolvedOptions().timeZone ? 0 : 0);', 'H4 nothing is read that could identify a person: not the user agent, the referrer, the language, the time zone, the address of the page, a cookie, or a form value outside the send'),
-  mut('page: a third storage key', P, 'const VISIT_KEY = "steakout.review.visit";', 'const VISIT_KEY = "steakout.review.visit";\nconst PROFILE_KEY = "steakout.review.profile";', 'H5 the page keeps one count in localStorage (a number) and three sessionStorage keys of its own, nothing else'),
-  mut('page: another thing kept on the phone', P, 'window.localStorage.setItem("so-review-visits", String(visits));', 'window.localStorage.setItem("so-review-visits", String(visits));\n    window.localStorage.setItem("so-review-name", $("name").value);', 'H5 the page keeps one count in localStorage (a number) and three sessionStorage keys of its own, nothing else'),
+  mut('page: a third storage key', P, 'const VISIT_KEY = "steakout.review.visit";', 'const VISIT_KEY = "steakout.review.visit";\nconst PROFILE_KEY = "steakout.review.profile";', 'H5 the page keeps one count in localStorage (a number) and four sessionStorage keys of its own (three in the page, the message id in the core), nothing else'),
+  mut('page: another thing kept on the phone', P, 'window.localStorage.setItem("so-review-visits", String(visits));', 'window.localStorage.setItem("so-review-visits", String(visits));\n    window.localStorage.setItem("so-review-name", $("name").value);', 'H5 the page keeps one count in localStorage (a number) and four sessionStorage keys of its own (three in the page, the message id in the core), nothing else'),
   mut('page: a second place sends a message', P, '    fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body, keepalive: true, mode: "no-cors", credentials: "omit" })', '    fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body, keepalive: true, mode: "cors", credentials: "omit" })', 'H6 events go to /collect and the message to /feedback and nowhere else; the message is sent from one place, with fetch (so its answer can be read); an event is sent with fetch only as the stand-in for a beacon (no-cors, keepalive)'),
   mut('core: events go to the message door', C, "const url = `${target}/collect`;", "const url = `${target}/feedback`;", 'H6 events go to /collect and the message to /feedback and nowhere else; the message is sent from one place, with fetch (so its answer can be read); an event is sent with fetch only as the stand-in for a beacon (no-cors, keepalive)'),
   mut('index: the look changes (a colour)', P, '--red: #ba202a;', '--red: #ca202a;', 'H7 the four screens look and read as the original did: the head, the styles (without the self-hosted font faces) and the markup (without the tracking tags and the scripts) hash to the original’s'),
   mut('index: a word changes', P, '<span class="bar">Tap one</span>', '<span class="bar">Tap a face</span>', 'H7 the four screens look and read as the original did: the head, the styles (without the self-hosted font faces) and the markup (without the tracking tags and the scripts) hash to the original’s'),
   mut('index: a sentence in the script changes', P, '"Tell me what happened first."', '"Please say what happened."', 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
   mut('index: an owner note changes', P, "Tell me what happened. This comes straight to me, and I'll make it right.", "Tell me what happened. It comes straight to me, and I'll make it right.", 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
+  // ---- a message sent again is one message (2026-10-08, after the review)
+  mut('core: message_id is never sent', C, "    if (hasId) fields.message_id = messageId;\n", '', E9),
+  mut('core: a message_id the Collector would refuse is sent', C, "    if (hasId && (typeof messageId !== 'string' || !MESSAGE_ID_RE.test(messageId))) return { ok: false, reason: 'message_id' };\n", '', E9),
+  mut('core: a message_id may have spaces', C, "const MESSAGE_ID_RE = /^[A-Za-z0-9-]{1,64}$/;", "const MESSAGE_ID_RE = /^[A-Za-z0-9 -]{1,64}$/;", E9),
+  mut('core: every try is given a new id', C, "        if (have && have.fp === fp) {", "        if (false) {", E10),
+  mut('core: the id is not read back from the tab (a reload loses it)', C, "        const have = current || fromStorage();", "        const have = current;", E10),
+  mut('core: spaces round the words make a different message', C, "const { words, who, reach } = typedFields({ message, name, contact });\n    return shortHash", "const { who, reach } = typedFields({ message, name, contact });\n    const words = String(message);\n    return shortHash", E10),
+  mut('core: the words are kept in the tab', C, "write(MESSAGE_ID_KEY, id + '_' + fp);", "write(MESSAGE_ID_KEY, id + '_' + fp + '_' + String(fields && fields.message));", E10B),
+  mut('core: the id is kept outside the visit’s keys', C, "const MESSAGE_ID_KEY = 'steakout.review.msgid';", "const MESSAGE_ID_KEY = 'steakout.msgid';", E10B),
+  mut('core: an edited message keeps its id', C, "        if (have && have.fp === fp) {", "        if (have) {", E11),
+  mut('core: the fingerprint ignores the name', C, "JSON.stringify([Number(rating), words, who, reach])", "JSON.stringify([Number(rating), words, reach])", E11),
+  mut('core: the fingerprint ignores the face', C, "JSON.stringify([Number(rating), words, who, reach])", "JSON.stringify([words, who, reach])", E11),
+  mut('core: a stored message keeps its id in the page', C, "      stored() {\n        current = null;\n", "      stored() {\n", E12),
+  mut('core: a stored message keeps its id in the tab', C, "        try { if (typeof write === 'function') write(MESSAGE_ID_KEY, ''); } catch (error) { /* nothing to clear */ }", "", E12),
+  mut('core: the id lives in the tab only, not in the page', C, "        current = { id, fp };\n        try { if (typeof write", "        try { if (typeof write", E13),
+  mut('core: a storage that throws on read breaks the send', C, "catch (error) { raw = null; }", "catch (error) { throw error; }", E13),
+  mut('core: a storage that throws on write breaks the send', C, "catch (error) { /* no storage: the id lives in this page only */ }", "catch (error) { throw error; }", E13),
+  mut('core: an id the Collector would refuse is used as made', C, "        if (typeof id !== 'string' || !MESSAGE_ID_RE.test(id)) id = 'mx-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);\n", '', E13B),
+  mut('core: junk in the tab is believed', C, "if (parts.length !== 2 || !MESSAGE_ID_RE.test(parts[0]) || !/^[0-9a-z]{1,16}$/.test(parts[1])) return null;", "if (parts.length < 2) return null;", E13C),
+  mut('core: nothing in the tab is believed', C, "      return { id: parts[0], fp: parts[1] };", "      return null;", E13D),
+  mut('page: the message is sent without an id', P, 'const messageId = connected && messageIds ? messageIds.idFor(payload) : null;', 'const messageId = null;', F7C),
+  mut('page: every try is given a new id', P, 'messageIds.idFor(payload)', 'newMessageId()', F7C),
+  mut('page: a failure forgets the id', P, '      emit("message_failed", { r: rating, err: out.err });\n', '      if (messageIds) messageIds.stored();\n      emit("message_failed", { r: rating, err: out.err });\n', F7C),
+  mut('page: the visit’s id is the message’s id', P, 'messageIds.idFor(payload)', 'session', F7D),
+  mut('page: a stored message does not end its id', P, '      if (messageIds) messageIds.stored(); // stored: the next message is a new one\n', '', F7G),
+  mut('page: the id of a message is not kept for a reload', P, 'core.createMessageIds({ read: readStore, write: writeStore, makeId: newMessageId })', 'core.createMessageIds({ read: () => null, write: writeStore, makeId: newMessageId })', F7E),
+  mut('page: the id is not kept in the page when storage throws', P, 'core.createMessageIds({ read: readStore, write: writeStore, makeId: newMessageId })', 'core.createMessageIds({ read: () => null, write: () => {}, makeId: newMessageId })', F7F),
+  mut('page: the words are kept in the tab', P, 'core.createMessageIds({ read: readStore, write: writeStore, makeId: newMessageId })', 'core.createMessageIds({ read: readStore, write: (k, v) => writeStore(k, v + "_" + $("msg").value), makeId: newMessageId })', F7C2),
+  mut('core: the id that is sent changes with the time of the try', C, "    if (hasId) fields.message_id = messageId;\n    const body = JSON.stringify(fields);", "    if (hasId) fields.message_id = messageId + String(fields.at);\n    const body = JSON.stringify(fields);", G7),
 ];
 
 /* --------------------------------------------------------------- running */

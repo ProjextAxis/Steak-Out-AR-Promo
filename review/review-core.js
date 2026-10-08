@@ -103,6 +103,10 @@
 
   const SESSION_RE = /^[A-Za-z0-9-]{1,64}$/;
   const SOURCE_RE = /^[a-z0-9_-]{1,40}$/;
+  // The Collector's rule for message_id (steak-out-ar-collector/src/index.js, MESSAGE_ID_RE).
+  const MESSAGE_ID_RE = /^[A-Za-z0-9-]{1,64}$/;
+  // sessionStorage key for the id of the message being sent (see createMessageIds).
+  const MESSAGE_ID_KEY = 'steakout.review.msgid';
 
   /* --------------------------------------------------------------- cleaning */
 
@@ -252,23 +256,37 @@
 
   /* ------------------------------------------------------ the message itself */
 
+  /** What the customer typed, as it is sent: the words trimmed, the name cut to 80 and the contact to 120. One place, so what is sent and what tells two messages apart cannot drift. */
+  function typedFields({ message, name, contact }) {
+    return {
+      words: typeof message === 'string' ? message.trim() : '',
+      who: typeof name === 'string' ? name.trim().slice(0, FEEDBACK_MAX_NAME) : '',
+      reach: typeof contact === 'string' ? contact.trim().slice(0, FEEDBACK_MAX_CONTACT) : ''
+    };
+  }
+
   /**
    * The body of POST {base}/feedback, or why there is none. Only what the
    * customer chose to give is in it: the words, a face, and optionally a name and
    * a phone or email; plus the visit's own session and placement, and
    * `website: ""` (the box no person sees; the Collector throws away a message
    * that has anything in it).
+   *
+   * `messageId` (see createMessageIds) goes as `message_id`: it is what lets the
+   * Collector store ONE message when the same one is sent twice because the
+   * first answer never reached the phone. Left out, the body is exactly what it
+   * was before the id existed; one that the Collector would refuse is never sent.
    */
-  function buildFeedback({ session, source, rating, message, name, contact, at }) {
+  function buildFeedback({ session, source, rating, message, name, contact, at, messageId }) {
     if (typeof session !== 'string' || !SESSION_RE.test(session)) return { ok: false, reason: 'session' };
+    const hasId = messageId !== undefined && messageId !== null;
+    if (hasId && (typeof messageId !== 'string' || !MESSAGE_ID_RE.test(messageId))) return { ok: false, reason: 'message_id' };
     const face = Number(rating);
     if (!Number.isInteger(face) || face < 1 || face > 5) return { ok: false, reason: 'rating' };
-    const words = typeof message === 'string' ? message.trim() : '';
+    const { words, who, reach } = typedFields({ message, name, contact });
     if (!words) return { ok: false, reason: 'empty' };
     if (words.length > FEEDBACK_MAX_MESSAGE) return { ok: false, reason: 'too_long' };
-    const who = typeof name === 'string' ? name.trim().slice(0, FEEDBACK_MAX_NAME) : '';
-    const reach = typeof contact === 'string' ? contact.trim().slice(0, FEEDBACK_MAX_CONTACT) : '';
-    const body = JSON.stringify({
+    const fields = {
       session,
       source: cleanSource(source),
       page: 'review',
@@ -278,7 +296,9 @@
       contact: reach,
       website: '',
       at: isNumber(at) && at >= 0 ? Math.round(at) : Date.now()
-    });
+    };
+    if (hasId) fields.message_id = messageId;
+    const body = JSON.stringify(fields);
     // Longer than the Collector will read (accented letters and emoji take more
     // than one byte each): refused here, so the customer is told to shorten it
     // instead of being sent into a retry that can never work.
@@ -333,6 +353,85 @@
     } finally {
       clearTimer(timer);
     }
+  }
+
+  /* ------------------------------------- the same message, sent again, is one */
+
+  /**
+   * A short code for some text (cyrb53, 53 bits, base 36). Not secret and not a
+   * lock: it only tells "the same words again" from "different words", so that
+   * what the customer typed is never kept on the phone to do it.
+   */
+  function shortHash(text) {
+    let h1 = 0xdeadbeef;
+    let h2 = 0x41c6ce57;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+
+  /** What makes a message "the same message": the face and the words, name and contact as buildFeedback sends them. Not the time. */
+  function messageFingerprint({ rating, message, name, contact }) {
+    const { words, who, reach } = typedFields({ message, name, contact });
+    return shortHash(JSON.stringify([Number(rating), words, who, reach]));
+  }
+
+  /**
+   * The id a message is sent with, so that sending it again is safe.
+   *
+   * On a weak signal the Collector can store a message while its "stored" answer
+   * never reaches the phone. The page then says it did not go through, and the
+   * customer presses Send again. With an id that stays the same from one try of a
+   * message to the next, the Collector stores it once and answers 201 both times.
+   *
+   *   idFor(fields)  the id for this message: the one already made for these
+   *                  same words (and the same face, name, contact), else a new
+   *                  one. Different words are a different message: a new id.
+   *   stored()       the message is stored: the next message starts afresh.
+   *
+   * The id is kept in the tab's sessionStorage as `<id>_<fingerprint of the
+   * words>`, so it survives a reload (the words themselves are never kept; the
+   * fingerprint only says whether they changed), and in memory too, so a phone
+   * that refuses storage still retries with the same id within the page.
+   * `read(key)` and `write(key, value)` are the page's guarded storage
+   * accessors; `makeId()` returns a fresh random id (A-Z a-z 0-9 and -, up to 64).
+   */
+  function createMessageIds({ read, write, makeId }) {
+    let current = null; // { id, fp } for the message in hand
+    const fromStorage = () => {
+      let raw = null;
+      try { raw = typeof read === 'function' ? read(MESSAGE_ID_KEY) : null; } catch (error) { raw = null; }
+      if (typeof raw !== 'string') return null;
+      const parts = raw.split('_');
+      if (parts.length !== 2 || !MESSAGE_ID_RE.test(parts[0]) || !/^[0-9a-z]{1,16}$/.test(parts[1])) return null;
+      return { id: parts[0], fp: parts[1] };
+    };
+    return {
+      idFor(fields) {
+        const fp = messageFingerprint(fields || {});
+        const have = current || fromStorage();
+        if (have && have.fp === fp) {
+          current = have;
+          return have.id;
+        }
+        let id = null;
+        try { id = typeof makeId === 'function' ? makeId() : null; } catch (error) { id = null; }
+        // A id the Collector would refuse is worse than none: fall back to one of our own making.
+        if (typeof id !== 'string' || !MESSAGE_ID_RE.test(id)) id = 'mx-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        current = { id, fp };
+        try { if (typeof write === 'function') write(MESSAGE_ID_KEY, id + '_' + fp); } catch (error) { /* no storage: the id lives in this page only */ }
+        return id;
+      },
+      stored() {
+        current = null;
+        try { if (typeof write === 'function') write(MESSAGE_ID_KEY, ''); } catch (error) { /* nothing to clear */ }
+      }
+    };
   }
 
   /* ------------------------------------------------------- where a tap fell */
@@ -684,6 +783,9 @@
     createSender,
     buildFeedback,
     postFeedback,
+    createMessageIds,
+    messageFingerprint,
+    MESSAGE_ID_KEY,
     pct1,
     resolveTarget,
     tapDetail,

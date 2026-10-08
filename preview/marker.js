@@ -135,8 +135,31 @@
    * A time that cannot be known yet is 0, never a guess: a lock that lands
    * before the camera-live message has no "ms from camera live", and leaving
    * before the camera was ever live has no "ms in AR".
+   *
+   * THE RUN NUMBER SURVIVES A RELOAD OF THE TAB. Orbit tells runs apart by
+   * (visit, run) and keeps only the first report of each step for a pair, and
+   * the visit (the tab's session id) survives a reload: the diner pressing
+   * refresh, the fault panel's TRY AGAIN, a phone that reloads a tab it
+   * dropped from memory. If this page counted from 1 again, the second attempt
+   * would be "run 1" a second time and every one of its timings would be
+   * thrown away as a repeat of the first. So the count is kept in
+   * sessionStorage (it dies with the tab, like the visit's own keys) and a new
+   * START CAMERA continues from it. With no storage (Safari private mode
+   * throws on it) the count lives in this page only, as it always did.
    * ------------------------------------------------------------------ */
   const MAX_LOST_EVENTS = 10;
+  const RUN_KEY = 'steakout.ar.run';
+  const MAX_RUN = 999; // the most tracking-core will send for `run`
+  const runStore = () => window.sessionStorage;
+  const readRunCount = () => {
+    try {
+      const stored = Number(runStore().getItem(RUN_KEY));
+      return Number.isInteger(stored) && stored > 0 && stored <= MAX_RUN ? stored : 0;
+    } catch (error) { return 0; }
+  };
+  const writeRunCount = (count) => {
+    try { runStore().setItem(RUN_KEY, String(count)); } catch (error) { /* private mode */ }
+  };
   let arRun = 0;
   let arStartedAt = 0;
   let arLiveAt = 0;
@@ -1197,7 +1220,10 @@
     if (startPromise) return startPromise;
 
     const runToken = ++sessionToken;
-    arRun += 1;
+    // Continue from whatever this tab has already counted (a reload starts this
+    // page at 0 again), and write it down before anything can reload the tab.
+    arRun = Math.max(arRun, readRunCount()) + 1;
+    writeRunCount(arRun);
     arStartedAt = performance.now();
     arLiveAt = 0;
     arLockedAt = 0;
