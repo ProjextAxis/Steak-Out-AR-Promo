@@ -67,7 +67,7 @@
       if (guide) guide.hidden = true;
       if (fault) fault.hidden = false;
       if (isEmbedded && window.parent !== window) {
-        window.parent.postMessage({ type: 'steakout-ar-camera-error' }, window.location.origin);
+        window.parent.postMessage({ type: 'steakout-ar-camera-error', detail: { err: 'load' } }, window.location.origin);
       }
     };
     startButton.addEventListener('click', showDependencyFault);
@@ -117,6 +117,33 @@
   let sessionToken = 0;
   let hasStartedEngine = false;
   let trackingStatus = 'UNKNOWN';
+
+  /* ------------------------------------------------------------------
+   * MEASURING A RUN, for the landing page to report (Orbit Analytics).
+   *
+   * One run is one START CAMERA. Times are ms on performance.now(), so none of
+   * this depends on the phone's clock. This only records moments the code below
+   * already passes through and hands them to the parent as messages; it never
+   * decides anything, and none of it touches tracking, the lock or the anchor.
+   *
+   *   camera_live  ms from START CAMERA until the camera is showing
+   *   lock         ms from camera live until the meal locked onto the flyer
+   *   lost         the flyer was lost AFTER the lock (at most MAX_LOST_EVENTS a run)
+   *   refound      it came back, after how many ms
+   *   ar_closed    in AR for how long, locked for how long, lost how many times
+   *
+   * A time that cannot be known yet is 0, never a guess: a lock that lands
+   * before the camera-live message has no "ms from camera live", and leaving
+   * before the camera was ever live has no "ms in AR".
+   * ------------------------------------------------------------------ */
+  const MAX_LOST_EVENTS = 10;
+  let arRun = 0;
+  let arStartedAt = 0;
+  let arLiveAt = 0;
+  let arLockedAt = 0;
+  let arLostCount = 0;
+  let arLostSince = 0;
+  let arLostWasSent = false;
 
   /* ------------------------------------------------------------------
    * GROUNDING: keep the meal on the flyer after commit.
@@ -218,9 +245,38 @@
     setFoodOpacity(1);
   };
 
-  const postToParent = (type) => {
+  const postToParent = (type, detail) => {
     if (!isEmbedded || window.parent === window) return;
-    window.parent.postMessage({ type }, window.location.origin);
+    window.parent.postMessage(detail ? { type, detail } : { type }, window.location.origin);
+  };
+
+  const msSince = (from) => (from ? Math.max(0, Math.round(performance.now() - from)) : 0);
+
+  // The flyer was lost after the meal had locked onto it.
+  const noteLost = () => {
+    if (arLostSince) return;
+    arLostSince = performance.now();
+    arLostCount += 1;
+    arLostWasSent = arLostCount <= MAX_LOST_EVENTS;
+    if (arLostWasSent) postToParent('steakout-ar-lost', { run: arRun, n: arLostCount });
+  };
+
+  // ...and found again. Reported only if its loss was.
+  const noteRefound = () => {
+    if (!arLostSince) return;
+    const ms = msSince(arLostSince);
+    arLostSince = 0;
+    if (arLostWasSent) postToParent('steakout-ar-refound', { run: arRun, ms });
+  };
+
+  // The customer chose to leave the AR. Asked for from every way out of it.
+  const requestClose = () => {
+    postToParent('steakout-ar-close', {
+      run: arRun,
+      ms: msSince(arLiveAt),
+      locked: hasLocked ? msSince(arLockedAt) : 0,
+      lost: arLostCount
+    });
   };
 
   const requestTopLevelMotionPermissions = () => {
@@ -367,21 +423,32 @@
     return [error.name, error.message, error.type].filter(Boolean).join(' ');
   };
 
-  const faultCopy = () => {
+  /* A short word for what went wrong, for the landing page to report. Never the
+     message itself: engine errors can quote anything. The same four buckets as
+     the panel below. */
+  const faultKind = () => {
     const summary = errorSummary();
-    if (/NotAllowedError|SecurityError|PermissionDenied/i.test(summary)) {
+    if (/NotAllowedError|SecurityError|PermissionDenied/i.test(summary)) return 'permission';
+    if (/NotReadableError|AbortError|TrackStartError|busy/i.test(summary)) return 'busy';
+    if (/NotFoundError|OverconstrainedError|DevicesNotFound|unsupported/i.test(summary)) return 'no_camera';
+    return 'other';
+  };
+
+  const faultCopy = () => {
+    const kind = faultKind();
+    if (kind === 'permission') {
       return {
         title: 'CAMERA ACCESS IS OFF',
         body: 'Tap Allow when your phone asks. If you already said no, turn the camera on for this site in your browser settings.'
       };
     }
-    if (/NotReadableError|AbortError|TrackStartError|busy/i.test(summary)) {
+    if (kind === 'busy') {
       return {
         title: 'THE CAMERA IS BUSY',
         body: 'Another app may be using it. Close your other camera apps, then try again.'
       };
     }
-    if (/NotFoundError|OverconstrainedError|DevicesNotFound|unsupported/i.test(summary)) {
+    if (kind === 'no_camera') {
       return {
         title: 'NO CAMERA AVAILABLE',
         body: 'This device did not offer a camera we can use. Try opening this page in Safari or Chrome directly.'
@@ -412,7 +479,7 @@
     if (orderLink) orderLink.hidden = true;
     intro.hidden = true;
     fault.hidden = false;
-    postToParent('steakout-ar-camera-error');
+    postToParent('steakout-ar-camera-error', { err: faultKind() });
   };
 
   /* Distinct from every other fault here: there is nothing to retry. Safari has
@@ -832,7 +899,8 @@
        the whole flow that means the experience actually WORKED -- reaching the
        camera only means they got past a permission prompt. Commit-once means
        this fires exactly once per session, which is what makes it countable. */
-    postToParent('steakout-ar-locked');
+    arLockedAt = performance.now();
+    postToParent('steakout-ar-locked', { ms: msSince(arLiveAt), run: arRun });
     setDiagnosticState('committed', { epoch: committedEpoch });
     recordDiagnostic('anchor-committed', {
       epoch: committedEpoch,
@@ -1007,6 +1075,7 @@
 
   const onImageFound = (event) => {
     if (!sessionActive || !isOurTarget(event)) return;
+    noteRefound();
     // The image tracker is back and is strictly better than a QR solve. Stand
     // the backstop down rather than letting two sources fight over the anchor.
     qrRecoveryEnabled(false);
@@ -1024,7 +1093,7 @@
     recordDiagnostic('target-lost', { committed: hasLocked, epoch: candidate?.epoch });
     // Only worth scanning once there is a committed anchor that could BE wrong.
     // Before commit the acquisition flow already owns the screen.
-    if (hasLocked) { qrRecoveryEnabled(true); return; }
+    if (hasLocked) { noteLost(); qrRecoveryEnabled(true); return; }
     anchor.emit('targetLost');
     resetCandidate('target-lost', { emitLost: false });
     clearLostGrace();
@@ -1128,6 +1197,13 @@
     if (startPromise) return startPromise;
 
     const runToken = ++sessionToken;
+    arRun += 1;
+    arStartedAt = performance.now();
+    arLiveAt = 0;
+    arLockedAt = 0;
+    arLostCount = 0;
+    arLostSince = 0;
+    arLostWasSent = false;
     const operation = (async () => {
       try {
         clearProgressAdvance();
@@ -1231,7 +1307,10 @@
         if (orderLink) { orderLink.hidden = false; postToParent('steakout-ar-order-shown'); }
         guide.hidden = false;
         await revealCamera();
-        if (runToken === sessionToken && isRunning) postToParent('steakout-ar-camera-live');
+        if (runToken === sessionToken && isRunning) {
+          arLiveAt = performance.now();
+          postToParent('steakout-ar-camera-live', { ms: msSince(arStartedAt), run: arRun });
+        }
       } catch (error) {
         if (runToken !== sessionToken) return;
         console.error(error);
@@ -1287,14 +1366,14 @@
   faultRetry?.addEventListener('click', reloadExperience);
   faultBack?.addEventListener('click', () => {
     hideFault();
-    if (isEmbedded) postToParent('steakout-ar-close');
+    if (isEmbedded) requestClose();
     else { stop(); intro.hidden = false; }
   });
 
   if (isEmbedded) {
     intro.hidden = true;
     logoHome?.setAttribute('aria-label', 'Close Steak Out AR');
-    logoHome?.addEventListener('click', (event) => { event.preventDefault(); postToParent('steakout-ar-close'); });
+    logoHome?.addEventListener('click', (event) => { event.preventDefault(); requestClose(); });
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent || event.origin !== window.location.origin) return;
       if (event.data?.type === 'steakout-ar-start') start();
@@ -1316,7 +1395,30 @@
        which is built to outlive exactly this. A plain fetch would be killed
        mid-flight. */
     orderLink?.addEventListener('click', () => postToParent('steakout-ar-order-tapped'));
-    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') postToParent('steakout-ar-close'); });
+
+    /* The landing page cannot see a tap in here, so a tap on a button tagged
+       data-track (ORDER NOW, close) is passed up with where it landed, as % of
+       the screen. Only tagged buttons: taps on the camera view are not reported. */
+    document.addEventListener('click', (event) => {
+      try {
+        if (!event.isTrusted || !event.target || !event.target.closest) return;
+        const tagged = event.target.closest('[data-track]');
+        if (!tagged) return;
+        let { clientX, clientY } = event;
+        if (clientX === 0 && clientY === 0 && event.detail === 0) {
+          const rect = tagged.getBoundingClientRect();
+          clientX = rect.left + rect.width / 2;
+          clientY = rect.top + rect.height / 2;
+        }
+        const pct = (value, total) => (total > 0 ? Math.round(Math.min(100, Math.max(0, (value / total) * 100)) * 10) / 10 : 0);
+        postToParent('steakout-ar-tap', {
+          el: tagged.getAttribute('data-track'),
+          x: pct(clientX, window.innerWidth),
+          y: pct(clientY, window.innerHeight)
+        });
+      } catch (error) { /* measurement never breaks the experience */ }
+    }, true);
+    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') requestClose(); });
 
     // Parent app.js gates start on this message. It must precede the engine
     // warm-up so a slow engine still receives the user's start request.

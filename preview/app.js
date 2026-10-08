@@ -188,31 +188,51 @@
 
   /* Where events go once there is somewhere to send them.
    *
-   * Deliberately EMPTY. sendBeacon is skipped entirely while it is, so this
-   * whole path ships and is verifiable today against window.dataLayer, and
-   * starts reporting the moment this one string is filled in -- no other
-   * change, no redeploy of the AR itself.
+   * config.collectorUrl (config.js), and it is EMPTY unless someone fills it in
+   * on purpose. While it is, nothing leaves the phone: events are only shaped
+   * and kept in window.dataLayer, which is how this whole path is verified
+   * without a Collector. Fill it in and the same events start reporting -- no
+   * other change, no redeploy of the AR itself.
    *
    * sendBeacon rather than fetch: it never blocks the main thread, never
    * rejects on a dead host, and is the only send that reliably survives the
    * document being torn down. That last part is the whole reason it is here --
    * order_tapped fires as the tab is already navigating to Toast, which is
-   * exactly the case a normal fetch loses. */
-  const COLLECTOR_URL = '';
+   * exactly the case a normal fetch loses.
+   *
+   * What may be sent -- which events, which keys, how big -- is decided in
+   * tracking-core.js against Orbit's list (ORBIT_SITE_EVENTS), not here. Every
+   * event also carries t, the ms since this page loaded. */
+  const core = window.SteakoutTrackingCore;
+
+  const send = core ? core.createSender({
+    url: config.collectorUrl,
+    source,
+    session,
+    beacon: (url, body) => navigator.sendBeacon && navigator.sendBeacon(url, body),
+    now: () => Date.now(),
+    since: () => (window.performance && typeof window.performance.now === 'function' ? window.performance.now() : 0)
+  }) : null;
 
   const track = (eventName, detail = {}) => {
-    // dataLayer stays the local, inspectable record -- now stamped with the
-    // visit so every entry can be tied to one diner and one flyer.
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({ event: eventName, ...detail, source, session });
+    let shaped = null;
+    try { shaped = send ? send(eventName, detail) : null; } catch (error) { /* measurement never breaks the experience */ }
 
-    if (!COLLECTOR_URL) return;
+    // dataLayer stays the local, inspectable record -- stamped with the visit so
+    // every entry can be tied to one diner and one flyer, and showing exactly
+    // what would be (or was) sent.
     try {
-      navigator.sendBeacon?.(COLLECTOR_URL, JSON.stringify({
-        name: eventName, source, session, at: Date.now(), meta: detail
-      }));
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: eventName, ...(shaped ? shaped.meta : detail), source, session });
     } catch (error) { /* measurement never breaks the experience */ }
   };
+
+  /* The page-side watcher (tracking.js): taps, hovers, time on each part of the
+     page, scroll depth, the model turned by hand, how they left. It calls track()
+     above; if it fails to load, the AR events still report. */
+  try {
+    if (window.SteakoutTracking) window.SteakoutTracking.start({ track });
+  } catch (error) { /* measurement never breaks the experience */ }
 
   /* Carry the visit into Toast so an order can be matched back to the flyer
    * that produced it, if Toast ever exposes order data. `c` and the session
@@ -241,8 +261,14 @@
    * per visit: a reload in the same tab keeps the session, so it is not counted
    * as a second scan, and no extra storage key is needed to know that. `source`
    * says where they came from: the QR placement, or "direct" for anyone who
-   * typed the address or followed a link. */
-  if (isNewVisit) track('scan');
+   * typed the address or followed a link. The device facts (screen size, pixel
+   * density, ios/android/other, whether a mouse can hover) ride along; the user
+   * agent never does. */
+  if (isNewVisit) {
+    let device = {};
+    try { device = (window.SteakoutTracking && window.SteakoutTracking.deviceDetail()) || {}; } catch (error) { /* no device facts is fine */ }
+    track('scan', device);
+  }
 
   /* Safari caches a motion refusal for the origin and will not ask again --
      not on reload, not on a new tab. Only clearing the site's data or quitting
@@ -252,6 +278,13 @@
   let motionBlocked = false;
   const startMessage = () =>
     (motionBlocked ? 'steakout-ar-motion-blocked' : 'steakout-ar-start');
+
+  /* Tell the page-side watcher something it cannot see for itself. Never throws. */
+  const notifyTracking = (method, ...args) => {
+    try {
+      if (window.SteakoutTracking) window.SteakoutTracking[method](...args);
+    } catch (error) { /* measurement never breaks the experience */ }
+  };
 
   const postToBrowserAR = (type, extra) => {
     if (!browserARFrameReady || !browserARFrame?.contentWindow) return;
@@ -302,6 +335,7 @@
     if (browserARFrameReady) postToBrowserAR(startMessage());
     setStatus('OPENING AR', 'active');
     track('browser_ar_opened', { item: config.itemName || 'test-food' });
+    notifyTracking('arState', true);
   };
 
   const closeBrowserAR = () => {
@@ -315,6 +349,7 @@
     if (browserARLoading) browserARLoading.hidden = true;
     setStatus('QR READY', 'ready');
     track('browser_ar_closed');
+    notifyTracking('arState', false);
     window.setTimeout(() => launchButton?.focus(), 0);
   };
 
@@ -340,18 +375,29 @@
       }
       hideBrowserARSplash();
       setStatus('AR ACTIVE', 'active');
-      track('camera_live');
+      // detail: { ms from START CAMERA, run } -- shaped and capped in tracking-core.js
+      track('camera_live', event.data.detail);
     } else if (event.data?.type === 'steakout-ar-camera-error') {
       if (!browserARShouldStart) return;
       hideBrowserARSplash();
       setStatus('CAMERA ERROR', 'error');
-      track('camera_error');
+      track('camera_error', event.data.detail);
     } else if (event.data?.type === 'steakout-ar-locked') {
       /* THE success event. "Camera started" only means they got past the
          permission prompt; this means the meal is actually sitting on their
          table. lock -> order_tapped is the number that says whether any of
          this sells a cheesesteak. */
-      track('lock');
+      track('lock', event.data.detail);
+    } else if (event.data?.type === 'steakout-ar-lost') {
+      /* The meal came off the flyer after it had locked: the tracker lost the
+         target. At most ten per run; the count that follows in ar_closed is
+         the true one. */
+      track('lost', event.data.detail);
+    } else if (event.data?.type === 'steakout-ar-refound') {
+      track('refound', event.data.detail);
+    } else if (event.data?.type === 'steakout-ar-tap') {
+      // A tap on a tagged button inside the AR frame, which this page cannot see.
+      notifyTracking('frameTap', event.data.detail);
     } else if (event.data?.type === 'steakout-ar-order-shown') {
       track('order_shown');
     } else if (event.data?.type === 'steakout-ar-order-tapped') {
@@ -360,7 +406,7 @@
       /* Distinct from browser_ar_closed, which fires for EVERY close including
          Escape and the parent tearing the layer down. This one means the
          customer deliberately left from inside AR. */
-      track('ar_closed');
+      track('ar_closed', event.data.detail);
       closeBrowserAR();
     }
   });
@@ -492,11 +538,18 @@
     if (event.target === arGuide) closeARGuide();
   });
 
+  /* The sheet closed without START CAMERA: NOT NOW, the x, a tap outside it, or
+     Escape. START CAMERA sets the flag first, so it is not a cancel. */
+  let guideStarted = false;
+
   arGuide?.addEventListener('close', () => {
     launchButton?.setAttribute('aria-expanded', 'false');
+    if (!guideStarted) track('guide_cancel');
+    guideStarted = false;
   });
 
   arGuideStart?.addEventListener('click', () => {
+    guideStarted = true;
     closeARGuide();
     launchAR();
   });

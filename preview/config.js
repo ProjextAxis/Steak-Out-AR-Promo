@@ -4,6 +4,13 @@ window.STEAKOUT_AR_CONFIG = {
   orderUrl: 'https://order.toasttab.com/online/steakout-sewell',
   demoAsset: false,
 
+  // Where the page reports what happens on it (the Steak Out AR Collector's
+  // /collect address, https://steakout-ar-collector.<subdomain>.workers.dev/collect).
+  // EMPTY ON PURPOSE: while it is empty nothing leaves the phone. Events are
+  // only kept in window.dataLayer, for looking at. Fill it in once the Collector
+  // is deployed and its address is known; no other change is needed.
+  collectorUrl: '',
+
   social: {
     instagramUrl: 'https://www.instagram.com/steakout.sewell/',
     facebookUrl: 'https://www.facebook.com/SteakOutSewellNJ/'

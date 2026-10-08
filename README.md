@@ -85,3 +85,44 @@ Toast is **not required** to test this site. Toast will only link into the deplo
 - Google `<model-viewer>` for free-placement AR.
 - MindAR for image-target/marker tracking.
 - A-Frame for the marker-tracked 3D scene.
+
+## What the page reports (Orbit Analytics)
+
+The landing page (`preview/`) records what happens on it and can send it to the
+Steak Out AR Collector, a small Cloudflare Worker that Orbit reads from. **Nothing
+leaves the phone until `collectorUrl` in `preview/config.js` is filled in**; it is
+empty in this repo. While it is empty the events are only kept in
+`window.dataLayer`, which is how to look at them.
+
+- `preview/app.js` owns the visit (session, `?c=` placement) and the one `track()`
+  function that sends an event.
+- `preview/tracking.js` watches the landing page: where it is tapped, where a
+  mouse rests, how long each page part is on screen, scroll depth, the 3D model
+  turned by hand, links that leave, and one cumulative `visit_end` each time the
+  page is hidden.
+- `preview/marker.js` (the AR frame) reports its own moments to the landing page:
+  camera live, lock, lost and found again, and how long the AR was used.
+- `preview/tracking-core.js` holds the rules: which events and which keys may
+  leave the phone (Orbit's `ORBIT_SITE_EVENTS`), how a tap becomes a position,
+  caps (60 taps, 40 hovers, 30 turns, 40 `visit_end`s per tab). It has no browser
+  code so it can be tested.
+- `data-track` and `data-section` attributes in `index.html` name the elements
+  and page parts a tap is filed under. Taps in the AR frame use the same two
+  names (`ar_order`, `ar_close`).
+
+Never sent: camera frames, poses, QR text, the user agent, anything typed,
+anything personal. The device is a coarse `ios` / `android` / `other`, the screen
+size, and whether a mouse can hover. One extra `sessionStorage` key,
+`steakout.visit`, holds counters only and dies with the tab.
+
+Checks (plain node, no packages), from the repo root:
+
+```
+node preview/tools/test-tracking.js              # rules, the page, the contract
+node preview/tools/test-marker-events.js         # the AR frame's messages
+node preview/tools/test-static-ar-entry.js
+node preview/tools/test-anchor-stability.js
+```
+
+Add `--selftest` to the first two: it breaks the real source one change at a time
+and fails unless the named check goes red.
