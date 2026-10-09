@@ -36,4 +36,17 @@ assert.match(diagnosticsSource, /const ALWAYS_ON = false;/,
 assert.match(diagnosticsSource, /!ALWAYS_ON && params\.get\('ar-debug'\) !== '1'/,
   'with ALWAYS_ON false, diagnostics still exit early for normal customers');
 
+// A-Frame's bundled WebVR polyfill asks a dead address (dpdb.webvr.rocks) for a
+// phone list unless both DPDB_URL defaults are emptied in the vendor file; see
+// vendor/8frame/LOCAL-CHANGES.md. Read whichever A-Frame file marker.html loads,
+// so an A-Frame update cannot bring the request back unnoticed.
+const aframeTag = markerHtml.match(/src="\.\/(vendor\/8frame\/aframe-[^"?#]+)(\?v=[^"]+)?"/);
+assert.ok(aframeTag, 'marker.html loads A-Frame from vendor/8frame');
+assert.ok(aframeTag[2], 'the A-Frame script tag carries a ?v= cache token');
+const aframeSource = fs.readFileSync(path.join(previewRoot, aframeTag[1]), 'utf8');
+assert.doesNotMatch(aframeSource, /dpdb\.webvr\.rocks/,
+  'A-Frame no longer asks the dead dpdb.webvr.rocks address');
+assert.doesNotMatch(aframeSource, /DPDB_URL\s*:\s*["'][^"']/,
+  'every DPDB_URL default in the A-Frame file is empty');
+
 console.log('static AR entry tests passed');

@@ -283,6 +283,33 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
+
+  /* ===== POLISH 2026-10-08 BEGIN =====
+     Sizes only: tap areas of at least 40px for the small links and the "Change my
+     answer" button, the footer in two clean lines, a few px off a short first
+     screen. No colour, font or word changes here, and tools/test-review.js holds
+     this block to that (only padding, margin, min size, wrapping). */
+  /* A link inside a line of text can be made taller to a finger without moving the
+     line: padding on an inline box adds to its tap area and not to the line's height. */
+  footer a { padding: 13px 0; }
+  .err a { padding: 12px 0; white-space: nowrap; }
+  .lead a { padding: 10px 0; white-space: nowrap; }
+  /* The button grows 10px (13px of padding instead of 8) and gives the 10px back
+     in its margins, so its text and everything after it stay where they were. */
+  .back { padding: 13px 8px; margin: 17px auto -5px; }
+  /* If the address ever has to break, break it evenly, not "Sewell," / "NJ". */
+  footer { text-wrap: balance; }
+  /* On a 320px phone the address is 290px of a 288px line: give the footer a
+     little more of the width so it stays on one line. */
+  @media (max-width: 340px) {
+    footer { padding-left: 8px; padding-right: 8px; }
+  }
+  /* A short phone (a 568px-tall one) scrolled the first screen by 3px: the page's
+     own top and bottom air is 10px less there, which is more than it needs. */
+  @media (max-height: 600px) {
+    main { padding-top: 24px; padding-bottom: 18px; }
+  }
+  /* ===== POLISH END ===== */
 </style>
 </head>
 <body>
@@ -359,7 +386,8 @@
 </main>
 
 <footer data-section="footer">
-  Steak Out · 641 Woodbury Glassboro Rd, Sewell, NJ · <a id="footPhone" href="tel:+18564648000" style="white-space:nowrap" data-track="phone">(856) 464-8000</a><span id="publicLink" style="white-space:nowrap" hidden> · <a id="googleSmall" href="#" rel="noopener" data-track="google_footer">Google review</a></span>
+  <div>Steak Out · 641 Woodbury Glassboro Rd, Sewell, NJ</div>
+  <div><a id="footPhone" href="tel:+18564648000" style="white-space:nowrap" data-track="phone">(856) 464-8000</a><span id="publicLink" style="white-space:nowrap" hidden> · <a id="googleSmall" href="#" rel="noopener" data-track="google_footer">Google review</a></span></div>
 </footer>
 
 <script src="./review-core.js?v=20261008-review1"></script>
@@ -704,6 +732,14 @@ $("msg").addEventListener("input", () => {
   visit.mark("typed");
   emit("message_started", { r: rating });
 });
+// The line that asks for words (the box was empty at Send) has done its job once they start typing: take it away
+// at the next letter (not any other message in that box, such as the one for a send that failed).
+let emptyAsked = false;
+$("msg").addEventListener("input", () => {
+  if (!emptyAsked) return;
+  emptyAsked = false;
+  $("err").classList.remove("on");
+});
 
 // ---- screens ----
 function show(id) {
@@ -731,6 +767,7 @@ document.querySelectorAll(".face").forEach(b => b.addEventListener("click", () =
     $("ownerTitle").textContent = m.title;
     $("ownerNote").textContent = m.note(CONFIG.OWNER_NAME);
     $("err").classList.remove("on");
+    emptyAsked = false;
     show("owner");
   }
 }));
@@ -752,10 +789,12 @@ $("ownerForm").addEventListener("submit", async e => {
   if (!message) {
     err.textContent = "Tell me what happened first.";
     err.classList.add("on");
+    emptyAsked = true;
     $("msg").focus();
     return;
   }
   err.classList.remove("on");
+  emptyAsked = false;
 
   const payload = {
     rating,

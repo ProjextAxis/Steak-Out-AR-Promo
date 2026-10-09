@@ -266,8 +266,12 @@ body:has(.ar-guide[open]) {
 }
 
 .ar-guide__cancel {
-  min-height: 34px;
-  margin-top: 5px;
+  /* A 40px-tall tap area (it was 34). The 6px it grew by are taken back from
+     its margins, so the sheet is the same height and NOT NOW is where it was. */
+  min-height: 40px;
+  min-width: 40px;
+  margin-top: 2px;
+  margin-bottom: -3px;
   padding: 0 12px;
   color: #b9b5b5;
   background: transparent;

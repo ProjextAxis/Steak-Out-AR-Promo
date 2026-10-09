@@ -23,13 +23,26 @@
   min-width: 0;
   place-items: center;
   white-space: nowrap;
+  /* 16px, as it always was, on any phone 361px wide or more. On a narrower one
+     ("No Gift Idea? Give The Steak Out Experience" is 20.3 times its font size
+     wide, so it is 324px at 16px and a 320px phone's bar is 292px) the type
+     shrinks with the screen so the whole message shows. 20.8 leaves it ~3% of
+     room. The bar's side padding is 14px (styles.css, up to 620px wide). */
+  font-size: min(16px, calc((100vw - 28px) / 20.8));
 }
 
+/* TAP AREAS (2026-10-08). Every link in the header, and the AR sheet's NOT NOW,
+   is at least 40 x 40 px to a finger. Each one grows its own box and gives the
+   room back with a negative margin (or, for the ones that already sit in a flex
+   row, simply by growing), so nothing on the page moves and nothing looks
+   different: the 20px icon is still where it was, centred in a 40px box. */
 .menu-button {
-  width: 20px;
-  height: 20px;
+  width: 40px;
+  height: 40px;
+  margin: -10px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .menu-button svg {
@@ -41,6 +54,13 @@
 
 .site-logo {
   gap: 4px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.sign-in {
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .site-logo span {

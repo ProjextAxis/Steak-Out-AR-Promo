@@ -55,7 +55,9 @@ const FILES = {
   marker: 'marker.js',
   index: 'index.html',
   markerHtml: 'marker.html',
-  config: 'config.js'
+  config: 'config.js',
+  headerCss: 'header-enhancements.css',
+  flowCss: 'ar-flow.css'
 };
 const ORBIT_CONTRACT = process.env.ORBIT_SITE_EVENTS_TS ||
   path.resolve(__dirname, '../../../orbit/libraries/orbit/src/site-events/site-events.types.ts');
@@ -101,7 +103,8 @@ function readContract() {
       else if (ch === ')') { if (depth === 0) break; depth--; }
       else if (depth === 0) out += ch;
     }
-    return out.split(',').map((piece) => piece.split('=')[0].trim()).filter((k) => /^[a-z]+$/.test(k));
+    // A note after a semicolon ("meta: ms, n; n is …") is prose, not more keys.
+    return out.split(';')[0].split(',').map((piece) => piece.split('=')[0].trim()).filter((k) => /^[a-z]+$/.test(k));
   };
   const events = {};
   const block = ts.slice(ts.indexOf('export const ORBIT_SITE_EVENTS = ['), ts.indexOf('] as const;'));
@@ -851,6 +854,29 @@ const CASES = [
           /steakout-ar-lost/.test(text.marker) && /steakout-ar-refound/.test(text.marker), /MAX_LOST_EVENTS = 10;/.test(text.marker),
           /steakout-ar-camera-error', \{ err: faultKind\(\) \}/.test(text.marker), /err: 'load'/.test(text.marker)],
         [true, 1, true, true, true, true, true, true]);
+      // Tap areas (2026-10-08): the header's links and the start sheet's NOT NOW are at least 40 x 40 px to a finger,
+      // and the red bar's message shrinks to fit a 320px phone. Read from the style sheets as the page loads them
+      // (every rule of that exact selector, later ones winning), not measured: a browser look at 390 and 320 wide
+      // found them 40px tall in Chrome and WebKit.
+      const declared = (css, selector) => {
+        const props = {};
+        for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+          if (!m[1].split(',').some((sel) => sel.trim() === selector)) continue;
+          for (const d of m[2].split(';')) { const at = d.indexOf(':'); if (at > 0) props[d.slice(0, at).trim()] = d.slice(at + 1).trim(); }
+        }
+        return props;
+      };
+      const px = (v) => (/^-?\d+(?:\.\d+)?px$/.test(v || '') ? parseFloat(v) : 0);
+      const atLeast40 = (props, a, b) => px(props[a]) >= 40 && px(props[b]) >= 40;
+      const menu = declared(text.headerCss, '.menu-button');
+      t('H7 a finger can hit the header and the start sheet: the menu, the logo, Sign in and NOT NOW are each at least 40 x 40 px (the menu keeps its 20px icon by taking the room back in its margin)',
+        [atLeast40(menu, 'width', 'height'), px(menu.margin) <= -10,
+          atLeast40(declared(text.headerCss, '.site-logo'), 'min-width', 'min-height'),
+          atLeast40(declared(text.headerCss, '.sign-in'), 'min-width', 'min-height'),
+          atLeast40(declared(text.flowCss, '.ar-guide__cancel'), 'min-width', 'min-height')],
+        [true, true, true, true, true]);
+      t('H7b the red bar shrinks with the screen on a phone narrower than 361px (16px from there up), so the whole message shows at 320',
+        [declared(text.headerCss, '.announcement__copy')['font-size']], ['min(16px, calc((100vw - 28px) / 20.8))']);
     }
   }
 ];
@@ -931,6 +957,13 @@ const MUTATIONS = [
   { name: 'tracking: the click is counted as a second tap', file: 'tracking', from: 'if (tapFilter.click(event.timeStamp)) recordTap(event);', to: 'recordTap(event);', check: 'G4 a tap on something tagged, on nothing tagged, and on a link that leaves: tap, leave and order_tapped, each once' },
   { name: 'app: a cancelled start sheet is not reported', file: 'app', from: "if (!guideStarted) track('guide_cancel');", to: '', check: 'G5 the start sheet opens (ar_guide_opened), and NOT NOW, the x, or a tap outside it is a guide_cancel, but START CAMERA is not' },
   { name: 'app: START CAMERA counts as a cancel', file: 'app', from: '    guideStarted = true;\n    closeARGuide();', to: '    closeARGuide();', check: 'G5 the start sheet opens (ar_guide_opened), and NOT NOW, the x, or a tap outside it is a guide_cancel, but START CAMERA is not' },
+  // tap areas and the bar on a small phone (2026-10-08)
+  { name: 'css: the menu button is 20px again', file: 'headerCss', from: '  width: 40px;\n  height: 40px;\n  margin: -10px;', to: '  width: 20px;\n  height: 20px;\n  margin: -10px;', check: 'H7 a finger can hit the header and the start sheet: the menu, the logo, Sign in and NOT NOW are each at least 40 x 40 px (the menu keeps its 20px icon by taking the room back in its margin)' },
+  { name: 'css: the menu button grows without taking the room back', file: 'headerCss', from: '  margin: -10px;\n', to: '', check: 'H7 a finger can hit the header and the start sheet: the menu, the logo, Sign in and NOT NOW are each at least 40 x 40 px (the menu keeps its 20px icon by taking the room back in its margin)' },
+  { name: 'css: the logo has no minimum height', file: 'headerCss', from: '  gap: 4px;\n  min-width: 40px;\n  min-height: 40px;', to: '  gap: 4px;', check: 'H7 a finger can hit the header and the start sheet: the menu, the logo, Sign in and NOT NOW are each at least 40 x 40 px (the menu keeps its 20px icon by taking the room back in its margin)' },
+  { name: 'css: Sign in is small again', file: 'headerCss', from: '.sign-in {\n  min-width: 40px;\n  min-height: 40px;\n}', to: '.sign-in {\n  min-width: 20px;\n  min-height: 15px;\n}', check: 'H7 a finger can hit the header and the start sheet: the menu, the logo, Sign in and NOT NOW are each at least 40 x 40 px (the menu keeps its 20px icon by taking the room back in its margin)' },
+  { name: 'css: NOT NOW is 34px tall again', file: 'flowCss', from: '  min-height: 40px;\n  min-width: 40px;\n  margin-top: 2px;', to: '  min-height: 34px;\n  min-width: 40px;\n  margin-top: 2px;', check: 'H7 a finger can hit the header and the start sheet: the menu, the logo, Sign in and NOT NOW are each at least 40 x 40 px (the menu keeps its 20px icon by taking the room back in its margin)' },
+  { name: 'css: the red bar keeps 16px on a 320px phone', file: 'headerCss', from: 'font-size: min(16px, calc((100vw - 28px) / 20.8));', to: 'font-size: 16px;', check: 'H7b the red bar shrinks with the screen on a phone narrower than 361px (16px from there up), so the whole message shows at 320' },
   { name: 'tracking: hover waits on nothing', file: 'tracking', from: 'const rest = core.createHoverRest();', to: 'const rest = core.createHoverRest({ minMs: 0 });', check: 'G6 a mouse resting 400 ms on a tagged thing is one hover with its ms; a shorter rest and a touch are none' },
   { name: 'tracking: a touch is a hover', file: 'tracking', from: "if (event.pointerType !== 'mouse') return;\n        const hit", to: 'const hit', check: 'G6 a mouse resting 400 ms on a tagged thing is one hover with its ms; a shorter rest and a touch are none' },
   { name: 'tracking: the model\'s own spinning is counted', file: 'tracking', from: "if (!event.detail || event.detail.source !== 'user-interaction') return;", to: '', check: 'G7 the model turned by hand is one viewer_spin when it is left alone for 1.5 s; its own spinning is not counted' },

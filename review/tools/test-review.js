@@ -65,6 +65,22 @@ const COLLECTOR_ROOT = process.env.COLLECTOR_ROOT ||
 const ORIGINAL_PAGE = process.env.ORIGINAL_REVIEW_PAGE ||
   path.join(process.env.HOME || '', 'Desktop/STEAK OUT/6 WEB & SEO/SO REVIEW PAGE/index.html');
 
+/* THE POLISH OF 2026-10-08, the only places the page is allowed to differ from the owner's original.
+   (1) A fenced block at the end of the page's <style>, which tools/test-review.js holds to sizes only (H8).
+   (2) The footer in two lines, which are these two edits of the original's markup (as it reads after
+       look() below has normalised it: attributes the tracking added are gone, white space is one space).
+   Everything else is still compared word for word (H7, H7b). */
+const POLISH_BLOCK = /\/\* ===== POLISH [0-9-]+ BEGIN =====[\s\S]*?===== POLISH END ===== \*\//;
+const POLISH_EDITS = [
+  ['<footer> Steak Out · 641 Woodbury Glassboro Rd, Sewell, NJ · <a id="footPhone"',
+    '<footer> <div>Steak Out · 641 Woodbury Glassboro Rd, Sewell, NJ</div> <div><a id="footPhone"'],
+  ['</span> </footer>', '</span></div> </footer>']
+];
+const withPolish = (originalLook) => POLISH_EDITS.reduce((text, [from, to]) => {
+  if (text.split(from).length !== 2) throw new Error(`the approved polish edit "${from.slice(0, 40)}…" does not apply once to the original`);
+  return text.replace(from, () => to);
+}, originalLook);
+
 /* --------------------------------------------------------------- sources */
 
 function loadText(mutations = []) {
@@ -1040,6 +1056,24 @@ const CASES = [
         await toOwner(w, { face: 2, message: '   ' });
         await w.submit();
         t('F10 nothing typed: "Tell me what happened first.", nothing is sent', [w.byId('err').textContent, w.byId('err').classList.contains('on'), w.fetches.length, w.screenOn()], ['Tell me what happened first.', true, 0, 'owner']);
+        // "Tell me what happened first." has done its job at the first letter typed (2026-10-08).
+        const e = openPage(text);
+        await toOwner(e, { face: 2, message: '   ' });
+        await e.submit();
+        const asked = e.byId('err').classList.contains('on');
+        e.type('msg', 'T');
+        t('F10b "Tell me what happened first." goes away at the first thing typed in the box, and was there before', [asked, e.byId('err').classList.contains('on')], [true, false]);
+        // ...but only that line: the one for a send that failed is not taken away by typing (the customer is told to call).
+        const f = openPage(text);
+        await toOwner(f, { face: 2, message: '   ' });
+        await f.submit();
+        f.byId('msg').value = 'the fries were cold';
+        f.plan.push({ status: 503 });
+        await f.submit();
+        const failedShown = [f.byId('err').classList.contains('on'), f.byId('err').innerHTML.includes("That didn't go through")];
+        f.type('msg', 'the fries were cold!');
+        t('F10c typing does not take away "That didn\'t go through" (only the empty-box line), even when the box was empty once before',
+          [failedShown, f.byId('err').classList.contains('on'), f.byId('err').innerHTML.includes("That didn't go through")], [[true, true], true, true]);
         const d = openPage(text);
         await toOwner(d, { face: 2, message: 'press twice' });
         d.plan.push({ hang: true });
@@ -1375,9 +1409,22 @@ const CASES = [
       t('H6 events go to /collect and the message to /feedback and nowhere else; the message is sent from one place, with fetch (so its answer can be read); an event is sent with fetch only as the stand-in for a beacon (no-cors, keepalive)',
         [(core.match(/\/collect`/g) || []).length, (core.match(/\/feedback`/g) || []).length, (script.match(/window\.fetch\(/g) || []).length, (script.match(/\bfetch\(url,/g) || []).length, /sendBeacon\(url, body\)/.test(script), /keepalive: true, mode: "no-cors"/.test(script)],
         [1, 1, 1, 1, true, true]);
+      // ---- the polish block (2026-10-08): sizes only, and the tap areas it exists for
+      const polish = (POLISH_BLOCK.exec(/<style>([\s\S]*?)<\/style>/.exec(html)[1]) || [''])[0].replace(/\/\*[\s\S]*?\*\//g, '');
+      const polishRules = [...polish.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim().replace(/\s+/g, ' '), Object.fromEntries(m[2].split(';').map((d) => d.split(':')).filter((d) => d.length > 1).map(([k, ...v]) => [k.trim(), v.join(':').trim()]))]);
+      const polishRule = (sel) => Object.assign({}, ...polishRules.filter(([s]) => s === sel).map(([, props]) => props));
+      const SIZES_ONLY = ['padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'margin', 'margin-top', 'margin-bottom', 'white-space', 'text-wrap', 'min-height', 'min-width'];
+      t('H8 the polish block changes sizes and wrapping only: nothing in it sets a colour, a font, a word (content) or a shadow',
+        [polishRules.length > 0, polishRules.flatMap(([, props]) => Object.keys(props)).filter((k) => !SIZES_ONLY.includes(k)), /content\s*:/.test(polish)], [true, [], false]);
+      t('H8b a finger can hit the small links and "Change my answer": the footer links, the phone in the "didn’t go through" line and the one on the sent screen get 13, 12 and 10px of padding above and below (the line is 17-18px), and the button grows 10px and takes it back in its margin',
+        [polishRule('footer a').padding, polishRule('.err a').padding, polishRule('.lead a').padding, polishRule('.back').padding, polishRule('.back').margin],
+        ['13px 0', '12px 0', '10px 0', '13px 8px', '17px auto -5px']);
+      t('H8c the footer is two lines (the address, then the phone and the Google link), so no dot dangles at a line end; its words break evenly if they ever must, and on a 320px phone it has 8px a side to hold the address on one line',
+        [(html.match(/<footer[^>]*>\s*<div>[^<]*<\/div>\s*<div><a id="footPhone"/g) || []).length, polishRule('footer')['text-wrap'], polishRule('footer')['padding-left'], polishRule('footer')['padding-right']],
+        [1, 'balance', '8px', '8px']);
       // ---- the look and the words are the original's
       const look = (page, isNew) => {
-        const style = /<style>([\s\S]*?)<\/style>/.exec(page)[1].replace(/@font-face\s*\{[^}]*\}/g, '');
+        const style = /<style>([\s\S]*?)<\/style>/.exec(page)[1].replace(/@font-face\s*\{[^}]*\}/g, '').replace(POLISH_BLOCK, '');
         const bodyText = page.slice(page.indexOf('<body>'), page.lastIndexOf('</body>'))
           .replace(/<script[\s\S]*?<\/script>/g, '')
           .replace(/ data-(?:track|section)="[^"]*"/g, '');
@@ -1385,17 +1432,19 @@ const CASES = [
         return `${head}\n${style}\n${bodyText}`.replace(/\s+/g, ' ').trim();
       };
       const newLook = look(html, true);
-      // The look of the original page, as the owner made it, after the normalising above. If this check goes
-      // red and the change was meant, set it to the new value the failure prints.
-      const LOOK_SHA256 = '819322f6913991ad9d1c78974483d0b19854f53967fb9c7f6ac4867f555214c2';
+      // The look of the original page, as the owner made it, after the normalising above and with the approved
+      // polish edits (POLISH_EDITS) made to it. If this check goes red and the change was meant, set it to the new
+      // value the failure prints. (Before the polish of 2026-10-08 it was 819322f6913991ad9d1c78974483d0b19854f53967fb9c7f6ac4867f555214c2,
+      // the original with nothing changed.)
+      const LOOK_SHA256 = '17f18b1dc1172afe91572c6ed68f18ed5cd285ecf6b7e5fcbb6e4789ab5fcdc0';
       const hash = crypto.createHash('sha256').update(newLook).digest('hex');
-      t('H7 the four screens look and read as the original did: the head, the styles (without the self-hosted font faces) and the markup (without the tracking tags and the scripts) hash to the original’s',
+      t('H7 the four screens look and read as the original did, apart from the approved polish edits: the head, the styles (without the self-hosted font faces and the polish block) and the markup (without the tracking tags and the scripts) hash to the original’s with those edits',
         hash, LOOK_SHA256);
       let original = null;
       try { original = fs.readFileSync(ORIGINAL_PAGE, 'utf8'); } catch (error) { /* not on this machine */ }
       if (original) {
-        const oldLook = look(original, false);
-        t('H7b …and set against the original page itself (the file the owner made), word for word', oldLook === newLook, true);
+        const oldLook = withPolish(look(original, false));
+        t('H7b …and set against the original page itself (the file the owner made), word for word, once the approved polish edits are made to it', oldLook === newLook, true);
         const strings = ['Tell me what happened first.', 'Sending…', 'Glad you loved it', 'Glad you enjoyed it', 'reads every one', 'will reach out to you. Need us sooner? Call', 'Thanks for telling us straight. Want a call back? Ring us at',
           "That didn't go through. Check your connection and try again, or call us at", "That's not the Steak Out way.", 'Sorry we fell short.', "Just OK isn't OK with us."];
         const moods = (s) => /const MOODS = \{[\s\S]*?\n\};/.exec(s)[0];
@@ -1434,6 +1483,11 @@ const F7E = 'F7e a timeout, a reload of the tab, the same words typed again: the
 const F7F = 'F7f a phone that refuses storage still sends the retry with the same message_id (kept in the page)';
 const F7G = 'F7g a second message with the same words after the first was stored is a new message: a new id';
 const G7 = 'G7 the page’s retry after a lost answer, sent to the REAL Worker: both tries are answered 201, and exactly one message is kept';
+const F10B = 'F10b "Tell me what happened first." goes away at the first thing typed in the box, and was there before';
+const F10C = 'F10c typing does not take away "That didn\'t go through" (only the empty-box line), even when the box was empty once before';
+const H8 = 'H8 the polish block changes sizes and wrapping only: nothing in it sets a colour, a font, a word (content) or a shadow';
+const H8B = 'H8b a finger can hit the small links and "Change my answer": the footer links, the phone in the "didn’t go through" line and the one on the sent screen get 13, 12 and 10px of padding above and below (the line is 17-18px), and the button grows 10px and takes it back in its margin';
+const H8C = 'H8c the footer is two lines (the address, then the phone and the Google link), so no dot dangles at a line end; its words break evenly if they ever must, and on a 320px phone it has 8px a side to hold the address on one line';
 const MUTATIONS = [
   // ---- A the contract
   mut('core: an event Orbit does not list', C, "    message_failed: Object.freeze(['r', 'err']),\n", "    message_failed: Object.freeze(['r', 'err']),\n    free_lunch: Object.freeze([]),\n", 'A1 the events are exactly Orbit’s ORBIT_REVIEW_EVENTS'),
@@ -1679,8 +1733,8 @@ const MUTATIONS = [
   mut('page: another thing kept on the phone', P, 'window.localStorage.setItem("so-review-visits", String(visits));', 'window.localStorage.setItem("so-review-visits", String(visits));\n    window.localStorage.setItem("so-review-name", $("name").value);', 'H5 the page keeps one count in localStorage (a number) and four sessionStorage keys of its own (three in the page, the message id in the core), nothing else'),
   mut('page: a second place sends a message', P, '    fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body, keepalive: true, mode: "no-cors", credentials: "omit" })', '    fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body, keepalive: true, mode: "cors", credentials: "omit" })', 'H6 events go to /collect and the message to /feedback and nowhere else; the message is sent from one place, with fetch (so its answer can be read); an event is sent with fetch only as the stand-in for a beacon (no-cors, keepalive)'),
   mut('core: events go to the message door', C, "const url = `${target}/collect`;", "const url = `${target}/feedback`;", 'H6 events go to /collect and the message to /feedback and nowhere else; the message is sent from one place, with fetch (so its answer can be read); an event is sent with fetch only as the stand-in for a beacon (no-cors, keepalive)'),
-  mut('index: the look changes (a colour)', P, '--red: #ba202a;', '--red: #ca202a;', 'H7 the four screens look and read as the original did: the head, the styles (without the self-hosted font faces) and the markup (without the tracking tags and the scripts) hash to the original’s'),
-  mut('index: a word changes', P, '<span class="bar">Tap one</span>', '<span class="bar">Tap a face</span>', 'H7 the four screens look and read as the original did: the head, the styles (without the self-hosted font faces) and the markup (without the tracking tags and the scripts) hash to the original’s'),
+  mut('index: the look changes (a colour)', P, '--red: #ba202a;', '--red: #ca202a;', 'H7 the four screens look and read as the original did, apart from the approved polish edits: the head, the styles (without the self-hosted font faces and the polish block) and the markup (without the tracking tags and the scripts) hash to the original’s with those edits'),
+  mut('index: a word changes', P, '<span class="bar">Tap one</span>', '<span class="bar">Tap a face</span>', 'H7 the four screens look and read as the original did, apart from the approved polish edits: the head, the styles (without the self-hosted font faces and the polish block) and the markup (without the tracking tags and the scripts) hash to the original’s with those edits'),
   mut('index: a sentence in the script changes', P, '"Tell me what happened first."', '"Please say what happened."', 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
   mut('index: an owner note changes', P, "Tell me what happened. This comes straight to me, and I'll make it right.", "Tell me what happened. It comes straight to me, and I'll make it right.", 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
   // ---- a message sent again is one message (2026-10-08, after the review)
@@ -1712,6 +1766,21 @@ const MUTATIONS = [
   mut('page: the id is not kept in the page when storage throws', P, 'core.createMessageIds({ read: readStore, write: writeStore, makeId: newMessageId })', 'core.createMessageIds({ read: () => null, write: () => {}, makeId: newMessageId })', F7F),
   mut('page: the words are kept in the tab', P, 'core.createMessageIds({ read: readStore, write: writeStore, makeId: newMessageId })', 'core.createMessageIds({ read: readStore, write: (k, v) => writeStore(k, v + "_" + $("msg").value), makeId: newMessageId })', F7C2),
   mut('core: the id that is sent changes with the time of the try', C, "    if (hasId) fields.message_id = messageId;\n    const body = JSON.stringify(fields);", "    if (hasId) fields.message_id = messageId + String(fields.at);\n    const body = JSON.stringify(fields);", G7),
+  // ---- the empty-box line goes at the first letter; the polish block is sizes and tap areas (2026-10-08)
+  mut('page: typing does not clear the empty-box line', P, '  if (!emptyAsked) return;\n  emptyAsked = false;\n  $("err").classList.remove("on");\n', '  if (!emptyAsked) return;\n  emptyAsked = false;\n', F10B),
+  mut('page: the empty-box line is never marked as such', P, '    emptyAsked = true;\n', '', F10B),
+  mut('page: typing clears any line in the box, a failed send’s too', P, '  if (!emptyAsked) return;\n  emptyAsked = false;\n  $("err")', '  emptyAsked = false;\n  $("err")', F10C),
+  mut('page: a send forgets that the empty-box line was up', P, '  err.classList.remove("on");\n  emptyAsked = false;\n\n  const payload', '  err.classList.remove("on");\n\n  const payload', F10C),
+  mut('index: the polish block sets a colour', P, 'footer a { padding: 13px 0; }', 'footer a { padding: 13px 0; color: #fff; }', H8),
+  mut('index: the polish block adds a word', P, 'footer { text-wrap: balance; }', 'footer { text-wrap: balance; }\n  footer::after { content: "!"; }', H8),
+  mut('index: the footer links lose their tap area', P, 'footer a { padding: 13px 0; }', 'footer a { padding: 0; }', H8B),
+  mut('index: the phone in the failed-send line loses its tap area', P, '.err a { padding: 12px 0; white-space: nowrap; }', '.err a { white-space: nowrap; }', H8B),
+  mut('index: the phone on the sent screen loses its tap area', P, '.lead a { padding: 10px 0; white-space: nowrap; }', '.lead a { white-space: nowrap; }', H8B),
+  mut('index: “Change my answer” is small again', P, '.back { padding: 13px 8px; margin: 17px auto -5px; }', '.back { padding: 8px 8px; margin: 17px auto 5px; }', H8B),
+  mut('index: “Change my answer” grows and moves what is under it', P, '.back { padding: 13px 8px; margin: 17px auto -5px; }', '.back { padding: 13px 8px; margin: 17px auto 5px; }', H8B),
+  mut('index: the footer is one line again', P, '  <div>Steak Out · 641 Woodbury Glassboro Rd, Sewell, NJ</div>', '  <p>Steak Out · 641 Woodbury Glassboro Rd, Sewell, NJ</p>', H8C),
+  mut('index: the footer breaks anywhere', P, '  footer { text-wrap: balance; }\n', '', H8C),
+  mut('index: the footer has no room for the address on a 320px phone', P, '    footer { padding-left: 8px; padding-right: 8px; }', '    footer { padding-left: 30px; padding-right: 30px; }', H8C),
 ];
 
 /* --------------------------------------------------------------- running */
