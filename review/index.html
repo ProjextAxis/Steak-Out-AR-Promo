@@ -351,7 +351,7 @@
   <section class="screen" id="owner" data-section="owner" aria-labelledby="ownerTitle">
     <div class="picked" id="ownerEmoji" aria-hidden="true"></div>
     <h2 id="ownerTitle"></h2>
-    <div class="center"><span class="bar">Talk to the owner</span></div>
+    <div class="center"><span class="bar">You're family here</span></div>
 
     <div class="note">
       <p id="ownerNote"></p>
@@ -449,11 +449,11 @@ const CONFIG = {
 
 const MOODS = {
   1: { mood: "bad",       emoji: "😡", title: "That's not the Steak Out way.",
-       note: n => `Hey, it's ${n}, the owner. I'm sorry. That's not how we do things here. Tell me what happened. This comes straight to me, and I'll make it right.` },
+       note: n => `We're sorry. That's not how we do things here. Tell us what happened and we'll make it right.` },
   2: { mood: "not-great", emoji: "🙁", title: "Sorry we fell short.",
-       note: n => `Hey, it's ${n}, the owner. We didn't hit the mark this time, and I want to know why. Tell me what happened. This comes straight to me.` },
+       note: n => `We didn't hit the mark this time, and we want to know why. Tell us what happened.` },
   3: { mood: "ok",        emoji: "😐", title: "Just OK isn't OK with us.",
-       note: n => `Hey, it's ${n}, the owner. "OK" isn't what we're going for. What would've made it great? This comes straight to me, and I read every one.` },
+       note: n => `"OK" isn't what we're going for. What would've made it great? We read every one.` },
 };
 
 const $ = id => document.getElementById(id);
@@ -557,8 +557,8 @@ function emit(event, detail) {
 }
 
 // ---- fill in names, links, phone ----
-$("sendBtn").textContent = `Send to ${CONFIG.OWNER_NAME}`;
-$("ownerSig").textContent = `— ${CONFIG.OWNER_NAME}`;
+$("sendBtn").textContent = "Leave your feedback!";
+$("ownerSig").textContent = "— The Steak Out family";
 $("footPhone").textContent = CONFIG.PHONE;
 $("footPhone").href = `tel:${CONFIG.PHONE_TEL}`;
 for (const a of [$("googleBtn"), $("googleSmall")]) {
@@ -846,7 +846,7 @@ $("ownerForm").addEventListener("submit", async e => {
   } finally {
     sending = false;
     btn.disabled = false;
-    btn.textContent = `Send to ${CONFIG.OWNER_NAME}`;
+    btn.textContent = "Leave your feedback!";
   }
 });
 
@@ -861,9 +861,9 @@ function sentOk(payload) {
   done(payload);
 }
 function done(payload) {
-  $("sentBar").textContent = `${CONFIG.OWNER_NAME} reads every one`;
+  $("sentBar").textContent = "We read every one";
   $("sentLead").innerHTML = payload.contact
-    ? `${esc(CONFIG.OWNER_NAME)} will reach out to you. Need us sooner? Call <a href="tel:${CONFIG.PHONE_TEL}" data-track="phone" style="color:#fff">${CONFIG.PHONE}</a>.`
+    ? `We'll reach out to you. Need us sooner? Call <a href="tel:${CONFIG.PHONE_TEL}" data-track="phone" style="color:#fff">${CONFIG.PHONE}</a>.`
     : `Thanks for telling us straight. Want a call back? Ring us at <a href="tel:${CONFIG.PHONE_TEL}" data-track="phone" style="color:#fff">${CONFIG.PHONE}</a>.`;
   $("ownerForm").reset();
   show("sent");

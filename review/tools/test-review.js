@@ -36,7 +36,7 @@
  *      rules as copied in this file;
  *   H. the files: nothing loaded from anywhere but this site except the one
  *      non-blocking font, the four screens' look and words are the original's
- *      (only Brian, the settings and the tracking changed), the shipping page has
+ *      (only the settings and the tracking changed), the shipping page has
  *      its settings empty.
  *
  * NOT proven here: a real phone, real Safari, real Cloudflare. The page was also
@@ -940,15 +940,15 @@ const CASES = [
         const all = JSON.stringify([w.beacons.map((b) => b.raw), w.dataLayer, w.sent('review_end')]);
         t('F6 nothing typed is in any event or in dataLayer; neither is the user agent, the language, the time zone, or where the visit came from',
           SECRETS.filter((s) => all.includes(s)), []);
-        t('F6b the page after sending: "Brian will reach out to you", the phone link, a cleared form, and the review_end says sent and typed',
-          [w.byId('sentLead').innerHTML.includes('Brian will reach out to you.'), w.byId('msg').value, w.byId('name').value, w.sent('review_end')[0].meta.sent, w.sent('review_end')[0].meta.typed, w.sent('review_end')[0].meta.s],
+        t('F6b the page after sending: "We’ll reach out to you", the phone link, a cleared form, and the review_end says sent and typed',
+          [w.byId('sentLead').innerHTML.includes("We'll reach out to you."), w.byId('msg').value, w.byId('name').value, w.sent('review_end')[0].meta.sent, w.sent('review_end')[0].meta.typed, w.sent('review_end')[0].meta.s],
           [true, '', '', 1, 1, 5]);
         const noContact = openPage(text);
         await toOwner(noContact, { message: 'No phone number given' });
         await noContact.submit();
         t('F6c without a phone or email the sent screen offers a call back instead; message_sent says no name, no contact',
           [noContact.byId('sentLead').innerHTML.includes('Want a call back?'), noContact.sent('message_sent')[0].meta, noContact.byId('sentBar').textContent],
-          [true, { r: 2, len: 21, nm: 0, ct: 0 }, 'Brian reads every one']);
+          [true, { r: 2, len: 21, nm: 0, ct: 0 }, 'We read every one']);
       }
       // ---- a message that does not go through
       {
@@ -960,7 +960,7 @@ const CASES = [
           t(`F7 ${label}: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code`,
             [w.screenOn(), w.byId('err').classList.contains('on'), w.byId('err').innerHTML.startsWith("That didn't go through. Check your connection and try again, or call us at"), w.byId('msg').value,
               w.byId('sendBtn').disabled, w.byId('sendBtn').textContent, w.sent('message_failed').map((e) => e.meta), w.sent('message_sent').length],
-            ['owner', true, true, 'SECRET-MESSAGE-WORDS', false, 'Send to Brian', [{ r: 1, err: code }], 0]);
+            ['owner', true, true, 'SECRET-MESSAGE-WORDS', false, 'Leave your feedback!', [{ r: 1, err: code }], 0]);
         }
         const w = openPage(text);
         await toOwner(w, { face: 3, message: 'try again' });
@@ -1035,7 +1035,7 @@ const CASES = [
         await slow.settle();
         t('F8 a Collector that never answers: the button says Sending… and is off, then after 15 s it gives up as a timeout, says it did not go through, and the button is back',
           [during, before, slow.byId('sendBtn').disabled, slow.byId('sendBtn').textContent, slow.sent('message_failed').map((e) => e.meta), slow.screenOn(), slow.byId('err').classList.contains('on')],
-          [[true, 'Sending…'], true, false, 'Send to Brian', [{ r: 2, err: 'timeout' }], 'owner', true]);
+          [[true, 'Sending…'], true, false, 'Leave your feedback!', [{ r: 2, err: 'timeout' }], 'owner', true]);
       }
       // ---- a robot
       {
@@ -1255,8 +1255,8 @@ const CASES = [
         w.face(1);
         const sees = [w.byId('ownerTitle').textContent, w.byId('ownerEmoji').textContent, w.byId('ownerNote').textContent, w.byId('ownerSig').textContent, w.byId('sendBtn').textContent];
         w.byId('ownerForm');
-        t('F24 the unhappy screen says what the original said, with the owner’s name Brian',
-          sees, ["That's not the Steak Out way.", '😡', "Hey, it's Brian, the owner. I'm sorry. That's not how we do things here. Tell me what happened. This comes straight to me, and I'll make it right.", '— Brian', 'Send to Brian']);
+        t('F24 the unhappy screen says what the original said, signed by the Steak Out family',
+          sees, ["That's not the Steak Out way.", '😡', "We're sorry. That's not how we do things here. Tell us what happened and we'll make it right.", '— The Steak Out family', 'Leave your feedback!']);
         w.byId('ownerForm');
         const back = openPage(text);
         back.face(3);
@@ -1435,8 +1435,9 @@ const CASES = [
       // The look of the original page, as the owner made it, after the normalising above and with the approved
       // polish edits (POLISH_EDITS) made to it. If this check goes red and the change was meant, set it to the new
       // value the failure prints. (Before the polish of 2026-10-08 it was 819322f6913991ad9d1c78974483d0b19854f53967fb9c7f6ac4867f555214c2,
-      // the original with nothing changed.)
-      const LOOK_SHA256 = '17f18b1dc1172afe91572c6ed68f18ed5cd285ecf6b7e5fcbb6e4789ab5fcdc0';
+      // the original with nothing changed; before the owner's wording of 2026-10-10, "You're family here" on the
+      // unhappy screen, it was 17f18b1dc1172afe91572c6ed68f18ed5cd285ecf6b7e5fcbb6e4789ab5fcdc0.)
+      const LOOK_SHA256 = '79da1f62e06f44638471347a6b2a21af74760e36a57fec6587d2dbdc1829a5b2';
       const hash = crypto.createHash('sha256').update(newLook).digest('hex');
       t('H7 the four screens look and read as the original did, apart from the approved polish edits: the head, the styles (without the self-hosted font faces and the polish block) and the markup (without the tracking tags and the scripts) hash to the original’s with those edits',
         hash, LOOK_SHA256);
@@ -1445,7 +1446,7 @@ const CASES = [
       if (original) {
         const oldLook = withPolish(look(original, false));
         t('H7b …and set against the original page itself (the file the owner made), word for word, once the approved polish edits are made to it', oldLook === newLook, true);
-        const strings = ['Tell me what happened first.', 'Sending…', 'Glad you loved it', 'Glad you enjoyed it', 'reads every one', 'will reach out to you. Need us sooner? Call', 'Thanks for telling us straight. Want a call back? Ring us at',
+        const strings = ['Tell me what happened first.', 'Sending…', 'Glad you loved it', 'Glad you enjoyed it', 'We read every one', "We'll reach out to you. Need us sooner? Call", 'Thanks for telling us straight. Want a call back? Ring us at',
           "That didn't go through. Check your connection and try again, or call us at", "That's not the Steak Out way.", 'Sorry we fell short.', "Just OK isn't OK with us."];
         const moods = (s) => /const MOODS = \{[\s\S]*?\n\};/.exec(s)[0];
         t('H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text', [strings.filter((s) => !original.includes(s)), strings.filter((s) => !script.includes(s)), moods(original) === moods(script)], [[], [], true]);
@@ -1635,15 +1636,15 @@ const MUTATIONS = [
   mut('page: dataLayer carries where the visit came from', P, 'window.dataLayer.push({ event, ...(shaped ? shaped.meta : {}), source, session });', 'window.dataLayer.push({ event, ...(shaped ? shaped.meta : {}), source, session, from: document.referrer });', 'F6 nothing typed is in any event or in dataLayer; neither is the user agent, the language, the time zone, or where the visit came from'),
   mut('page: dataLayer carries what was typed', P, 'window.dataLayer.push({ event, ...(shaped ? shaped.meta : {}), source, session });', 'window.dataLayer.push({ event, ...(shaped ? shaped.meta : {}), source, session, typed: $("msg").value });', 'F6 nothing typed is in any event or in dataLayer; neither is the user agent, the language, the time zone, or where the visit came from'),
   mut('page: dataLayer carries the language', P, 'window.dataLayer.push({ event, ...(shaped ? shaped.meta : {}), source, session });', 'window.dataLayer.push({ event, ...(shaped ? shaped.meta : {}), source, session, lang: navigator.language });', 'F6 nothing typed is in any event or in dataLayer; neither is the user agent, the language, the time zone, or where the visit came from'),
-  mut('page: the form is not cleared after sending', P, '  $("ownerForm").reset();\n', '', 'F6b the page after sending: "Brian will reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
-  mut('page: the sent screen does not say Brian will reach out', P, '? `${esc(CONFIG.OWNER_NAME)} will reach out to you.', '? `Someone will reach out to you.', 'F6b the page after sending: "Brian will reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
-  mut('page: sending is not marked', P, '  visit.mark("sent");\n', '', 'F6b the page after sending: "Brian will reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
-  mut('page: typing is not marked', P, '  visit.mark("typed");\n', '', 'F6b the page after sending: "Brian will reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
+  mut('page: the form is not cleared after sending', P, '  $("ownerForm").reset();\n', '', 'F6b the page after sending: "We’ll reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
+  mut('page: the sent screen does not say we will reach out', P, "? `We'll reach out to you.", '? `Someone will reach out to you.', 'F6b the page after sending: "We’ll reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
+  mut('page: sending is not marked', P, '  visit.mark("sent");\n', '', 'F6b the page after sending: "We’ll reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
+  mut('page: typing is not marked', P, '  visit.mark("typed");\n', '', 'F6b the page after sending: "We’ll reach out to you", the phone link, a cleared form, and the review_end says sent and typed'),
   mut('page: the sent screen offers a call back to someone who gave a number', P, '$("sentLead").innerHTML = payload.contact\n', '$("sentLead").innerHTML = !payload.contact\n', 'F6c without a phone or email the sent screen offers a call back instead; message_sent says no name, no contact'),
   mut('page: a failure is not reported', P, '      emit("message_failed", { r: rating, err: out.err });\n', '', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: a failure says nothing to the customer', P, '      emit("message_failed", { r: rating, err: out.err });\n      err.innerHTML = failedLine;\n      err.classList.add("on");', '      emit("message_failed", { r: rating, err: out.err });', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: a failure is shown as sent', P, '    if (out.ok) {\n', '    if (true) {\n', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
-  mut('page: the button stays off after a failure', P, '    sending = false;\n    btn.disabled = false;\n    btn.textContent = `Send to ${CONFIG.OWNER_NAME}`;', '    sending = false;\n    btn.textContent = `Send to ${CONFIG.OWNER_NAME}`;', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
+  mut('page: the button stays off after a failure', P, '    sending = false;\n    btn.disabled = false;\n    btn.textContent = "Leave your feedback!";', '    sending = false;\n    btn.textContent = "Leave your feedback!";', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: the error line has no phone', P, 'or call us at <a href="tel:${CONFIG.PHONE_TEL}" data-track="phone">${CONFIG.PHONE}</a>.`;\nconst tooLongLine', 'or call us.`;\nconst tooLongLine', 'F7 a 400: the page says it did not go through (with the phone to call), shows no "sent", keeps what was typed, and reports only the short code'),
   mut('page: after one send the page cannot send again', P, '    sending = false;\n    btn.disabled = false;', '    btn.disabled = false;', 'F7b after a failure the same message can be sent again, and then it is sent: one failure, one success, the error line goes away'),
   mut('core: no answer is waited for for ever', C, 'return await Promise.race([attempt, clock]);', 'return await attempt;', 'F8 a Collector that never answers: the button says Sending… and is off, then after 15 s it gives up as a timeout, says it did not go through, and the button is back', [{ file: C, from: '          try { controller.abort(); } catch (error) { /* already finished */ }', to: '' }]),
@@ -1693,9 +1694,9 @@ const MUTATIONS = [
   mut('page: a page without its rules does not say so', P, 'const collector = core ? core.normalizeCollectorBase(CONFIG.COLLECTOR_URL) : "";', 'const collector = core ? core.normalizeCollectorBase(CONFIG.COLLECTOR_URL) : CONFIG.COLLECTOR_URL;', 'F22 if review-core.js does not load the page still works: it can be rated and the screens change; nothing is reported; and a message is not pretended sent'),
   mut('page: a page without its rules takes a message', P, ': { ok: false, reason: "unavailable" };', ': { ok: true, body: "{}" };', 'F22b …and then a message says it did not go through and the phone to call, rather than "sent"'),
   mut('page: a beacon that throws breaks the page', P, '  try { shaped = send ? send(event, detail) : null; } catch (e) { /* measurement never breaks the page */ }', '  shaped = send ? send(event, detail) : null;', 'F23 a beacon that throws never breaks the page: the screens still change and the taps still work', [{ file: C, from: "      } catch (error) {\n        /* measurement never breaks the experience */\n      }", to: "      } catch (error) {\n        throw error;\n      }" }]),
-  mut('page: the owner is not Brian', P, 'OWNER_NAME: "Brian",', 'OWNER_NAME: "Brain",', 'F24 the unhappy screen says what the original said, with the owner’s name Brian'),
-  mut('page: the signature is changed', P, '$("ownerSig").textContent = `— ${CONFIG.OWNER_NAME}`;', '$("ownerSig").textContent = `- ${CONFIG.OWNER_NAME}`;', 'F24 the unhappy screen says what the original said, with the owner’s name Brian'),
-  mut('page: the first sentence is changed', P, 'title: "That\'s not the Steak Out way.",', 'title: "That is not the Steak Out way.",', 'F24 the unhappy screen says what the original said, with the owner’s name Brian'),
+  mut('page: the owner is not Brian', P, 'OWNER_NAME: "Brian",', 'OWNER_NAME: "Brain",', 'H3 the shipping page sends to the live Collector and no other, its Google link is Steak Out Sewell’s write-a-review address, and the owner is Brian'),
+  mut('page: the signature is changed', P, '$("ownerSig").textContent = "— The Steak Out family";', '$("ownerSig").textContent = "- The Steak Out family";', 'F24 the unhappy screen says what the original said, signed by the Steak Out family'),
+  mut('page: the first sentence is changed', P, 'title: "That\'s not the Steak Out way.",', 'title: "That is not the Steak Out way.",', 'F24 the unhappy screen says what the original said, signed by the Steak Out family'),
   mut('page: changing the answer is not reported', P, '  emit("answer_changed", { from: rating, scr: visit.current() });\n', '', 'F25 "Change my answer" is answer_changed (from the face, on which screen), then the first screen again, with the footer link hidden'),
   mut('page: changing the answer says the wrong screen', P, 'emit("answer_changed", { from: rating, scr: visit.current() });', 'emit("answer_changed", { from: rating, scr: "rate" });', 'F25 "Change my answer" is answer_changed (from the face, on which screen), then the first screen again, with the footer link hidden'),
   mut('page: a second face does not say the first', P, '  const before = visit.rated(rating);', '  visit.rated(rating);\n  const before = 0;', 'F25b the second tap says which face came before'),
@@ -1736,7 +1737,7 @@ const MUTATIONS = [
   mut('index: the look changes (a colour)', P, '--red: #ba202a;', '--red: #ca202a;', 'H7 the four screens look and read as the original did, apart from the approved polish edits: the head, the styles (without the self-hosted font faces and the polish block) and the markup (without the tracking tags and the scripts) hash to the original’s with those edits'),
   mut('index: a word changes', P, '<span class="bar">Tap one</span>', '<span class="bar">Tap a face</span>', 'H7 the four screens look and read as the original did, apart from the approved polish edits: the head, the styles (without the self-hosted font faces and the polish block) and the markup (without the tracking tags and the scripts) hash to the original’s with those edits'),
   mut('index: a sentence in the script changes', P, '"Tell me what happened first."', '"Please say what happened."', 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
-  mut('index: an owner note changes', P, "Tell me what happened. This comes straight to me, and I'll make it right.", "Tell me what happened. It comes straight to me, and I'll make it right.", 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
+  mut('index: an owner note changes', P, "Tell us what happened and we'll make it right.", "Tell us what happened and we will make it right.", 'H7c the words in the script are the original’s: the same sentences are in both, and the three owner notes are the same text'),
   // ---- a message sent again is one message (2026-10-08, after the review)
   mut('core: message_id is never sent', C, "    if (hasId) fields.message_id = messageId;\n", '', E9),
   mut('core: a message_id the Collector would refuse is sent', C, "    if (hasId && (typeof messageId !== 'string' || !MESSAGE_ID_RE.test(messageId))) return { ok: false, reason: 'message_id' };\n", '', E9),

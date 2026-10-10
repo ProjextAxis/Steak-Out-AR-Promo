@@ -146,7 +146,7 @@ four screens, their look and their words are the original's. Only the owner's na
 
 | Setting | What it is | Now |
 |---|---|---|
-| `OWNER_NAME` | In the personal note and on the Send button | `Brian` |
+| `OWNER_NAME` | Not shown to guests since 2026-10-10: the note is signed “— The Steak Out family” and the button says “Leave your feedback!” | `Brian` |
 | `GOOGLE_REVIEW_URL` | Google Business Profile, then "Ask for reviews", then copy the link (`https://g.page/r/XXXX/review`) | empty: waiting for the link |
 | `COLLECTOR_URL` | The Collector's address, the same Worker the AR page reports to, but **without** `/collect` (`https://steakout-ar-collector.YOUR-SUBDOMAIN.workers.dev`) | empty: nothing leaves the phone |
 
